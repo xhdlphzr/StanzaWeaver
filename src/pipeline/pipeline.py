@@ -1,19 +1,6 @@
 # Copyright (C) 2026 xhdlphzr
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
+
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
@@ -47,7 +34,9 @@ class PipelineState:
 
 
 class PoetryPipeline:
-    def __init__(self, writer_config: dict | None = None, checker_config: dict | None = None):
+    def __init__(
+        self, writer_config: dict | None = None, checker_config: dict | None = None
+    ):
         config = get_config()
         self.writer_config = writer_config or config.writer
         self.checker_config = checker_config or config.checker
@@ -69,20 +58,22 @@ class PoetryPipeline:
 
     def _report(self, state: PipelineState):
         if self._on_progress:
-            self._on_progress({
-                "step": state.current_step,
-                "description": state.description,
-                "draft": state.draft,
-                "refine_rounds": state.refine_rounds,
-                "checker_pass": state.checker_pass,
-                "checker_suggestions": state.checker_suggestions,
-                "step_details": state.step_details,
-                "last_tool": state.last_tool,
-                "last_tool_result": state.last_tool_result,
-                "stream_text": state.stream_text,
-                "current_detail_step": state.current_detail_step,
-                "current_detail": state.current_detail,
-            })
+            self._on_progress(
+                {
+                    "step": state.current_step,
+                    "description": state.description,
+                    "draft": state.draft,
+                    "refine_rounds": state.refine_rounds,
+                    "checker_pass": state.checker_pass,
+                    "checker_suggestions": state.checker_suggestions,
+                    "step_details": state.step_details,
+                    "last_tool": state.last_tool,
+                    "last_tool_result": state.last_tool_result,
+                    "stream_text": state.stream_text,
+                    "current_detail_step": state.current_detail_step,
+                    "current_detail": state.current_detail,
+                }
+            )
 
     def run(
         self,
@@ -103,7 +94,9 @@ class PoetryPipeline:
             return state
 
         template_dict = self._load_template(template_key)
-        state = PipelineState(topic=topic, template_key=template_key, template=template_dict)
+        state = PipelineState(
+            topic=topic, template_key=template_key, template=template_dict
+        )
         self._run_step1(state)
         self._run_step2(state)
         self._run_refine_loop(state)
@@ -121,15 +114,19 @@ class PoetryPipeline:
             state.current_detail = text
             self._report(state)
 
-        description, detail = self.writer.generate_description(state.topic, on_stream=on_stream)
+        description, detail = self.writer.generate_description(
+            state.topic, on_stream=on_stream
+        )
         state.description = description
         state.stream_text = ""
         state.current_detail = ""
-        state.step_details.append({
-            "step": "step1_description",
-            "title": "Step 1: 生成现代文描述",
-            "content": detail,
-        })
+        state.step_details.append(
+            {
+                "step": "step1_description",
+                "title": "Step 1: 生成现代文描述",
+                "content": detail,
+            }
+        )
         self._report(state)
 
     def _run_step2(self, state: PipelineState):
@@ -149,11 +146,13 @@ class PoetryPipeline:
         )
         state.draft = draft
         state.stream_text = ""
-        state.step_details.append({
-            "step": "step2_draft",
-            "title": "Step 2: 生成初稿",
-            "content": detail,
-        })
+        state.step_details.append(
+            {
+                "step": "step2_draft",
+                "title": "Step 2: 生成初稿",
+                "content": detail,
+            }
+        )
         self._report(state)
 
     def _run_refine_loop(self, state: PipelineState):
@@ -167,7 +166,9 @@ class PoetryPipeline:
             def on_step(step_info: dict):
                 state.draft = step_info["poem"]
                 state.last_tool = step_info["last_tool"]
-                state.last_tool_result = json_dumps_safe(step_info.get("last_result", ""))
+                state.last_tool_result = json_dumps_safe(
+                    step_info.get("last_result", "")
+                )
                 state.current_detail_step = "step3_refine"
                 state.current_detail = step_info.get("detail", "")
                 self._report(state)
@@ -183,13 +184,17 @@ class PoetryPipeline:
 
             state.draft = poem
             state.refine_history = history
-            state.refine_rounds += len([h for h in history if h.get("tool") not in ("submit",)])
-            state.step_details.append({
-                "step": "step3_refine",
-                "title": "Step 3: 炼句优化",
-                "content": detail,
-                "rounds": state.refine_rounds,
-            })
+            state.refine_rounds += len(
+                [h for h in history if h.get("tool") not in ("submit",)]
+            )
+            state.step_details.append(
+                {
+                    "step": "step3_refine",
+                    "title": "Step 3: 炼句优化",
+                    "content": detail,
+                    "rounds": state.refine_rounds,
+                }
+            )
 
             if not submitted:
                 state.checker_pass = False
@@ -212,11 +217,13 @@ class PoetryPipeline:
                 state.checker_pass = False
                 state.checker_suggestions = f"检查AI异常: {e}"
 
-            state.step_details.append({
-                "step": "step4_check",
-                "title": "Step 4: 检查AI终审",
-                "content": f"pass={state.checker_pass}\n{state.checker_suggestions}",
-            })
+            state.step_details.append(
+                {
+                    "step": "step4_check",
+                    "title": "Step 4: 检查AI终审",
+                    "content": f"pass={state.checker_pass}\n{state.checker_suggestions}",
+                }
+            )
             self._report(state)
 
             if state.checker_pass:
@@ -246,6 +253,7 @@ class PoetryPipeline:
 
 def json_dumps_safe(obj, default=""):
     import json
+
     try:
         return json.dumps(obj, ensure_ascii=False)
     except Exception:

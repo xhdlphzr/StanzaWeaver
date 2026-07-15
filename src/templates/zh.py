@@ -1,19 +1,6 @@
 # Copyright (C) 2026 xhdlphzr
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
+
 from . import PoetryTemplate, register
 from ..models.syllable import Syllable
 
@@ -57,7 +44,7 @@ def _check_guping(syllables: list[Syllable]) -> list[str]:
         if prev == "仄" and curr == "平" and nxt == "仄":
             if i == n - 2:
                 continue
-            errors.append(f"孤平: 第{i+1}字为孤立的平声（前后皆为仄声）")
+            errors.append(f"孤平: 第{i + 1}字为孤立的平声（前后皆为仄声）")
     return errors
 
 
@@ -69,11 +56,17 @@ def _check_alternation(syllables: list[Syllable], even_pattern: list[str]) -> li
         if actual_pos < n:
             actual_tone = syllables[actual_pos].attributes.get("tone", "")
             if actual_tone and actual_tone != expected:
-                errors.append(f"第{actual_pos+1}字应为{expected}声（二四六分明），实际为{actual_tone}")
+                errors.append(
+                    f"第{actual_pos + 1}字应为{expected}声（二四六分明），实际为{actual_tone}"
+                )
     return errors
 
 
-def _check_rhyme(syllables_list: list[list[Syllable]], rhyme_lines: list[int], description: str = "押韵") -> list[str]:
+def _check_rhyme(
+    syllables_list: list[list[Syllable]],
+    rhyme_lines: list[int],
+    description: str = "押韵",
+) -> list[str]:
     """Check that specified lines share the same rhyme (nucleus + coda of last syllable)."""
     errors = []
     rhyme_keys = []
@@ -89,18 +82,22 @@ def _check_rhyme(syllables_list: list[list[Syllable]], rhyme_lines: list[int], d
     for line_idx, rhyme in rhyme_keys[1:]:
         if rhyme and rhyme != base_rhyme:
             errors.append(
-                f"{description}: 第{base_idx+1}行韵脚为'{base_rhyme}'，第{line_idx+1}行韵脚为'{rhyme}'，不押韵"
+                f"{description}: 第{base_idx + 1}行韵脚为'{base_rhyme}'，第{line_idx + 1}行韵脚为'{rhyme}'，不押韵"
             )
     return errors
 
 
-def _check_lv_alternation(syllables: list[Syllable], line_idx: int, constraints: list[list[dict]]) -> list[str]:
+def _check_lv_alternation(
+    syllables: list[Syllable], line_idx: int, constraints: list[list[dict]]
+) -> list[str]:
     errors = []
     if line_idx < len(constraints) and len(syllables) >= 3:
         even_pattern = []
         for pos in range(1, len(syllables), 2):
             if pos < len(constraints[line_idx]):
-                expected = constraints[line_idx][pos].get("attributes", {}).get("tone", "")
+                expected = (
+                    constraints[line_idx][pos].get("attributes", {}).get("tone", "")
+                )
                 if expected:
                     even_pattern.append(expected)
         if even_pattern:
