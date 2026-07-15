@@ -1,19 +1,5 @@
 # Copyright (C) 2026 xhdlphzr
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
 
 import re
 import urllib.request
@@ -53,19 +39,26 @@ def _download_cedict() -> Path | None:
         try:
             is_gz = url.endswith(".gz")
             is_zip = url.endswith(".zip")
-            dl_path = _DATA_DIR / ("cedict_tmp" + (".gz" if is_gz else ".zip" if is_zip else ""))
+            dl_path = _DATA_DIR / (
+                "cedict_tmp" + (".gz" if is_gz else ".zip" if is_zip else "")
+            )
 
             _download_file(url, dl_path)
 
             if is_gz:
                 import gzip
+
                 with gzip.open(dl_path, "rb") as gz, open(raw_path, "wb") as out:
                     out.write(gz.read())
             elif is_zip:
                 import zipfile
+
                 with zipfile.ZipFile(dl_path, "r") as zf:
                     names = zf.namelist()
-                    txt_name = next((n for n in names if n.endswith(".txt") or n.endswith(".u8")), names[0])
+                    txt_name = next(
+                        (n for n in names if n.endswith(".txt") or n.endswith(".u8")),
+                        names[0],
+                    )
                     with zf.open(txt_name) as zf_in, open(raw_path, "wb") as out:
                         out.write(zf_in.read())
             dl_path.unlink(missing_ok=True)
@@ -122,31 +115,76 @@ def _parse_cedict_line(line: str) -> Word | None:
 
 def _parse_pinyin_syllables(syllables_raw: list[str]) -> list[Syllable]:
     tone_map = {
-        "1": "平", "2": "平", "3": "仄", "4": "仄", "5": "",
+        "1": "平",
+        "2": "平",
+        "3": "仄",
+        "4": "仄",
+        "5": "",
     }
 
     _FINAL_PARTS = {
-        "a": ("a", ""), "o": ("o", ""), "e": ("e", ""),
-        "i": ("i", ""), "u": ("u", ""), "v": ("v", ""),
+        "a": ("a", ""),
+        "o": ("o", ""),
+        "e": ("e", ""),
+        "i": ("i", ""),
+        "u": ("u", ""),
+        "v": ("v", ""),
         "er": ("er", ""),
-        "ai": ("ai", ""), "ei": ("ei", ""), "ao": ("ao", ""), "ou": ("ou", ""),
-        "iu": ("iu", ""), "ui": ("ui", ""),
-        "an": ("a", "n"), "en": ("e", "n"), "in": ("i", "n"),
-        "un": ("u", "n"), "vn": ("v", "n"),
-        "ang": ("a", "ng"), "eng": ("e", "ng"), "ing": ("i", "ng"), "ong": ("o", "ng"),
-        "ia": ("ia", ""), "ie": ("ie", ""), "ua": ("ua", ""), "uo": ("uo", ""),
+        "ai": ("ai", ""),
+        "ei": ("ei", ""),
+        "ao": ("ao", ""),
+        "ou": ("ou", ""),
+        "iu": ("iu", ""),
+        "ui": ("ui", ""),
+        "an": ("a", "n"),
+        "en": ("e", "n"),
+        "in": ("i", "n"),
+        "un": ("u", "n"),
+        "vn": ("v", "n"),
+        "ang": ("a", "ng"),
+        "eng": ("e", "ng"),
+        "ing": ("i", "ng"),
+        "ong": ("o", "ng"),
+        "ia": ("ia", ""),
+        "ie": ("ie", ""),
+        "ua": ("ua", ""),
+        "uo": ("uo", ""),
         "ve": ("ve", ""),
-        "iao": ("iao", ""), "uai": ("uai", ""),
-        "ian": ("ia", "n"), "uan": ("ua", "n"), "van": ("va", "n"),
-        "iang": ("ia", "ng"), "uang": ("ua", "ng"),
-        "iong": ("io", "ng"), "ueng": ("ue", "ng"),
+        "iao": ("iao", ""),
+        "uai": ("uai", ""),
+        "ian": ("ia", "n"),
+        "uan": ("ua", "n"),
+        "van": ("va", "n"),
+        "iang": ("ia", "ng"),
+        "uang": ("ua", "ng"),
+        "iong": ("io", "ng"),
+        "ueng": ("ue", "ng"),
     }
 
     _INITIALS = {
-        "b", "p", "m", "f", "d", "t", "n", "l",
-        "g", "k", "h", "j", "q", "x",
-        "zh", "ch", "sh", "r", "z", "c", "s",
-        "y", "w",
+        "b",
+        "p",
+        "m",
+        "f",
+        "d",
+        "t",
+        "n",
+        "l",
+        "g",
+        "k",
+        "h",
+        "j",
+        "q",
+        "x",
+        "zh",
+        "ch",
+        "sh",
+        "r",
+        "z",
+        "c",
+        "s",
+        "y",
+        "w",
     }
 
     results = []
@@ -164,7 +202,7 @@ def _parse_pinyin_syllables(syllables_raw: list[str]) -> list[Syllable]:
         for init in sorted(_INITIALS, key=len, reverse=True):
             if base.startswith(init) and base != init:
                 onset = init
-                final_part = base[len(init):]
+                final_part = base[len(init) :]
                 break
 
         if final_part and final_part[0] in {"y", "w"} and not onset:
@@ -174,12 +212,18 @@ def _parse_pinyin_syllables(syllables_raw: list[str]) -> list[Syllable]:
         if not nucleus and final_part:
             nucleus = final_part
 
-        results.append(Syllable(
-            onset=onset,
-            nucleus=nucleus,
-            coda=coda,
-            attributes={"tone": tone_map.get(tone_num, ""), "stress": "", "length": ""},
-        ))
+        results.append(
+            Syllable(
+                onset=onset,
+                nucleus=nucleus,
+                coda=coda,
+                attributes={
+                    "tone": tone_map.get(tone_num, ""),
+                    "stress": "",
+                    "length": "",
+                },
+            )
+        )
     return results
 
 
@@ -212,6 +256,7 @@ def import_english():
         return
     try:
         import nltk
+
         nltk.data.find("corpora/cmudict.zip")
     except LookupError:
         nltk.download("cmudict", quiet=True)
@@ -227,13 +272,15 @@ def import_english():
         if not syllables:
             continue
 
-        batch.append(Word(
-            text=word.upper(),
-            language="en",
-            syllables=syllables,
-            pos="",
-            meaning="",
-        ))
+        batch.append(
+            Word(
+                text=word.upper(),
+                language="en",
+                syllables=syllables,
+                pos="",
+                meaning="",
+            )
+        )
         if len(batch) >= 500:
             insert_words(batch)
             batch.clear()
@@ -242,11 +289,25 @@ def import_english():
 
 
 _VOWEL_PHONEMES = {
-    "AA", "AE", "AH", "AO", "AW", "AX", "AXR", "AY",
-    "EH", "ER", "EY",
-    "IH", "IX", "IY",
-    "OW", "OY",
-    "UH", "UW", "UX",
+    "AA",
+    "AE",
+    "AH",
+    "AO",
+    "AW",
+    "AX",
+    "AXR",
+    "AY",
+    "EH",
+    "ER",
+    "EY",
+    "IH",
+    "IX",
+    "IY",
+    "OW",
+    "OY",
+    "UH",
+    "UW",
+    "UX",
 }
 _STRESS_MAP = {"0": "", "1": "heavy", "2": "light"}
 
@@ -265,12 +326,14 @@ def _parse_arpabet(phones: list[str]) -> list[Syllable]:
 
         if clean in _VOWEL_PHONEMES:
             if current_nucleus:
-                syllables.append(Syllable(
-                    onset="".join(current_onset),
-                    nucleus=current_nucleus,
-                    coda="".join(current_coda),
-                    attributes={"tone": "", "stress": current_stress, "length": ""},
-                ))
+                syllables.append(
+                    Syllable(
+                        onset="".join(current_onset),
+                        nucleus=current_nucleus,
+                        coda="".join(current_coda),
+                        attributes={"tone": "", "stress": current_stress, "length": ""},
+                    )
+                )
                 current_onset = []
                 current_coda = []
             current_nucleus = clean
@@ -282,12 +345,14 @@ def _parse_arpabet(phones: list[str]) -> list[Syllable]:
                 current_onset.append(clean)
 
     if current_nucleus:
-        syllables.append(Syllable(
-            onset="".join(current_onset),
-            nucleus=current_nucleus,
-            coda="".join(current_coda),
-            attributes={"tone": "", "stress": current_stress, "length": ""},
-        ))
+        syllables.append(
+            Syllable(
+                onset="".join(current_onset),
+                nucleus=current_nucleus,
+                coda="".join(current_coda),
+                attributes={"tone": "", "stress": current_stress, "length": ""},
+            )
+        )
     return syllables
 
 

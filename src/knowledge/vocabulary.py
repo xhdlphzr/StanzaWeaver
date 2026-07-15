@@ -1,19 +1,5 @@
 # Copyright (C) 2026 xhdlphzr
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
 
 import sqlite3
 from pathlib import Path
@@ -74,7 +60,19 @@ def insert_word(word: Word):
     conn.execute(
         """INSERT INTO words (text, language, pos, meaning, onset, nucleus, coda, tone, stress, length, syllable_count)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (word.text, word.language, word.pos, word.meaning, onset, nucleus, coda, tone, stress, length, syl_count),
+        (
+            word.text,
+            word.language,
+            word.pos,
+            word.meaning,
+            onset,
+            nucleus,
+            coda,
+            tone,
+            stress,
+            length,
+            syl_count,
+        ),
     )
     conn.commit()
     conn.close()
@@ -97,7 +95,21 @@ def insert_words(words: list[Word]):
         else:
             onset = nucleus = coda = tone = stress = length = ""
             syl_count = 0
-        rows.append((word.text, word.language, word.pos, word.meaning, onset, nucleus, coda, tone, stress, length, syl_count))
+        rows.append(
+            (
+                word.text,
+                word.language,
+                word.pos,
+                word.meaning,
+                onset,
+                nucleus,
+                coda,
+                tone,
+                stress,
+                length,
+                syl_count,
+            )
+        )
 
     conn.executemany(
         """INSERT INTO words (text, language, pos, meaning, onset, nucleus, coda, tone, stress, length, syllable_count)
@@ -178,20 +190,24 @@ def search_words(
             attributes={"tone": ton, "stress": stre, "length": leng},
         )
         syllables = [syl] * sc
-        results.append({
-            "text": text,
-            "language": lang,
-            "pos": p,
-            "meaning": m,
-            "syllables": [s.to_dict() for s in syllables],
-        })
+        results.append(
+            {
+                "text": text,
+                "language": lang,
+                "pos": p,
+                "meaning": m,
+                "syllables": [s.to_dict() for s in syllables],
+            }
+        )
     return results
 
 
 def word_count(language: str = "") -> int:
     conn = _get_conn()
     if language:
-        count = conn.execute("SELECT COUNT(*) FROM words WHERE language = ?", (language,)).fetchone()[0]
+        count = conn.execute(
+            "SELECT COUNT(*) FROM words WHERE language = ?", (language,)
+        ).fetchone()[0]
     else:
         count = conn.execute("SELECT COUNT(*) FROM words").fetchone()[0]
     conn.close()

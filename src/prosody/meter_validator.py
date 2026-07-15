@@ -1,19 +1,5 @@
 # Copyright (C) 2026 xhdlphzr
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
 
 from dataclasses import dataclass, field
 
@@ -58,7 +44,7 @@ class MeterValidator:
 
             if actual_count != expected_count:
                 result.add_error(
-                    f"第{i+1}行音节数不匹配: 期望 {expected_count}, 实际 {actual_count}"
+                    f"第{i + 1}行音节数不匹配: 期望 {expected_count}, 实际 {actual_count}"
                 )
 
         if constraints:
@@ -74,12 +60,12 @@ class MeterValidator:
                         constraint_desc = self._describe_constraint(line_constraints[j])
                         actual_desc = self._describe_syllable(syllables[j])
                         result.add_error(
-                            f"第{i+1}行第{j+1}音节不匹配: 要求{constraint_desc}, 实际{actual_desc}"
+                            f"第{i + 1}行第{j + 1}音节不匹配: 要求{constraint_desc}, 实际{actual_desc}"
                         )
 
-        if template_obj is not None and hasattr(template_obj, 'validate_full'):
+        if template_obj is not None and hasattr(template_obj, "validate_full"):
             if not all_syllables:
-                for line in poem[:len(syllables_expected)]:
+                for line in poem[: len(syllables_expected)]:
                     all_syllables.append(analyze_line(line, language))
             full_errors = template_obj.validate_full(poem, all_syllables)
             for err in full_errors:
@@ -111,7 +97,7 @@ class MeterValidator:
 
             if actual_count != expected_count:
                 result.add_error(
-                    f"第{i+1}行音节数不匹配: 期望 {expected_count}, 实际 {actual_count}"
+                    f"第{i + 1}行音节数不匹配: 期望 {expected_count}, 实际 {actual_count}"
                 )
 
         return result
@@ -145,7 +131,7 @@ class MeterValidator:
                     constraint_desc = self._describe_constraint(line_constraints[j])
                     actual_desc = self._describe_syllable(syllables[j])
                     result.add_error(
-                        f"第{j+1}音节: 要求{constraint_desc}, 实际{actual_desc}"
+                        f"第{j + 1}音节: 要求{constraint_desc}, 实际{actual_desc}"
                     )
 
         return result

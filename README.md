@@ -1,3 +1,8 @@
+<!--
+Copyright (C) 2026 xhdlphzr
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # StanzaWeaver
 
 神经符号智能诗歌生成桌面软件

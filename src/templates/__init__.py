@@ -1,19 +1,6 @@
 # Copyright (C) 2026 xhdlphzr
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
+
 from abc import ABC, abstractmethod
 from ..models.syllable import Syllable
 
@@ -27,7 +14,9 @@ class PoetryTemplate(ABC):
     def get_syllable_constraints(self) -> list[list[dict]] | None:
         return None
 
-    def validate_full(self, poem: list[str], syllables: list[list[Syllable]]) -> list[str]:
+    def validate_full(
+        self, poem: list[str], syllables: list[list[Syllable]]
+    ) -> list[str]:
         return []
 
     def to_dict(self) -> dict:
@@ -44,18 +33,22 @@ class PoetryTemplate(ABC):
         lines_desc = f"共 {self.lines} 行"
         for i, cnt in enumerate(self.syllables_per_line):
             constraints = self.get_syllable_constraints()
-            line_info = f"  第{i+1}行: {cnt}音节"
+            line_info = f"  第{i + 1}行: {cnt}音节"
             if constraints and i < len(constraints):
                 parts = []
                 for j, c in enumerate(constraints[i]):
                     desc_parts = []
-                    if c.get("onset"): desc_parts.append(f"声母={c['onset']}")
-                    if c.get("nucleus"): desc_parts.append(f"韵母={c['nucleus']}")
-                    if c.get("coda"): desc_parts.append(f"韵尾={c['coda']}")
+                    if c.get("onset"):
+                        desc_parts.append(f"声母={c['onset']}")
+                    if c.get("nucleus"):
+                        desc_parts.append(f"韵母={c['nucleus']}")
+                    if c.get("coda"):
+                        desc_parts.append(f"韵尾={c['coda']}")
                     for k, v in c.get("attributes", {}).items():
-                        if v: desc_parts.append(f"{k}={v}")
+                        if v:
+                            desc_parts.append(f"{k}={v}")
                     if desc_parts:
-                        parts.append(f"    第{j+1}位: {','.join(desc_parts)}")
+                        parts.append(f"    第{j + 1}位: {','.join(desc_parts)}")
                 if parts:
                     line_info += "\n" + "\n".join(parts)
             lines_desc += "\n" + line_info
