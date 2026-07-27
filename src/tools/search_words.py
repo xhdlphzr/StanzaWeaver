@@ -1,7 +1,6 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-import json
 from ..knowledge.vocabulary import search_words as db_search
 
 

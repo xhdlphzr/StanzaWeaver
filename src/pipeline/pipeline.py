@@ -185,7 +185,7 @@ class PoetryPipeline:
             state.draft = poem
             state.refine_history = history
             state.refine_rounds += len(
-                [h for h in history if h.get("tool") not in ("submit",)]
+                [h for h in history if h.get("tool") in ("refine_line", "rewrite")]
             )
             state.step_details.append(
                 {

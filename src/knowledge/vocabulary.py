@@ -7,7 +7,6 @@ from typing import Optional
 
 from ..models.word import Word
 from ..models.syllable import Syllable
-from ..prosody.syllable_counter import analyze_line
 
 
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
