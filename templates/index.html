@@ -122,7 +122,7 @@ function loadTemplates() {
             templates.forEach(t => {
                 const opt = document.createElement('option');
                 opt.value = t.key;
-                opt.textContent = t.name;
+                opt.textContent = t.display_name || t.name;
                 select.appendChild(opt);
             });
         });
