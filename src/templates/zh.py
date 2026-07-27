@@ -218,11 +218,15 @@ class XiangjianhuanTemplate(PoetryTemplate):
     lines = 7
     syllables_per_line = [6, 3, 9, 3, 3, 3, 9]
 
+    def get_syllable_constraints(self):
+        return None
+
     def validate_full(self, poem, syllables):
         errors = []
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
         errors.extend(_check_rhyme(syllables, [0, 1, 2, 6], "押韵(平韵)"))
+        errors.extend(_check_rhyme(syllables, [3, 4], "押韵(仄韵·换韵)"))
         return errors
 
 

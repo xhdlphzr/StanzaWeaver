@@ -1,6 +1,8 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
+import json
+
 from openai import OpenAI
 
 
@@ -33,8 +35,6 @@ class LLMClient:
             result["reasoning_content"] = reasoning
 
         if msg.tool_calls:
-            import json
-
             for tc in msg.tool_calls:
                 try:
                     args = json.loads(tc.function.arguments)
@@ -84,7 +84,7 @@ class LLMClient:
                     "type": "function",
                     "function": {
                         "name": tc["name"],
-                        "arguments": __import__("json").dumps(
+                        "arguments": json.dumps(
                             tc["arguments"], ensure_ascii=False
                         ),
                     },
