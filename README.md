@@ -1,6 +1,6 @@
 <!--
-Copyright (C) 2026 xhdlphzr
-SPDX-License-Identifier: AGPL-3.0-or-later
+Copyright (c) 2026 xhdlphzr
+SPDX-License-Identifier: MIT
 -->
 
 # StanzaWeaver
@@ -118,7 +118,7 @@ UI 齿轮按钮中直接编辑保存，或手动编辑 `~/.stanza_weaver/config.
 
 ## 许可证
 
-Copyright (C) 2026 xhdlphzr
+Copyright (c) 2026 xhdlphzr
 
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later).
 
