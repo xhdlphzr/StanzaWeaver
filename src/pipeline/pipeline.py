@@ -172,6 +172,11 @@ class PoetryPipeline:
                 )
                 state.current_detail_step = "step3_refine"
                 state.current_detail = step_info.get("detail", "")
+                state.stream_text = step_info.get("stream_text", state.stream_text)
+                self._report(state)
+
+            def on_stream(text: str):
+                state.stream_text = text
                 self._report(state)
 
             poem, submitted, history, detail = self.writer.refine(
@@ -181,6 +186,7 @@ class PoetryPipeline:
                 template_obj=self._template_obj,
                 feedback=checker_feedback,
                 on_step=on_step,
+                on_stream=on_stream,
             )
 
             state.draft = poem
@@ -204,6 +210,7 @@ class PoetryPipeline:
                 break
 
             state.current_step = "step4_check"
+            state.stream_text = ""
             self._report(state)
 
             try:
