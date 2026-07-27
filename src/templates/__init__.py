@@ -70,5 +70,18 @@ def list_all() -> list[PoetryTemplate]:
     return list(_registry.values())
 
 
+_LANGUAGE_LABELS: dict[str, str] = {
+    "zh": "汉语",
+    "en": "英语",
+}
+
+
 def list_dicts() -> list[dict]:
-    return [{"key": k, **t.to_dict()} for k, t in _registry.items()]
+    return [
+        {
+            "key": k,
+            **t.to_dict(),
+            "display_name": f"{t.name}（{_LANGUAGE_LABELS.get(t.language, t.language)}）",
+        }
+        for k, t in _registry.items()
+    ]
