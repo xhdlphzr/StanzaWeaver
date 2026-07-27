@@ -23,7 +23,7 @@ _h = _make_syl(attributes={"stress": "heavy"})
 
 
 class SonnetTemplate(PoetryTemplate):
-    name = "Sonnet (Shakespearean)"
+    name = "十四行诗"
     language = "en"
     lines = 14
     syllables_per_line = [10] * 14
@@ -66,25 +66,8 @@ class SonnetTemplate(PoetryTemplate):
         return errors
 
 
-class HaikuTemplate(PoetryTemplate):
-    name = "Haiku"
-    language = "en"
-    lines = 3
-    syllables_per_line = [5, 7, 5]
 
-    def validate_full(self, poem, syllables):
-        errors = []
-        for i, syls in enumerate(syllables):
-            expected = (
-                self.syllables_per_line[i] if i < len(self.syllables_per_line) else 0
-            )
-            if len(syls) != expected:
-                errors.append(
-                    f"第{i + 1}行音节数不匹配: 期望 {expected}, 实际 {len(syls)}"
-                )
-        return errors
 
 
 def register_english_templates():
     register("en_sonnet", SonnetTemplate())
-    register("en_haiku", HaikuTemplate())

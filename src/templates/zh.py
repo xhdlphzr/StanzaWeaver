@@ -212,17 +212,17 @@ class QilvTemplate(PoetryTemplate):
         return errors
 
 
-class RumenglingTemplate(PoetryTemplate):
-    name = "如梦令"
+class XiangjianhuanTemplate(PoetryTemplate):
+    name = "相见欢"
     language = "zh"
-    lines = 6
-    syllables_per_line = [5, 6, 5, 6, 2, 6]
+    lines = 7
+    syllables_per_line = [6, 3, 9, 3, 3, 3, 9]
 
     def validate_full(self, poem, syllables):
         errors = []
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
-        errors.extend(_check_rhyme(syllables, [1, 3, 5], "押韵"))
+        errors.extend(_check_rhyme(syllables, [0, 1, 2, 6], "押韵(平韵)"))
         return errors
 
 
@@ -231,4 +231,4 @@ def register_chinese_templates():
     register("zh_qijue", QijueTemplate())
     register("zh_wulv", WulvTemplate())
     register("zh_qilv", QilvTemplate())
-    register("zh_rumengling", RumenglingTemplate())
+    register("zh_xiangjianhuan", XiangjianhuanTemplate())
