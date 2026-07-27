@@ -1,509 +1,424 @@
-<!--
-Copyright (c) 2026 xhdlphzr
-SPDX-License-Identifier: MIT
--->
-
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>StanzaWeaver</title>
-    <link rel="stylesheet" href="/static/style.css" />
-  </head>
-  <body>
-    <div id="app">
-      <header>
-        <h1><span class="logo-icon">&#x2734;</span> StanzaWeaver</h1>
-        <button id="btn-config" class="btn-icon" title="LLM配置">
-          &#9881;
-        </button>
-      </header>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StanzaWeaver</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alex+Brush&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="app">
+    <header>
+        <h1>StanzaWeaver</h1>
+        <button id="btn-config" class="btn-icon" title="LLM配置">&#9881;</button>
+    </header>
 
-      <main>
+    <main>
         <section class="input-section">
-          <div class="field">
-            <label>主题</label>
-            <input
-              type="text"
-              id="topic"
-              placeholder="输入你想写的诗歌主题..."
-            />
-          </div>
-          <div class="field field-inline">
-            <label>格律</label>
-            <select id="template-select">
-              <option value="">-- 选择模板 --</option>
-            </select>
-            <button
-              id="btn-import"
-              class="btn-secondary btn-small"
-              title="导入词库"
-            >
-              导入词库
-            </button>
-          </div>
-          <div class="actions">
-            <button id="btn-generate" class="btn-primary">开始生成</button>
-          </div>
+            <div class="field">
+                <label>主题</label>
+                <input type="text" id="topic" placeholder="输入你想写的诗歌主题...">
+            </div>
+            <div class="field field-inline">
+                <label>格律</label>
+                <select id="template-select">
+                    <option value="">-- 选择模板 --</option>
+                </select>
+                <button id="btn-import" class="btn-secondary btn-small" title="导入词库">导入词库</button>
+            </div>
+            <div class="actions">
+                <button id="btn-generate" class="btn-primary">开始生成</button>
+            </div>
         </section>
 
         <section id="progress-section" class="hidden card">
-          <div class="section-header">生成进度</div>
-          <div id="progress-list"></div>
+            <div class="section-header">生成进度</div>
+            <div id="progress-list"></div>
         </section>
 
         <section id="poem-section" class="hidden card">
-          <div class="section-header">诗稿</div>
-          <div id="poem-display"></div>
-          <div id="checker-inline" class="checker-inline hidden"></div>
-          <div id="tool-status" class="tool-status hidden"></div>
+            <div class="section-header">诗稿</div>
+            <div id="poem-display"></div>
+            <div id="checker-inline" class="checker-inline hidden"></div>
+            <div id="tool-status" class="tool-status hidden"></div>
         </section>
 
         <section id="feedback-section" class="hidden card">
-          <div class="feedback-buttons">
-            <button id="btn-accept" class="btn-accept">定稿</button>
-            <button id="btn-reject" class="btn-reject">不定稿</button>
-          </div>
-          <div id="feedback-input-area" class="hidden">
-            <div class="field">
-              <input
-                type="text"
-                id="user-feedback"
-                placeholder="输入修改意见..."
-              />
+            <div class="feedback-buttons">
+                <button id="btn-accept" class="btn-accept">定稿</button>
+                <button id="btn-reject" class="btn-reject">不定稿</button>
             </div>
-            <button id="btn-feedback" class="btn-send">发送反馈</button>
-          </div>
+            <div id="feedback-input-area" class="hidden">
+                <div class="field">
+                    <input type="text" id="user-feedback" placeholder="输入修改意见...">
+                </div>
+                <button id="btn-feedback" class="btn-send">发送反馈</button>
+            </div>
         </section>
-      </main>
-    </div>
+    </main>
+</div>
 
-    <div id="config-modal" class="modal hidden">
-      <div class="modal-content">
+<div id="config-modal" class="modal hidden">
+    <div class="modal-content">
         <h2>LLM 配置</h2>
         <div class="config-group">
-          <h3>编写AI</h3>
-          <label>Base URL <input type="text" id="cfg-writer-url" /></label>
-          <label>API Key <input type="password" id="cfg-writer-key" /></label>
-          <label>Model <input type="text" id="cfg-writer-model" /></label>
+            <h3>编写AI</h3>
+            <label>Base URL <input type="text" id="cfg-writer-url"></label>
+            <label>API Key <input type="password" id="cfg-writer-key"></label>
+            <label>Model <input type="text" id="cfg-writer-model"></label>
         </div>
         <div class="config-group">
-          <h3>检查AI</h3>
-          <label>Base URL <input type="text" id="cfg-checker-url" /></label>
-          <label>API Key <input type="password" id="cfg-checker-key" /></label>
-          <label>Model <input type="text" id="cfg-checker-model" /></label>
+            <h3>检查AI</h3>
+            <label>Base URL <input type="text" id="cfg-checker-url"></label>
+            <label>API Key <input type="password" id="cfg-checker-key"></label>
+            <label>Model <input type="text" id="cfg-checker-model"></label>
         </div>
         <div class="modal-actions">
-          <button id="btn-save-config" class="btn-primary">保存</button>
-          <button id="btn-close-config" class="btn-secondary">取消</button>
+            <button id="btn-save-config" class="btn-primary">保存</button>
+            <button id="btn-close-config" class="btn-secondary">取消</button>
         </div>
-      </div>
     </div>
+</div>
 
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script>
-      const socket = io();
-      let isGenerating = false;
-      let lastPoem = [];
-      let currentStep = "";
-      const STEP_NAMES = {
-        step1_description: "Step 1: 生成描述",
-        step2_draft: "Step 2: 生成初稿",
-        step3_refine: "Step 3: 炼句优化",
-        step4_check: "Step 4: 终审",
-      };
-      const STEP_ORDER = [
-        "step1_description",
-        "step2_draft",
-        "step3_refine",
-        "step4_check",
-      ];
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+const socket = io();
+let isGenerating = false;
+let lastPoem = [];
+let currentStep = '';
+const STEP_NAMES = {
+    'step1_description': '生成描述',
+    'step2_draft': '生成初稿',
+    'step3_refine': '炼句优化',
+    'step4_check': '终审',
+};
+const STEP_ORDER = ['step1_description', 'step2_draft', 'step3_refine', 'step4_check'];
 
-      document.addEventListener("DOMContentLoaded", () => {
-        loadTemplates();
-        document
-          .getElementById("btn-generate")
-          .addEventListener("click", startGenerate);
-        document
-          .getElementById("btn-feedback")
-          .addEventListener("click", sendFeedback);
-        document
-          .getElementById("btn-reject")
-          .addEventListener("click", showFeedbackInput);
-        document
-          .getElementById("btn-accept")
-          .addEventListener("click", acceptFinal);
-        document
-          .getElementById("btn-config")
-          .addEventListener("click", openConfig);
-        document
-          .getElementById("btn-close-config")
-          .addEventListener("click", closeConfig);
-        document
-          .getElementById("btn-save-config")
-          .addEventListener("click", saveConfig);
-        document
-          .getElementById("btn-import")
-          .addEventListener("click", importVocab);
+document.addEventListener('DOMContentLoaded', () => {
+    loadTemplates();
+    document.getElementById('btn-generate').addEventListener('click', startGenerate);
+    document.getElementById('btn-feedback').addEventListener('click', sendFeedback);
+    document.getElementById('btn-reject').addEventListener('click', showFeedbackInput);
+    document.getElementById('btn-accept').addEventListener('click', acceptFinal);
+    document.getElementById('btn-config').addEventListener('click', openConfig);
+    document.getElementById('btn-close-config').addEventListener('click', closeConfig);
+    document.getElementById('btn-save-config').addEventListener('click', saveConfig);
+    document.getElementById('btn-import').addEventListener('click', importVocab);
 
-        socket.on("progress", handleProgress);
-        socket.on("done", handleDone);
-        socket.on("error", handleError);
-        socket.on("import_progress", handleImportProgress);
-      });
+    socket.on('progress', handleProgress);
+    socket.on('done', handleDone);
+    socket.on('error', handleError);
+    socket.on('import_progress', handleImportProgress);
+});
 
-      function loadTemplates() {
-        fetch("/api/templates")
-          .then((r) => r.json())
-          .then((templates) => {
-            const select = document.getElementById("template-select");
-            templates.forEach((t) => {
-              const opt = document.createElement("option");
-              opt.value = t.key;
-              opt.textContent = t.name;
-              select.appendChild(opt);
+function loadTemplates() {
+    fetch('/api/templates')
+        .then(r => r.json())
+        .then(templates => {
+            const select = document.getElementById('template-select');
+            templates.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.key;
+                opt.textContent = t.name;
+                select.appendChild(opt);
             });
-          });
-      }
+        });
+}
 
-      function getSelectedTemplate() {
-        const select = document.getElementById("template-select");
-        const val = select.value;
-        if (!val) return null;
-        return val;
-      }
+function getSelectedTemplate() {
+    const select = document.getElementById('template-select');
+    const val = select.value;
+    if (!val) return null;
+    return val;
+}
 
-      function startGenerate() {
-        const topic = document.getElementById("topic").value.trim();
-        const templateKey = getSelectedTemplate();
-        if (!topic) {
-          alert("请输入主题");
-          return;
-        }
-        if (!templateKey) {
-          alert("请选择格律模板");
-          return;
-        }
+function startGenerate() {
+    const topic = document.getElementById('topic').value.trim();
+    const templateKey = getSelectedTemplate();
+    if (!topic) { alert('请输入主题'); return; }
+    if (!templateKey) { alert('请选择格律模板'); return; }
 
-        isGenerating = true;
-        document.getElementById("btn-generate").disabled = true;
-        document.getElementById("progress-section").classList.remove("hidden");
-        document.getElementById("poem-section").classList.remove("hidden");
-        document.getElementById("feedback-section").classList.add("hidden");
-        document.getElementById("checker-inline").classList.add("hidden");
-        document.getElementById("tool-status").classList.add("hidden");
-        document.getElementById("progress-list").innerHTML = "";
-        document.getElementById("poem-display").innerHTML = "";
-        document.getElementById("feedback-input-area").classList.add("hidden");
-        document.getElementById("user-feedback").value = "";
-        lastPoem = [];
-        currentStep = "";
+    isGenerating = true;
+    document.getElementById('btn-generate').disabled = true;
+    document.getElementById('progress-section').classList.remove('hidden');
+    document.getElementById('poem-section').classList.remove('hidden');
+    document.getElementById('feedback-section').classList.add('hidden');
+    document.getElementById('checker-inline').classList.add('hidden');
+    document.getElementById('tool-status').classList.add('hidden');
+    document.getElementById('progress-list').innerHTML = '';
+    document.getElementById('poem-display').innerHTML = '';
+    document.getElementById('feedback-input-area').classList.add('hidden');
+    document.getElementById('user-feedback').value = '';
+    lastPoem = [];
+    currentStep = '';
 
-        socket.emit("generate", { topic: topic, template_key: templateKey });
-      }
+    socket.emit('generate', { topic: topic, template_key: templateKey });
+}
 
-      function sendFeedback() {
-        const feedback = document.getElementById("user-feedback").value.trim();
-        if (!feedback) return;
+function sendFeedback() {
+    const feedback = document.getElementById('user-feedback').value.trim();
+    if (!feedback) return;
 
-        document.getElementById("btn-feedback").disabled = true;
-        document.getElementById("progress-list").innerHTML = "";
-        document.getElementById("checker-inline").classList.add("hidden");
-        document.getElementById("tool-status").classList.add("hidden");
-        document.getElementById("feedback-section").classList.add("hidden");
-        lastPoem = [];
-        currentStep = "";
-        socket.emit("feedback", { feedback: feedback });
-      }
+    document.getElementById('btn-feedback').disabled = true;
+    document.getElementById('progress-list').innerHTML = '';
+    document.getElementById('checker-inline').classList.add('hidden');
+    document.getElementById('tool-status').classList.add('hidden');
+    document.getElementById('feedback-section').classList.add('hidden');
+    lastPoem = [];
+    currentStep = '';
+    socket.emit('feedback', { feedback: feedback });
+}
 
-      function showFeedbackInput() {
-        document
-          .getElementById("feedback-input-area")
-          .classList.remove("hidden");
-        document.getElementById("user-feedback").focus();
-      }
+function showFeedbackInput() {
+    document.getElementById('feedback-input-area').classList.remove('hidden');
+    document.getElementById('user-feedback').focus();
+}
 
-      function acceptFinal() {
-        document.getElementById("feedback-section").classList.add("hidden");
-        alert("诗歌定稿完成！感谢使用 StanzaWeaver。");
-      }
+function acceptFinal() {
+    document.getElementById('feedback-section').classList.add('hidden');
+    alert('诗歌定稿完成！感谢使用 StanzaWeaver。');
+}
 
-      function importVocab() {
-        document.getElementById("btn-import").disabled = true;
-        socket.emit("import_vocabulary", { limit: 0 });
-      }
+function importVocab() {
+    document.getElementById('btn-import').disabled = true;
+    socket.emit('import_vocabulary', { limit: 0 });
+}
 
-      function updateStepDot(stepKey, state) {
-        const item = document.getElementById("progress-" + stepKey);
-        if (!item) return;
-        const dot = item.querySelector(".step-dot");
-        dot.className = "step-dot " + state;
-      }
+function updateStepDot(stepKey, state) {
+    const item = document.getElementById('progress-' + stepKey);
+    if (!item) return;
+    const dot = item.querySelector('.step-dot');
+    dot.className = 'step-dot ' + state;
+}
 
-      function ensureStepItem(list, stepKey) {
-        let item = document.getElementById("progress-" + stepKey);
-        if (!item) {
-          item = createStepItem(stepKey, STEP_NAMES[stepKey] || stepKey);
-          list.appendChild(item);
-        }
-        return item;
-      }
+function ensureStepItem(list, stepKey) {
+    let item = document.getElementById('progress-' + stepKey);
+    if (!item) {
+        item = createStepItem(stepKey, STEP_NAMES[stepKey] || stepKey);
+        list.appendChild(item);
+    }
+    return item;
+}
 
-      function removeStepItem(stepKey) {
-        const item = document.getElementById("progress-" + stepKey);
-        if (item) item.remove();
-      }
+function removeStepItem(stepKey) {
+    const item = document.getElementById('progress-' + stepKey);
+    if (item) item.remove();
+}
 
-      function handleProgress(data) {
-        const list = document.getElementById("progress-list");
+function handleProgress(data) {
+    const list = document.getElementById('progress-list');
 
-        if (data.step !== currentStep) {
-          const prevIdx = STEP_ORDER.indexOf(currentStep);
-          const newIdx = STEP_ORDER.indexOf(data.step);
-          if (prevIdx >= 0) updateStepDot(currentStep, "done");
+    if (data.step !== currentStep) {
+        const prevIdx = STEP_ORDER.indexOf(currentStep);
+        const newIdx = STEP_ORDER.indexOf(data.step);
+        if (prevIdx >= 0) updateStepDot(currentStep, 'done');
 
-          for (let i = newIdx + 1; i < STEP_ORDER.length; i++) {
+        for (let i = newIdx + 1; i < STEP_ORDER.length; i++) {
             removeStepItem(STEP_ORDER[i]);
-          }
+        }
 
-          currentStep = data.step;
+        currentStep = data.step;
 
-          for (let i = 0; i <= newIdx; i++) {
+        for (let i = 0; i <= newIdx; i++) {
             ensureStepItem(list, STEP_ORDER[i]);
-          }
-
-          for (let i = 0; i < newIdx; i++) {
-            updateStepDot(STEP_ORDER[i], "done");
-          }
-          updateStepDot(currentStep, "running");
         }
 
-        if (data.step_details) {
-          data.step_details.forEach((d) => {
+        for (let i = 0; i < newIdx; i++) {
+            updateStepDot(STEP_ORDER[i], 'done');
+        }
+        updateStepDot(currentStep, 'running');
+    }
+
+    if (data.step_details) {
+        data.step_details.forEach(d => {
             const item = ensureStepItem(list, d.step);
-            const dot = item.querySelector(".step-dot");
+            const dot = item.querySelector('.step-dot');
             if (d.step === currentStep) {
-              dot.className = "step-dot running";
+                dot.className = 'step-dot running';
             }
-            const title = item.querySelector(".step-title");
+            const title = item.querySelector('.step-title');
             if (d.rounds !== undefined) {
-              title.textContent = (d.title || "") + " (" + d.rounds + ")";
+                title.textContent = (d.title || '') + ' (' + d.rounds + ')';
             } else if (d.title) {
-              title.textContent = d.title;
+                title.textContent = d.title;
             }
             if (d.content) {
-              const pre = item.querySelector(".step-detail");
-              pre.textContent = d.content;
+                const pre = item.querySelector('.step-detail');
+                pre.textContent = d.content;
             }
-          });
-        }
+        });
+    }
 
-        if (data.stream_text) {
-          const display = document.getElementById("poem-display");
-          display.innerHTML =
-            '<div class="poem-line stream-text">' +
-            escapeHtml(data.stream_text) +
-            "</div>";
-        } else if (data.draft && data.draft.length > 0) {
-          updatePoemDisplay(data.draft);
-        }
+    if (data.stream_text) {
+        const display = document.getElementById('poem-display');
+        display.innerHTML = '<div class="poem-line stream-text">' + escapeHtml(data.stream_text) + '</div>';
+    } else if (data.draft && data.draft.length > 0) {
+        updatePoemDisplay(data.draft);
+    }
 
-        if (data.last_tool) {
-          const ts = document.getElementById("tool-status");
-          ts.classList.remove("hidden");
-          const toolNames = {
-            search_words: "搜索候选词",
-            refine_line: "修改某行",
-            rewrite: "整体重写",
-            submit: "提交评审",
-          };
-          ts.innerHTML =
-            '<span class="tool-label">' +
-            (toolNames[data.last_tool] || data.last_tool) +
-            "</span>";
-          if (data.last_tool_result) {
-            ts.innerHTML +=
-              '<span class="tool-result">' +
-              escapeHtml(String(data.last_tool_result).substring(0, 200)) +
-              "</span>";
-          }
+    if (data.last_tool) {
+        const ts = document.getElementById('tool-status');
+        ts.classList.remove('hidden');
+        const toolNames = { 'search_words': '搜索候选词', 'refine_line': '修改某行', 'rewrite': '整体重写', 'submit': '提交评审' };
+        ts.innerHTML = '<span class="tool-label">' + (toolNames[data.last_tool] || data.last_tool) + '</span>';
+        if (data.last_tool_result) {
+            ts.innerHTML += '<span class="tool-result">' + escapeHtml(String(data.last_tool_result).substring(0, 200)) + '</span>';
         }
+    }
 
-        if (data.current_detail_step && data.current_detail) {
-          const item = document.getElementById(
-            "progress-" + data.current_detail_step,
-          );
-          if (item) {
-            const pre = item.querySelector(".step-detail");
+    if (data.current_detail_step && data.current_detail) {
+        const item = document.getElementById('progress-' + data.current_detail_step);
+        if (item) {
+            const pre = item.querySelector('.step-detail');
             pre.textContent = data.current_detail;
-          }
         }
-      }
+    }
+}
 
-      function createStepItem(stepKey, title) {
-        const wrapper = document.createElement("div");
-        wrapper.id = "progress-" + stepKey;
-        wrapper.className = "progress-step";
+function createStepItem(stepKey, title) {
+    const wrapper = document.createElement('div');
+    wrapper.id = 'progress-' + stepKey;
+    wrapper.className = 'progress-step';
 
-        const header = document.createElement("div");
-        header.className = "progress-header";
-        header.innerHTML =
-          '<span class="step-dot"></span><span class="step-title">' +
-          title +
-          '</span><span class="step-caret">&#9660;</span>';
+    const header = document.createElement('div');
+    header.className = 'progress-header';
+    header.innerHTML = '<span class="step-dot"></span><span class="step-title">' + title + '</span><span class="step-caret">&#9660;</span>';
 
-        const body = document.createElement("div");
-        body.className = "progress-body";
-        body.innerHTML = '<pre class="step-detail"></pre>';
+    const body = document.createElement('div');
+    body.className = 'progress-body';
+    body.innerHTML = '<pre class="step-detail"></pre>';
 
-        header.addEventListener("click", () => {
-          body.classList.toggle("collapsed");
-          const caret = header.querySelector(".step-caret");
-          caret.innerHTML = body.classList.contains("collapsed")
-            ? "&#9654;"
-            : "&#9660;";
-        });
+    header.addEventListener('click', () => {
+        body.classList.toggle('collapsed');
+        const caret = header.querySelector('.step-caret');
+        caret.innerHTML = body.classList.contains('collapsed') ? '&#9654;' : '&#9660;';
+    });
 
-        wrapper.appendChild(header);
-        wrapper.appendChild(body);
-        return wrapper;
-      }
+    wrapper.appendChild(header);
+    wrapper.appendChild(body);
+    return wrapper;
+}
 
-      function updatePoemDisplay(poem) {
-        if (JSON.stringify(poem) === JSON.stringify(lastPoem)) return;
-        lastPoem = [...poem];
+function updatePoemDisplay(poem) {
+    if (JSON.stringify(poem) === JSON.stringify(lastPoem)) return;
+    lastPoem = [...poem];
 
-        const display = document.getElementById("poem-display");
-        display.innerHTML = "";
-        poem.forEach((line, i) => {
-          const div = document.createElement("div");
-          div.className = "poem-line";
-          div.textContent = line;
-          display.appendChild(div);
-        });
-      }
+    const display = document.getElementById('poem-display');
+    display.innerHTML = '';
+    poem.forEach((line, i) => {
+        const div = document.createElement('div');
+        div.className = 'poem-line';
+        div.textContent = line;
+        display.appendChild(div);
+    });
+}
 
-      function handleDone(data) {
-        isGenerating = false;
-        document.getElementById("btn-generate").disabled = false;
-        document.getElementById("btn-feedback").disabled = false;
+function handleDone(data) {
+    isGenerating = false;
+    document.getElementById('btn-generate').disabled = false;
+    document.getElementById('btn-feedback').disabled = false;
 
-        const poem = data.final_poem || data.draft || [];
-        updatePoemDisplay(poem);
+    const poem = data.final_poem || data.draft || [];
+    updatePoemDisplay(poem);
 
-        document.getElementById("tool-status").classList.add("hidden");
+    document.getElementById('tool-status').classList.add('hidden');
 
-        const checkerInline = document.getElementById("checker-inline");
-        checkerInline.classList.remove("hidden");
-        if (data.checker_pass) {
-          checkerInline.innerHTML =
-            '<div class="checker-pass">&#10004; 终审通过</div>';
-        } else {
-          checkerInline.innerHTML =
-            '<div class="checker-fail">&#10008; 未通过</div>';
-          if (data.checker_suggestions) {
-            checkerInline.innerHTML +=
-              '<div class="checker-detail">' +
-              escapeHtml(data.checker_suggestions) +
-              "</div>";
-          }
+    const checkerInline = document.getElementById('checker-inline');
+    checkerInline.classList.remove('hidden');
+    if (data.checker_pass) {
+        checkerInline.innerHTML = '<div class="checker-pass">&#10004; 终审通过</div>';
+    } else {
+        checkerInline.innerHTML = '<div class="checker-fail">&#10008; 未通过</div>';
+        if (data.checker_suggestions) {
+            checkerInline.innerHTML += '<div class="checker-detail">' + escapeHtml(data.checker_suggestions) + '</div>';
         }
+    }
 
-        // Merge step_details - update existing entries, don't wipe list
-        if (data.step_details) {
-          const list = document.getElementById("progress-list");
-          data.step_details.forEach((d) => {
+    if (data.step_details) {
+        const list = document.getElementById('progress-list');
+        data.step_details.forEach(d => {
             const item = ensureStepItem(list, d.step);
-            const dot = item.querySelector(".step-dot");
-            dot.className = "step-dot done";
-            const title = item.querySelector(".step-title");
+            const dot = item.querySelector('.step-dot');
+            dot.className = 'step-dot done';
+            const title = item.querySelector('.step-title');
             if (d.rounds !== undefined) {
-              title.textContent = (d.title || "") + " (" + d.rounds + ")";
+                title.textContent = (d.title || '') + ' (' + d.rounds + ')';
             } else if (d.title) {
-              title.textContent = d.title;
+                title.textContent = d.title;
             }
             if (d.content) {
-              const pre = item.querySelector(".step-detail");
-              pre.textContent = d.content;
+                const pre = item.querySelector('.step-detail');
+                pre.textContent = d.content;
             }
-          });
+        });
+    }
+
+    document.getElementById('feedback-section').classList.remove('hidden');
+    document.getElementById('feedback-input-area').classList.add('hidden');
+    document.getElementById('user-feedback').value = '';
+}
+
+function handleError(data) {
+    alert(data.message || '发生错误');
+    document.getElementById('btn-generate').disabled = false;
+    document.getElementById('btn-feedback').disabled = false;
+    isGenerating = false;
+}
+
+function handleImportProgress(data) {
+    document.getElementById('btn-import').disabled = false;
+    alert(data.message);
+}
+
+function openConfig() {
+    fetch('/api/config')
+        .then(r => r.json())
+        .then(cfg => {
+            document.getElementById('cfg-writer-url').value = cfg.writer.base_url;
+            document.getElementById('cfg-writer-key').value = cfg.writer.api_key;
+            document.getElementById('cfg-writer-model').value = cfg.writer.model;
+            document.getElementById('cfg-checker-url').value = cfg.checker.base_url;
+            document.getElementById('cfg-checker-key').value = cfg.checker.api_key;
+            document.getElementById('cfg-checker-model').value = cfg.checker.model;
+        });
+    document.getElementById('config-modal').classList.remove('hidden');
+}
+
+function closeConfig() {
+    document.getElementById('config-modal').classList.add('hidden');
+}
+
+function saveConfig() {
+    const data = {
+        writer: {
+            base_url: document.getElementById('cfg-writer-url').value,
+            api_key: document.getElementById('cfg-writer-key').value,
+            model: document.getElementById('cfg-writer-model').value,
+        },
+        checker: {
+            base_url: document.getElementById('cfg-checker-url').value,
+            api_key: document.getElementById('cfg-checker-key').value,
+            model: document.getElementById('cfg-checker-model').value,
         }
+    };
+    fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(() => {
+        closeConfig();
+        alert('配置已保存');
+    });
+}
 
-        // Remove step4_check if checker is passing (it's the final done state)
-        // Actually, keep all steps in done state
-
-        document.getElementById("feedback-section").classList.remove("hidden");
-        document.getElementById("feedback-input-area").classList.add("hidden");
-        document.getElementById("user-feedback").value = "";
-      }
-
-      function handleError(data) {
-        alert(data.message || "发生错误");
-        document.getElementById("btn-generate").disabled = false;
-        document.getElementById("btn-feedback").disabled = false;
-        isGenerating = false;
-      }
-
-      function handleImportProgress(data) {
-        document.getElementById("btn-import").disabled = false;
-        alert(data.message);
-      }
-
-      function openConfig() {
-        fetch("/api/config")
-          .then((r) => r.json())
-          .then((cfg) => {
-            document.getElementById("cfg-writer-url").value =
-              cfg.writer.base_url;
-            document.getElementById("cfg-writer-key").value =
-              cfg.writer.api_key;
-            document.getElementById("cfg-writer-model").value =
-              cfg.writer.model;
-            document.getElementById("cfg-checker-url").value =
-              cfg.checker.base_url;
-            document.getElementById("cfg-checker-key").value =
-              cfg.checker.api_key;
-            document.getElementById("cfg-checker-model").value =
-              cfg.checker.model;
-          });
-        document.getElementById("config-modal").classList.remove("hidden");
-      }
-
-      function closeConfig() {
-        document.getElementById("config-modal").classList.add("hidden");
-      }
-
-      function saveConfig() {
-        const data = {
-          writer: {
-            base_url: document.getElementById("cfg-writer-url").value,
-            api_key: document.getElementById("cfg-writer-key").value,
-            model: document.getElementById("cfg-writer-model").value,
-          },
-          checker: {
-            base_url: document.getElementById("cfg-checker-url").value,
-            api_key: document.getElementById("cfg-checker-key").value,
-            model: document.getElementById("cfg-checker-model").value,
-          },
-        };
-        fetch("/api/config", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
-        })
-          .then((r) => r.json())
-          .then(() => {
-            closeConfig();
-            alert("配置已保存");
-          });
-      }
-
-      function escapeHtml(str) {
-        const div = document.createElement("div");
-        div.textContent = str;
-        return div.innerHTML;
-      }
-    </script>
-  </body>
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+</script>
+</body>
 </html>
