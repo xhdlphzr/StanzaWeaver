@@ -10,6 +10,14 @@ from ..tools.refine_line import execute_refine_line
 from ..prosody.meter_validator import MeterValidator
 
 
+def _fire_stream(cb, text: str):
+    if cb:
+        try:
+            cb(text)
+        except Exception:
+            pass
+
+
 def _build_writer_system(
     description: str,
     poem: list[str],
@@ -186,6 +194,7 @@ class WriterAI:
         max_rounds: int = 20,
         feedback: str = "",
         on_step: object = None,
+        on_stream: object = None,
     ) -> tuple[list[str], bool, list[dict], str]:
         current_poem = list(poem)
         system_prompt = _build_writer_system(
@@ -206,7 +215,15 @@ class WriterAI:
         modifications = 0
 
         for _round in range(max_rounds):
+            if on_stream:
+                on_stream("")
+                _fire_stream(on_stream, f"[第{_round + 1}轮] 思考中...")
+
             response = self.client.chat(messages, tools=WRITER_TOOLS)
+
+            if on_stream:
+                _fire_stream(on_stream, f"[第{_round + 1}轮] 思考完成" +
+                             (f" → 调用工具: {response['tool_calls'][0]['name']}" if response.get('tool_calls') else ""))
 
             if not response["tool_calls"]:
                 messages.append(LLMClient.assistant_to_message(response))
@@ -287,7 +304,8 @@ class WriterAI:
                     detail_parts.append(detail)
                 elif name == "rewrite":
                     result = self._handle_rewrite(
-                        description, current_poem, template, template_obj, args
+                        description, current_poem, template, template_obj, args,
+                        on_stream=on_stream,
                     )
                     if "poem" in result:
                         current_poem = result["poem"]
@@ -335,6 +353,7 @@ class WriterAI:
                             "last_tool": name,
                             "last_result": result,
                             "detail": "\n".join(detail_parts) if detail_parts else "",
+                            "stream_text": "",
                         }
                     )
 
@@ -355,6 +374,7 @@ class WriterAI:
         template: dict,
         template_obj=None,
         args: dict = None,
+        on_stream: object = None,
     ) -> dict:
         instruction = args.get("instruction", "")
         lines = template.get("lines", 4)
@@ -388,7 +408,14 @@ class WriterAI:
 
         new_poem = poem
         for attempt in range(3):
-            response = self.client.chat(messages)
+            if on_stream and attempt == 0:
+                _fire_stream(on_stream, "[rewrite] 生成中...")
+                response = self.client.chat_stream(
+                    messages,
+                    on_chunk=lambda text: _fire_stream(on_stream, text),
+                )
+            else:
+                response = self.client.chat(messages)
             text = response["content"].strip()
             new_poem = [line.strip() for line in text.split("\n") if line.strip()]
 
