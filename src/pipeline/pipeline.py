@@ -1,6 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
+import json
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
@@ -252,8 +253,6 @@ class PoetryPipeline:
 
 
 def json_dumps_safe(obj, default=""):
-    import json
-
     try:
         return json.dumps(obj, ensure_ascii=False)
     except Exception:

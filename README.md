@@ -20,7 +20,7 @@ StanzaWeaver 是一个基于 **神经符号方法**（Neuro-Symbolic）的多语
 
 - **四步流水线**：描述生成 → 初稿（仅验音节数）→ ReAct 炼句循环（搜词 + 整行替换 + 整体重写，每次改完自动跑全部格律约束）→ 检查 AI 句意终审
 - **三要素反馈闭环**：编写 AI → 检查 AI → 用户，任意一环不通过即可打回 Step 3 继续炼句
-- **多语言支持**：中文（绝句、律诗、词牌）、英文（Sonnet、Haiku），模板以 Python 类定义，可无限扩展
+- **多语言支持**：中文（绝句、律诗、词牌）、英文（Sonnet），模板以 Python 类定义，可无限扩展
 - **多层格律校验**：逐位平仄/轻重约束 + 三平尾 + 孤平 + 二四六分明 + 押韵检测
 - **实时流式输出**：LLM 生成过程逐 token 推送到前端，Step 详情区默认展开持续更新
 - **双重 AI 代理**：编写 AI（4 工具）+ 检查 AI（1 工具），可独立配置不同 LLM 端点/模型
@@ -47,7 +47,7 @@ python app.py
 
 ```
 StanzaWeaver/
-├── pyproject.toml          # 项目依赖与构建配置
+├── requirements.txt        # 项目依赖
 ├── app.py                   # pywebview + Flask + SocketIO 入口
 ├── templates/index.html     # 前端 UI
 ├── static/style.css         # 样式
@@ -75,8 +75,8 @@ StanzaWeaver/
     │   └── submit.py        # 提交执行
     ├── templates/           # 格律模板（Python 类）
     │   ├── __init__.py      # PoetryTemplate 基类 + 注册表
-    │   ├── zh.py            # 中文模板（五绝/七绝/五律/七律/如梦令）
-    │   └── en.py            # 英文模板（Sonnet / Haiku）
+    │   ├── zh.py            # 中文模板（五绝/七绝/五律/七律/相见欢）
+    │   └── en.py            # 英文模板（十四行诗）
     └── pipeline/
         └── pipeline.py      # 4 步流水线 + 打回循环
 ```
@@ -91,7 +91,7 @@ StanzaWeaver/
 | `validate_full()` | 完整规则检查（三平尾、孤平、押韵等） |
 | `describe()` | 人类可读的格律描述（供 AI prompt 使用） |
 
-内置模板：五言绝句、七言绝句、五言律诗、七言律诗、如梦令、Sonnet、Haiku。
+内置模板：五言绝句、七言绝句、五言律诗、七言律诗、相见欢、十四行诗。
 
 扩展方式：在 `src/templates/` 下新增 Python 文件，实现模板类后在 `app.py` 中注册。
 

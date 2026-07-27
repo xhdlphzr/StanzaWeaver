@@ -6,48 +6,29 @@ from pypinyin import pinyin, Style
 from .base import SyllableAnalyzer
 from ..models.syllable import Syllable
 
-_FINAL_TO_PARTS = {
-    "a": ("a", ""),
-    "o": ("o", ""),
-    "e": ("e", ""),
-    "i": ("i", ""),
-    "u": ("u", ""),
-    "v": ("v", ""),
-    "ü": ("ü", ""),
+FINAL_TO_PARTS = {
+    "a": ("a", ""), "o": ("o", ""), "e": ("e", ""),
+    "i": ("i", ""), "u": ("u", ""), "v": ("v", ""), "ü": ("ü", ""),
     "er": ("er", ""),
-    "ai": ("ai", ""),
-    "ei": ("ei", ""),
-    "ao": ("ao", ""),
-    "ou": ("ou", ""),
-    "iu": ("iu", ""),
-    "ui": ("ui", ""),
-    "an": ("a", "n"),
-    "en": ("e", "n"),
-    "in": ("i", "n"),
-    "un": ("u", "n"),
-    "vn": ("v", "n"),
-    "ün": ("ü", "n"),
-    "ang": ("a", "ng"),
-    "eng": ("e", "ng"),
-    "ing": ("i", "ng"),
-    "ong": ("o", "ng"),
-    "ia": ("ia", ""),
-    "ie": ("ie", ""),
-    "ua": ("ua", ""),
-    "uo": ("uo", ""),
-    "ve": ("ve", ""),
-    "üe": ("üe", ""),
-    "iao": ("iao", ""),
-    "uai": ("uai", ""),
-    "ian": ("ia", "n"),
-    "uan": ("ua", "n"),
-    "van": ("va", "n"),
-    "üan": ("üa", "n"),
-    "iang": ("ia", "ng"),
-    "uang": ("ua", "ng"),
-    "iong": ("io", "ng"),
-    "ueng": ("ue", "ng"),
+    "ai": ("ai", ""), "ei": ("ei", ""), "ao": ("ao", ""), "ou": ("ou", ""),
+    "iu": ("iu", ""), "ui": ("ui", ""),
+    "an": ("a", "n"), "en": ("e", "n"), "in": ("i", "n"),
+    "un": ("u", "n"), "vn": ("v", "n"), "ün": ("ü", "n"),
+    "ang": ("a", "ng"), "eng": ("e", "ng"), "ing": ("i", "ng"), "ong": ("o", "ng"),
+    "ia": ("ia", ""), "ie": ("ie", ""), "ua": ("ua", ""), "uo": ("uo", ""),
+    "ve": ("ve", ""), "üe": ("üe", ""),
+    "iao": ("iao", ""), "uai": ("uai", ""),
+    "ian": ("ia", "n"), "uan": ("ua", "n"), "van": ("va", "n"), "üan": ("üa", "n"),
+    "iang": ("ia", "ng"), "uang": ("ua", "ng"),
+    "iong": ("io", "ng"), "ueng": ("ue", "ng"),
 }
+
+CHINESE_INITIALS = frozenset({
+    "b", "p", "m", "f", "d", "t", "n", "l",
+    "g", "k", "h", "j", "q", "x",
+    "zh", "ch", "sh", "r", "z", "c", "s",
+    "y", "w",
+})
 
 _PING_TONES = {"1", "2"}
 _ZE_TONES = {"3", "4"}
@@ -63,7 +44,7 @@ def _split_final(final_str: str) -> tuple[str, str]:
         base = final_str
         tone_char = ""
     base_lower = base.lower()
-    nucleus, coda = _FINAL_TO_PARTS.get(base_lower, (base, ""))
+    nucleus, coda = FINAL_TO_PARTS.get(base_lower, (base, ""))
     return nucleus, coda
 
 

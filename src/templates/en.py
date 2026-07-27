@@ -38,35 +38,41 @@ class SonnetTemplate(PoetryTemplate):
             stress_count = sum(1 for s in syls if s.attributes.get("stress") == "heavy")
             if stress_count < 3:
                 errors.append(f"第{i + 1}行重音音节过少 ({stress_count}/10)")
-        rhyme_groups = [
-            ([0, 2], "ABAB quatrain 1"),
-            ([1, 3], ""),
-            ([4, 6], "CDCD quatrain 2"),
-            ([5, 7], ""),
-            ([8, 10], "EFEF quatrain 3"),
-            ([9, 11], ""),
-            ([12, 13], "GG couplet"),
+
+        quatrains = [
+            ("A", [0, 2], 0), ("B", [1, 3], 0),
+            ("C", [4, 6], 1), ("D", [5, 7], 1),
+            ("E", [8, 10], 2), ("F", [9, 11], 2),
+            ("G", [12, 13], 3),
         ]
-        for line_indices, label in rhyme_groups:
-            if len(line_indices) < 2:
-                continue
+        quatrain_rhymes: dict[int, dict[str, str]] = {}
+
+        for letter, indices, q_idx in quatrains:
+            if q_idx not in quatrain_rhymes:
+                quatrain_rhymes[q_idx] = {}
             rhymes = []
-            for idx in line_indices:
+            for idx in indices:
                 if idx < len(syllables) and syllables[idx]:
                     last = syllables[idx][-1]
-                    rhymes.append((idx, last.nucleus + last.coda))
+                    rhyme_key = last.nucleus + last.coda
+                    rhymes.append((idx, rhyme_key))
             if len(rhymes) >= 2:
                 base_rhyme = rhymes[0][1]
+                quatrain_rhymes[q_idx][letter] = base_rhyme
                 for idx, r in rhymes[1:]:
                     if r and base_rhyme and r != base_rhyme:
-                        desc = f" ({label})" if label else ""
                         errors.append(
-                            f"押韵不匹配{desc}: 第{rhymes[0][0] + 1}行韵脚为'{base_rhyme}'，第{idx + 1}行韵脚为'{r}'"
+                            f"押韵不匹配 {letter}: 第{rhymes[0][0] + 1}行韵脚为'{base_rhyme}'，第{idx + 1}行韵脚为'{r}'"
                         )
+
+        for q_idx in range(3):
+            if q_idx in quatrain_rhymes:
+                rhyme_set = set(quatrain_rhymes[q_idx].values())
+                if len(rhyme_set) < 2:
+                    a_rhyme = list(quatrain_rhymes[q_idx].values())[0]
+                    errors.append(f"第{q_idx + 1}段对韵: A/B 韵脚应不同，当前均为'{a_rhyme}'")
+
         return errors
-
-
-
 
 
 def register_english_templates():

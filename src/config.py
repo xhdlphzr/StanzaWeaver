@@ -33,8 +33,11 @@ class Config:
         if self._loaded:
             return
         if self._path.exists():
-            with open(self._path, "r", encoding="utf-8") as f:
-                self._data = json.load(f)
+            try:
+                with open(self._path, "r", encoding="utf-8") as f:
+                    self._data = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                self._data = {}
         self._loaded = True
 
     def save(self):

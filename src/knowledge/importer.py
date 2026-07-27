@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..models.word import Word
 from ..models.syllable import Syllable
+from ..prosody.chinese import FINAL_TO_PARTS, CHINESE_INITIALS
 from .vocabulary import init_db, insert_words, word_count
 
 _DATA_DIR = Path(__file__).parent / "data"
@@ -115,76 +116,7 @@ def _parse_cedict_line(line: str) -> Word | None:
 
 def _parse_pinyin_syllables(syllables_raw: list[str]) -> list[Syllable]:
     tone_map = {
-        "1": "平",
-        "2": "平",
-        "3": "仄",
-        "4": "仄",
-        "5": "",
-    }
-
-    _FINAL_PARTS = {
-        "a": ("a", ""),
-        "o": ("o", ""),
-        "e": ("e", ""),
-        "i": ("i", ""),
-        "u": ("u", ""),
-        "v": ("v", ""),
-        "er": ("er", ""),
-        "ai": ("ai", ""),
-        "ei": ("ei", ""),
-        "ao": ("ao", ""),
-        "ou": ("ou", ""),
-        "iu": ("iu", ""),
-        "ui": ("ui", ""),
-        "an": ("a", "n"),
-        "en": ("e", "n"),
-        "in": ("i", "n"),
-        "un": ("u", "n"),
-        "vn": ("v", "n"),
-        "ang": ("a", "ng"),
-        "eng": ("e", "ng"),
-        "ing": ("i", "ng"),
-        "ong": ("o", "ng"),
-        "ia": ("ia", ""),
-        "ie": ("ie", ""),
-        "ua": ("ua", ""),
-        "uo": ("uo", ""),
-        "ve": ("ve", ""),
-        "iao": ("iao", ""),
-        "uai": ("uai", ""),
-        "ian": ("ia", "n"),
-        "uan": ("ua", "n"),
-        "van": ("va", "n"),
-        "iang": ("ia", "ng"),
-        "uang": ("ua", "ng"),
-        "iong": ("io", "ng"),
-        "ueng": ("ue", "ng"),
-    }
-
-    _INITIALS = {
-        "b",
-        "p",
-        "m",
-        "f",
-        "d",
-        "t",
-        "n",
-        "l",
-        "g",
-        "k",
-        "h",
-        "j",
-        "q",
-        "x",
-        "zh",
-        "ch",
-        "sh",
-        "r",
-        "z",
-        "c",
-        "s",
-        "y",
-        "w",
+        "1": "平", "2": "平", "3": "仄", "4": "仄", "5": "",
     }
 
     results = []
@@ -199,7 +131,7 @@ def _parse_pinyin_syllables(syllables_raw: list[str]) -> list[Syllable]:
 
         onset = ""
         final_part = base
-        for init in sorted(_INITIALS, key=len, reverse=True):
+        for init in sorted(CHINESE_INITIALS, key=len, reverse=True):
             if base.startswith(init) and base != init:
                 onset = init
                 final_part = base[len(init) :]
@@ -208,7 +140,7 @@ def _parse_pinyin_syllables(syllables_raw: list[str]) -> list[Syllable]:
         if final_part and final_part[0] in {"y", "w"} and not onset:
             final_part = final_part[1:]
 
-        nucleus, coda = _FINAL_PARTS.get(final_part, (final_part, ""))
+        nucleus, coda = FINAL_TO_PARTS.get(final_part, (final_part, ""))
         if not nucleus and final_part:
             nucleus = final_part
 

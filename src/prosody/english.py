@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import re
+import threading
 from typing import Dict, Optional
 
 from .base import SyllableAnalyzer
@@ -35,23 +36,27 @@ _STRESS_MAP = {"0": "", "1": "heavy", "2": "light"}
 
 _ARPABET_TO_PHONEME: Dict[str, Dict[str, str]] = {}
 _cmudict_loaded = False
+_cmudict_lock = threading.Lock()
 
 
 def _load_cmudict():
     global _cmudict_loaded
     if _cmudict_loaded:
         return
-    try:
-        import nltk
+    with _cmudict_lock:
+        if _cmudict_loaded:
+            return
+        try:
+            import nltk
 
-        nltk.data.find("corpora/cmudict.zip")
-    except LookupError:
-        nltk.download("cmudict", quiet=True)
-    from nltk.corpus import cmudict
+            nltk.data.find("corpora/cmudict.zip")
+        except LookupError:
+            nltk.download("cmudict", quiet=True)
+        from nltk.corpus import cmudict
 
-    for word, pronunciations in cmudict.dict().items():
-        _ARPABET_TO_PHONEME[word] = pronunciations[0]
-    _cmudict_loaded = True
+        for word, pronunciations in cmudict.dict().items():
+            _ARPABET_TO_PHONEME[word] = pronunciations[0]
+        _cmudict_loaded = True
 
 
 class EnglishAnalyzer(SyllableAnalyzer):
