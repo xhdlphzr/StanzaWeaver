@@ -115,11 +115,3 @@ StanzaWeaver/
 ```
 
 UI 齿轮按钮中直接编辑保存，或手动编辑 `~/.stanza_weaver/config.json`。
-
-## 许可证
-
-Copyright (c) 2026 xhdlphzr
-
-Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later).
-
-See [https://www.gnu.org/licenses/agpl-3.0.html](https://www.gnu.org/licenses/agpl-3.0.html)
