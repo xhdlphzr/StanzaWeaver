@@ -402,7 +402,7 @@ class WriterAI:
                 )
                 continue
 
-            full_result = self.validator.validate(new_poem, template)
+            full_result = self.validator.validate(new_poem, template, template_obj)
             if full_result.passed:
                 return {"poem": new_poem}
 

@@ -36,12 +36,12 @@ class MeterValidator:
             )
 
         all_syllables: list[list] = []
-        min_lines = min(len(poem), len(syllables_expected))
-        for i in range(min_lines):
-            line = poem[i]
-            expected_count = syllables_expected[i]
-            actual_count = count_syllables(line, language)
+        for i in range(len(poem)):
+            all_syllables.append(analyze_line(poem[i], language))
 
+        for i in range(min(len(poem), len(syllables_expected))):
+            actual_count = len(all_syllables[i])
+            expected_count = syllables_expected[i]
             if actual_count != expected_count:
                 result.add_error(
                     f"第{i + 1}行音节数不匹配: 期望 {expected_count}, 实际 {actual_count}"
@@ -50,10 +50,8 @@ class MeterValidator:
         if constraints:
             min_constraint_lines = min(len(poem), len(constraints))
             for i in range(min_constraint_lines):
-                line = poem[i]
                 line_constraints = constraints[i]
-                syllables = analyze_line(line, language)
-                all_syllables.append(syllables)
+                syllables = all_syllables[i]
                 min_syl = min(len(syllables), len(line_constraints))
                 for j in range(min_syl):
                     if not syllables[j].match_constraint(line_constraints[j]):
@@ -64,9 +62,6 @@ class MeterValidator:
                         )
 
         if template_obj is not None and hasattr(template_obj, "validate_full"):
-            if not all_syllables:
-                for line in poem[: len(syllables_expected)]:
-                    all_syllables.append(analyze_line(line, language))
             full_errors = template_obj.validate_full(poem, all_syllables)
             for err in full_errors:
                 result.add_error(err)

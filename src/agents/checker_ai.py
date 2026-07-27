@@ -1,8 +1,6 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-import json
-
 from .base import LLMClient
 from ..tools import CHECKER_TOOLS
 
