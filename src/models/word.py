@@ -10,7 +10,6 @@ class Word:
     text: str
     language: str
     syllables: list = field(default_factory=list)
-    pos: str = ""
     meaning: str = ""
 
     @property
@@ -24,7 +23,6 @@ class Word:
             "syllables": [s.to_dict() for s in self.syllables]
             if self.syllables
             else [],
-            "pos": self.pos,
             "meaning": self.meaning,
         }
 
@@ -40,6 +38,5 @@ class Word:
             text=d["text"],
             language=d.get("language", ""),
             syllables=syllables,
-            pos=d.get("pos", ""),
             meaning=d.get("meaning", ""),
         )
