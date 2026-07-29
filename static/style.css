@@ -720,6 +720,68 @@ header h1 {
     margin-top: 20px;
 }
 
+/* ---- Custom Template Modal ---- */
+
+.modal-wide {
+    width: 680px;
+}
+
+.config-row {
+    display: flex;
+    gap: 16px;
+}
+
+.config-row label {
+    flex: 1;
+}
+
+.config-row input[type="number"] {
+    width: 100%;
+}
+
+#tmpl-code {
+    width: 100%;
+    font-family: "Consolas", "Monaco", monospace;
+    font-size: 12px;
+}
+
+.syllable-table {
+    max-height: 260px;
+    overflow-y: auto;
+    border: 1px solid rgba(180, 150, 120, 0.2);
+    border-radius: 8px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.4);
+}
+
+.syl-row {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-bottom: 3px;
+}
+
+.syl-row-label {
+    font-size: 11px;
+    color: #8b7355;
+    min-width: 36px;
+    text-align: right;
+    margin-right: 4px;
+}
+
+.syl-cell {
+    width: 52px;
+    padding: 3px 2px;
+    border: 1px solid rgba(180, 150, 120, 0.25);
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: inherit;
+    background: #fdfaf5;
+    color: #3d3226;
+    cursor: pointer;
+    text-align: center;
+}
+
 /* ---- Scrollbar ---- */
 
 ::-webkit-scrollbar {
