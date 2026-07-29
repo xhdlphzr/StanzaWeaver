@@ -195,6 +195,7 @@ class WriterAI:
         feedback: str = "",
         on_step: object = None,
         on_stream: object = None,
+        start_round: int = 0,
     ) -> tuple[list[str], bool, list[dict], str]:
         current_poem = list(poem)
         system_prompt = _build_writer_system(
@@ -215,14 +216,15 @@ class WriterAI:
         modifications = 0
 
         for _round in range(max_rounds):
+            round_num = start_round + _round + 1
             if on_stream:
                 on_stream("")
-                _fire_stream(on_stream, f"[第{_round + 1}轮] 思考中...")
+                _fire_stream(on_stream, f"[第{round_num}轮] 思考中...")
 
             response = self.client.chat(messages, tools=WRITER_TOOLS)
 
             if on_stream:
-                _fire_stream(on_stream, f"[第{_round + 1}轮] 思考完成" +
+                _fire_stream(on_stream, f"[第{round_num}轮] 思考完成" +
                              (f" → 调用工具: {response['tool_calls'][0]['name']}" if response.get('tool_calls') else ""))
 
             if not response["tool_calls"]:
@@ -242,7 +244,7 @@ class WriterAI:
                 if name == "submit":
                     if modifications < 1:
                         detail_parts.append(
-                            f"[第{_round + 1}轮] submit: 拒绝 - 尚未进行任何修改，必须先调用 refine_line 或 rewrite"
+                            f"[第{round_num}轮] submit: 拒绝 - 尚未进行任何修改，必须先调用 refine_line 或 rewrite"
                         )
                         result_for_msg = {
                             "error": "不允许直接提交。你必须至少调用一次 refine_line 或 rewrite 成功修改诗句后，才能调用 submit。"
@@ -274,7 +276,7 @@ class WriterAI:
                         continue
                     submitted = True
                     history.append({"tool": "submit", "result": "submitted"})
-                    detail_parts.append(f"[第{_round + 1}轮] submit: 提交定稿")
+                    detail_parts.append(f"[第{round_num}轮] submit: 提交定稿")
                     break
 
                 result = None
@@ -282,7 +284,7 @@ class WriterAI:
                     result = execute_search_words(template, args)
                     word_count_result = len(result.get("words", []))
                     detail_parts.append(
-                        f"[第{_round + 1}轮] search_words({args.get('meaning', '')}): 找到{word_count_result}个候选词"
+                        f"[第{round_num}轮] search_words({args.get('meaning', '')}): 找到{word_count_result}个候选词"
                     )
                 elif name == "refine_line":
                     result = execute_refine_line(current_poem, template, args)
@@ -294,7 +296,7 @@ class WriterAI:
                         )
                         if not full_result.passed:
                             result["validation_errors"] = full_result.errors
-                    detail = f"[第{_round + 1}轮] refine_line(行{args.get('line')}, '{args.get('new_text', '')}')"
+                    detail = f"[第{round_num}轮] refine_line(行{args.get('line')}, '{args.get('new_text', '')}')"
                     if "error" in result:
                         detail += f": 失败 - {result['error']}"
                     else:
@@ -316,7 +318,7 @@ class WriterAI:
                         if not full_result.passed:
                             result["validation_errors"] = full_result.errors
                     detail = (
-                        f"[第{_round + 1}轮] rewrite({args.get('instruction', '')})"
+                        f"[第{round_num}轮] rewrite({args.get('instruction', '')})"
                     )
                     if "poem" in result:
                         detail += ": 重写完成"

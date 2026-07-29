@@ -177,6 +177,8 @@ class PoetryPipeline:
 
             def on_stream(text: str):
                 state.stream_text = text
+                state.last_tool = "_thinking"
+                state.last_tool_result = text
                 self._report(state)
 
             poem, submitted, history, detail = self.writer.refine(
@@ -187,12 +189,13 @@ class PoetryPipeline:
                 feedback=checker_feedback,
                 on_step=on_step,
                 on_stream=on_stream,
+                start_round=state.refine_rounds,
             )
 
             state.draft = poem
             state.refine_history = history
             state.refine_rounds += len(
-                [h for h in history if h.get("tool") in ("refine_line", "rewrite")]
+                [h for h in history if h.get("tool") not in ("submit",)]
             )
             state.step_details.append(
                 {
