@@ -35,6 +35,15 @@ def _check_sanpingwei(syllables: list[Syllable]) -> list[str]:
     return errors
 
 
+def _check_sanzewei(syllables: list[Syllable]) -> list[str]:
+    errors = []
+    if len(syllables) >= 3:
+        last3 = [s.attributes.get("tone", "") for s in syllables[-3:]]
+        if last3 == ["仄", "仄", "仄"]:
+            errors.append("三仄尾: 末三字皆为仄声，不合律")
+    return errors
+
+
 def _check_guping(syllables: list[Syllable]) -> list[str]:
     errors = []
     n = len(syllables)
@@ -127,6 +136,7 @@ class WujueTemplate(PoetryTemplate):
         errors = []
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
+            errors.extend(_check_sanzewei(syls))
             errors.extend(_check_guping(syls))
         errors.extend(_check_rhyme(syllables, [1, 3], "押韵(二四行)"))
         return errors
@@ -151,6 +161,7 @@ class QijueTemplate(PoetryTemplate):
         errors = []
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
+            errors.extend(_check_sanzewei(syls))
             errors.extend(_check_guping(syls))
         errors.extend(_check_rhyme(syllables, [1, 3], "押韵(二四行)"))
         return errors
@@ -180,6 +191,7 @@ class WulvTemplate(PoetryTemplate):
         constraints = self.get_syllable_constraints()
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
+            errors.extend(_check_sanzewei(syls))
             errors.extend(_check_guping(syls))
             errors.extend(_check_lv_alternation(syls, i, constraints))
         errors.extend(_check_rhyme(syllables, [1, 3, 5, 7], "押韵(二四六八行)"))
@@ -210,6 +222,7 @@ class QilvTemplate(PoetryTemplate):
         constraints = self.get_syllable_constraints()
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
+            errors.extend(_check_sanzewei(syls))
             errors.extend(_check_guping(syls))
             errors.extend(_check_lv_alternation(syls, i, constraints))
         errors.extend(_check_rhyme(syllables, [1, 3, 5, 7], "押韵(二四六八行)"))
@@ -223,23 +236,25 @@ class XiangjianhuanTemplate(PoetryTemplate):
     syllables_per_line = [6, 3, 9, 3, 3, 3, 9]
 
     def get_syllable_constraints(self):
-        _f = _FREE
+        _f, _p, _z = _FREE, _tone("平"), _tone("仄")
         return [
-            [_f] * 6,
-            [_f] * 3,
-            [_f] * 9,
-            [_f] * 3,
-            [_f] * 3,
-            [_f] * 3,
-            [_f] * 9,
+            [_f, _p, _f, _z, _p, _p],
+            [_z, _p, _p],
+            [_f, _z, _f, _p, _f, _z, _z, _p, _p],
+            [_f, _f, _z],
+            [_f, _f, _z],
+            [_z, _p, _p],
+            [_f, _z, _f, _p, _f, _z, _z, _p, _p],
         ]
 
     def validate_full(self, poem, syllables):
         errors = []
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
-        errors.extend(_check_rhyme(syllables, [0, 1, 2, 6], "押韵(平韵)"))
-        errors.extend(_check_rhyme(syllables, [3, 4], "押韵(仄韵·换韵)"))
+            errors.extend(_check_sanzewei(syls))
+        errors.extend(_check_rhyme(syllables, [0, 1, 2], "押韵(上阕·平韵)"))
+        errors.extend(_check_rhyme(syllables, [3, 4], "押韵(下阕·仄韵·换韵)"))
+        errors.extend(_check_rhyme(syllables, [5, 6], "押韵(下阕·平韵·换回)"))
         return errors
 
 
