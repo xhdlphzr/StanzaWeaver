@@ -745,6 +745,19 @@ header h1 {
     font-size: 12px;
 }
 
+.code-editor {
+    border: 1px solid rgba(180, 150, 120, 0.3);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.code-editor .CodeMirror {
+    height: 200px;
+    border-radius: 8px;
+    font-family: "JetBrains Mono", "Consolas", "Monaco", monospace;
+    font-variant-ligatures: none;
+}
+
 .syllable-table {
     max-height: 260px;
     overflow-y: auto;
