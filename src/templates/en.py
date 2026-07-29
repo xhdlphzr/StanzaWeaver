@@ -75,5 +75,83 @@ class SonnetTemplate(PoetryTemplate):
         return errors
 
 
+class VillanelleTemplate(PoetryTemplate):
+    name = "维拉内拉诗"
+    language = "en"
+    lines = 19
+    syllables_per_line = [10] * 19
+    _refrain_a1 = [0, 5, 11, 17]
+    _refrain_a2 = [2, 8, 14, 18]
+    _rhyme_a = [0, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18]
+    _rhyme_b = [1, 4, 7, 10, 13, 16]
+
+    def get_syllable_constraints(self):
+        return [None] * 19
+
+    def validate_full(self, poem, syllables):
+        errors = []
+
+        for i, syls in enumerate(syllables):
+            stress_count = sum(1 for s in syls if s.attributes.get("stress") == "heavy")
+            if stress_count < 3:
+                errors.append(f"第{i + 1}行重音音节过少 ({stress_count}/10)")
+
+        base_a1 = poem[self._refrain_a1[0]] if len(poem) > self._refrain_a1[0] else ""
+        base_a2 = poem[self._refrain_a2[0]] if len(poem) > self._refrain_a2[0] else ""
+
+        for ref_idx in self._refrain_a1[1:]:
+            if ref_idx < len(poem) and poem[ref_idx].strip() != base_a1.strip():
+                errors.append(
+                    f"叠句A1不匹配: 第1行与第{ref_idx + 1}行文本不一致"
+                )
+
+        for ref_idx in self._refrain_a2[1:]:
+            if ref_idx < len(poem) and poem[ref_idx].strip() != base_a2.strip():
+                errors.append(
+                    f"叠句A2不匹配: 第3行与第{ref_idx + 1}行文本不一致"
+                )
+
+        def _rhyme_key(syls_list, idx):
+            if idx < len(syls_list) and syls_list[idx]:
+                last = syls_list[idx][-1]
+                return last.nucleus + last.coda
+            return ""
+
+        a_keys = []
+        for idx in self._rhyme_a:
+            k = _rhyme_key(syllables, idx)
+            if k:
+                a_keys.append((idx, k))
+        if len(a_keys) >= 2:
+            base = a_keys[0][1]
+            for idx, k in a_keys[1:]:
+                if k != base:
+                    errors.append(
+                        f"押韵A不匹配: 第{a_keys[0][0] + 1}行韵脚为'{base}'，第{idx + 1}行韵脚为'{k}'"
+                    )
+
+        b_keys = []
+        for idx in self._rhyme_b:
+            k = _rhyme_key(syllables, idx)
+            if k:
+                b_keys.append((idx, k))
+        if len(b_keys) >= 2:
+            base = b_keys[0][1]
+            for idx, k in b_keys[1:]:
+                if k != base:
+                    errors.append(
+                        f"押韵B不匹配: 第{b_keys[0][0] + 1}行韵脚为'{base}'，第{idx + 1}行韵脚为'{k}'"
+                    )
+
+        if a_keys and b_keys:
+            a_rhyme = a_keys[0][1]
+            b_rhyme = b_keys[0][1]
+            if a_rhyme and b_rhyme and a_rhyme == b_rhyme:
+                errors.append(f"A/B韵脚应不同，当前均为'{a_rhyme}'")
+
+        return errors
+
+
 def register_english_templates():
     register("en_sonnet", SonnetTemplate())
+    register("en_villanelle", VillanelleTemplate())
