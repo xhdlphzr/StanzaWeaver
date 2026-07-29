@@ -45,7 +45,11 @@
         </section>
 
         <section id="poem-section" class="hidden card">
-            <div class="section-header">诗稿</div>
+            <div class="section-header-row">
+                <span class="section-header">诗稿</span>
+                <button id="btn-copy" class="btn-copy" title="复制诗稿">&#128203;</button>
+                <button id="btn-history" class="btn-history-link" title="历史记录">&#128220;</button>
+            </div>
             <div id="poem-display"></div>
             <div id="checker-inline" class="checker-inline hidden"></div>
             <div id="tool-status" class="tool-status hidden"></div>
@@ -84,6 +88,16 @@
         <div class="modal-actions">
             <button id="btn-save-config" class="btn-primary">保存</button>
             <button id="btn-close-config" class="btn-secondary">取消</button>
+        </div>
+    </div>
+</div>
+
+<div id="history-modal" class="modal hidden">
+    <div class="modal-content modal-wide">
+        <h2>历史记录</h2>
+        <div id="history-list" class="history-list"></div>
+        <div class="modal-actions">
+            <button id="btn-close-history" class="btn-secondary">关闭</button>
         </div>
     </div>
 </div>
@@ -145,6 +159,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-custom-template').addEventListener('click', openTemplateModal);
     document.getElementById('btn-create-template').addEventListener('click', createTemplate);
     document.getElementById('btn-close-template').addEventListener('click', closeTemplateModal);
+    document.getElementById('btn-copy').addEventListener('click', copyPoem);
+    document.getElementById('btn-history').addEventListener('click', openHistory);
+    document.getElementById('btn-close-history').addEventListener('click', closeHistory);
     document.getElementById('tmpl-lines').addEventListener('change', function() {
         const n = parseInt(this.value) || 4;
         const raw = document.getElementById('tmpl-syl-per-line').value.trim();
@@ -303,15 +320,21 @@ function handleProgress(data) {
 
     if (data.stream_text) {
         const display = document.getElementById('poem-display');
-        display.innerHTML = '<div class="poem-line stream-text">' + escapeHtml(data.stream_text) + '</div>';
-    } else if (data.draft && data.draft.length > 0) {
+        if (!data.draft || !data.draft.length) {
+            display.innerHTML = '<div class="poem-line stream-text">' + escapeHtml(data.stream_text) + '</div>';
+        }
+    }
+    if (data.draft && data.draft.length > 0) {
         updatePoemDisplay(data.draft);
     }
 
     if (data.last_tool) {
         const ts = document.getElementById('tool-status');
         ts.classList.remove('hidden');
-        const toolNames = { 'search_words': '搜索候选词', 'refine_line': '修改某行', 'rewrite': '整体重写', 'submit': '提交评审' };
+        const toolNames = {
+            'search_words': '搜索候选词', 'refine_line': '修改某行',
+            'rewrite': '整体重写', 'submit': '提交评审', '_thinking': '思考'
+        };
         ts.innerHTML = '<span class="tool-label">' + (toolNames[data.last_tool] || data.last_tool) + '</span>';
         if (data.last_tool_result) {
             ts.innerHTML += '<span class="tool-result">' + escapeHtml(String(data.last_tool_result).substring(0, 200)) + '</span>';
@@ -408,6 +431,17 @@ function handleDone(data) {
     document.getElementById('feedback-section').classList.remove('hidden');
     document.getElementById('feedback-input-area').classList.add('hidden');
     document.getElementById('user-feedback').value = '';
+
+    if (data.checker_pass) {
+        const poemText = poem.join('\n');
+        const topic = document.getElementById('topic').value;
+        const tmplName = document.getElementById('template-select').selectedOptions[0].textContent;
+        fetch('/api/history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic: topic, template_name: tmplName, poem: poemText })
+        });
+    }
 }
 
 function handleError(data) {
@@ -461,6 +495,46 @@ function saveConfig() {
         closeConfig();
         alert('配置已保存');
     });
+}
+
+function copyPoem() {
+    const lines = document.querySelectorAll('.poem-line');
+    const text = Array.from(lines).map(function(el) { return el.textContent; }).join('\n');
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(function() {
+        const btn = document.getElementById('btn-copy');
+        btn.textContent = '\u2714';
+        setTimeout(function() { btn.textContent = '\uD83D\uDCCB'; }, 1500);
+    });
+}
+
+function openHistory() {
+    document.getElementById('history-modal').classList.remove('hidden');
+    fetch('/api/history')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            const list = document.getElementById('history-list');
+            if (data.length === 0) {
+                list.innerHTML = '<p class="history-empty">暂无记录</p>';
+                return;
+            }
+            list.innerHTML = '';
+            data.forEach(function(item) {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = '<div class="history-meta">' +
+                    '<span class="history-topic">' + escapeHtml(item.topic) + '</span>' +
+                    '<span class="history-template">' + escapeHtml(item.template_name) + '</span>' +
+                    '<span class="history-time">' + escapeHtml(item.created_at) + '</span>' +
+                    '</div>' +
+                    '<div class="history-poem">' + escapeHtml(item.poem).replace(/\n/g, '<br>') + '</div>';
+                list.appendChild(div);
+            });
+        });
+}
+
+function closeHistory() {
+    document.getElementById('history-modal').classList.add('hidden');
 }
 
 function escapeHtml(str) {

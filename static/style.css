@@ -795,6 +795,101 @@ header h1 {
     text-align: center;
 }
 
+/* ---- Poem Header Row ---- */
+
+.section-header-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.section-header-row .section-header {
+    margin-bottom: 0;
+    flex: 1;
+}
+
+.btn-copy, .btn-history-link {
+    background: rgba(255,255,255,0.4);
+    border: 1px solid rgba(180,150,120,0.3);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px 10px;
+    transition: all 0.2s;
+    color: #8b7355;
+}
+
+.btn-copy:hover, .btn-history-link:hover {
+    background: rgba(139,115,85,0.1);
+    border-color: rgba(139,115,85,0.4);
+}
+
+/* ---- History ---- */
+
+.history-list {
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+.history-empty {
+    text-align: center;
+    color: #a08c75;
+    padding: 40px 0;
+    font-size: 14px;
+}
+
+.history-item {
+    padding: 14px;
+    border-bottom: 1px solid rgba(180,150,120,0.15);
+    transition: background 0.2s;
+    animation: card-in 0.35s ease-out;
+}
+
+.history-item:last-child {
+    border-bottom: none;
+}
+
+.history-item:hover {
+    background: rgba(139,115,85,0.04);
+}
+
+.history-meta {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    margin-bottom: 6px;
+}
+
+.history-topic {
+    font-size: 14px;
+    font-weight: 600;
+    color: #5a3e2b;
+}
+
+.history-template {
+    font-size: 11px;
+    color: #8b7355;
+    background: rgba(180,150,120,0.15);
+    padding: 1px 8px;
+    border-radius: 3px;
+}
+
+.history-time {
+    font-size: 11px;
+    color: #a08c75;
+    margin-left: auto;
+}
+
+.history-poem {
+    font-size: 15px;
+    color: #3d3226;
+    line-height: 2;
+    letter-spacing: 2px;
+    text-align: center;
+    user-select: text;
+}
+
 /* ---- Scrollbar ---- */
 
 ::-webkit-scrollbar {

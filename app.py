@@ -259,6 +259,67 @@ def api_create_custom_template():
     )
 
 
+def _init_history_db():
+    import sqlite3
+
+    hdb = Path.home() / ".stanza_weaver" / "history.db"
+    hdb.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(hdb))
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        topic TEXT,
+        template_name TEXT,
+        poem TEXT,
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+    )"""
+    )
+    conn.commit()
+    conn.close()
+
+
+@app.route("/api/history", methods=["GET"])
+def api_get_history():
+    import sqlite3
+
+    _init_history_db()
+    hdb = Path.home() / ".stanza_weaver" / "history.db"
+    conn = sqlite3.connect(str(hdb))
+    rows = conn.execute(
+        "SELECT id, topic, template_name, poem, created_at FROM history ORDER BY id DESC LIMIT 50"
+    ).fetchall()
+    conn.close()
+    return jsonify(
+        [
+            {
+                "id": r[0],
+                "topic": r[1],
+                "template_name": r[2],
+                "poem": r[3],
+                "created_at": r[4],
+            }
+            for r in rows
+        ]
+    )
+
+
+@app.route("/api/history", methods=["POST"])
+def api_save_history():
+    import sqlite3
+
+    _init_history_db()
+    data = request.get_json()
+    hdb = Path.home() / ".stanza_weaver" / "history.db"
+    conn = sqlite3.connect(str(hdb))
+    conn.execute(
+        "INSERT INTO history (topic, template_name, poem) VALUES (?, ?, ?)",
+        (data.get("topic", ""), data.get("template_name", ""), data.get("poem", "")),
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+
 def start_server():
     socketio.run(app, host="127.0.0.1", port=5000, allow_unsafe_werkzeug=True)
 
