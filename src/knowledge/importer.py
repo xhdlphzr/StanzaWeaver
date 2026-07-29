@@ -109,7 +109,6 @@ def _parse_cedict_line(line: str) -> Word | None:
         text=simplified,
         language="zh",
         syllables=syllables,
-        pos="",
         meaning=meaning.replace("/", "; "),
     )
 
@@ -209,7 +208,6 @@ def import_english():
                 text=word.upper(),
                 language="en",
                 syllables=syllables,
-                pos="",
                 meaning="",
             )
         )

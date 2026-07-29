@@ -26,7 +26,6 @@ SEARCH_WORDS_TOOL = {
                     "type": "string",
                     "description": "长短约束: long/short（空=不限）",
                 },
-                "pos": {"type": "string", "description": "词性约束（空=不限）"},
                 "limit": {"type": "integer", "description": "最大返回数量，默认20"},
             },
             "required": [],

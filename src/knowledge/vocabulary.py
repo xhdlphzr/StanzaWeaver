@@ -57,12 +57,11 @@ def insert_word(word: Word):
         syl_count = 0
 
     conn.execute(
-        """INSERT INTO words (text, language, pos, meaning, onset, nucleus, coda, tone, stress, length, syllable_count)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO words (text, language, meaning, onset, nucleus, coda, tone, stress, length, syllable_count)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             word.text,
             word.language,
-            word.pos,
             word.meaning,
             onset,
             nucleus,
@@ -98,7 +97,6 @@ def insert_words(words: list[Word]):
             (
                 word.text,
                 word.language,
-                word.pos,
                 word.meaning,
                 onset,
                 nucleus,
@@ -111,8 +109,8 @@ def insert_words(words: list[Word]):
         )
 
     conn.executemany(
-        """INSERT INTO words (text, language, pos, meaning, onset, nucleus, coda, tone, stress, length, syllable_count)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO words (text, language, meaning, onset, nucleus, coda, tone, stress, length, syllable_count)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         rows,
     )
     conn.commit()
@@ -129,7 +127,6 @@ def search_words(
     tone: str = "",
     stress: str = "",
     length: str = "",
-    pos: str = "",
     limit: int = 20,
 ) -> list[dict]:
     conn = _get_conn()
@@ -168,12 +165,8 @@ def search_words(
         conditions.append("length = ?")
         params.append(length)
 
-    if pos:
-        conditions.append("pos = ?")
-        params.append(pos)
-
     where_clause = " AND ".join(conditions)
-    query = f"SELECT text, language, pos, meaning, onset, nucleus, coda, tone, stress, length, syllable_count FROM words WHERE {where_clause} LIMIT ?"
+    query = f"SELECT text, language, meaning, onset, nucleus, coda, tone, stress, length, syllable_count FROM words WHERE {where_clause} LIMIT ?"
     params.append(limit)
 
     rows = conn.execute(query, params).fetchall()
@@ -181,7 +174,7 @@ def search_words(
 
     results = []
     for row in rows:
-        text, lang, p, m, ons, nuc, cod, ton, stre, leng, sc = row
+        text, lang, m, ons, nuc, cod, ton, stre, leng, sc = row
         syl = Syllable(
             onset=ons,
             nucleus=nuc,
@@ -193,7 +186,6 @@ def search_words(
             {
                 "text": text,
                 "language": lang,
-                "pos": p,
                 "meaning": m,
                 "syllables": [s.to_dict() for s in syllables],
             }

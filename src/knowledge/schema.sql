@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS words (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     text TEXT NOT NULL,
     language TEXT NOT NULL,
-    pos TEXT DEFAULT '',
     meaning TEXT DEFAULT '',
     onset TEXT DEFAULT '',
     nucleus TEXT DEFAULT '',
@@ -18,7 +17,6 @@ CREATE TABLE IF NOT EXISTS words (
 
 CREATE INDEX IF NOT EXISTS idx_words_language ON words(language);
 CREATE INDEX IF NOT EXISTS idx_words_text ON words(text);
-CREATE INDEX IF NOT EXISTS idx_words_pos ON words(pos);
 CREATE INDEX IF NOT EXISTS idx_words_onset ON words(onset);
 CREATE INDEX IF NOT EXISTS idx_words_nucleus ON words(nucleus);
 CREATE INDEX IF NOT EXISTS idx_words_coda ON words(coda);

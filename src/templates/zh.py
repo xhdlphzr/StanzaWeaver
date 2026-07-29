@@ -23,6 +23,9 @@ def _tone(t: str) -> dict:
     return _make_syl(attributes={"tone": t})
 
 
+_FREE = _make_syl()
+
+
 def _check_sanpingwei(syllables: list[Syllable]) -> list[str]:
     errors = []
     if len(syllables) >= 3:
@@ -112,11 +115,12 @@ class WujueTemplate(PoetryTemplate):
     syllables_per_line = [5, 5, 5, 5]
 
     def get_syllable_constraints(self):
+        _z, _p, _f = _tone("仄"), _tone("平"), _FREE
         return [
-            [_tone("仄"), _tone("仄"), _tone("平"), _tone("平"), _tone("仄")],
-            [_tone("平"), _tone("平"), _tone("仄"), _tone("仄"), _tone("平")],
-            [_tone("平"), _tone("平"), _tone("平"), _tone("仄"), _tone("仄")],
-            [_tone("仄"), _tone("仄"), _tone("仄"), _tone("平"), _tone("平")],
+            [_f, _z, _f, _p, _z],
+            [_f, _p, _f, _z, _p],
+            [_f, _p, _f, _z, _z],
+            [_f, _z, _f, _p, _p],
         ]
 
     def validate_full(self, poem, syllables):
@@ -135,12 +139,12 @@ class QijueTemplate(PoetryTemplate):
     syllables_per_line = [7, 7, 7, 7]
 
     def get_syllable_constraints(self):
-        _z, _p = _tone("仄"), _tone("平")
+        _z, _p, _f = _tone("仄"), _tone("平"), _FREE
         return [
-            [_z, _z, _p, _p, _p, _z, _z],
-            [_p, _p, _z, _z, _z, _p, _p],
-            [_p, _p, _z, _z, _p, _p, _z],
-            [_z, _z, _p, _p, _z, _z, _p],
+            [_f, _z, _f, _p, _f, _z, _z],
+            [_f, _p, _f, _z, _f, _p, _p],
+            [_f, _p, _f, _z, _f, _p, _z],
+            [_f, _z, _f, _p, _f, _z, _p],
         ]
 
     def validate_full(self, poem, syllables):
@@ -159,16 +163,16 @@ class WulvTemplate(PoetryTemplate):
     syllables_per_line = [5] * 8
 
     def get_syllable_constraints(self):
-        _z, _p = _tone("仄"), _tone("平")
+        _z, _p, _f = _tone("仄"), _tone("平"), _FREE
         return [
-            [_z, _z, _p, _p, _z],
-            [_p, _p, _z, _z, _p],
-            [_p, _p, _p, _z, _z],
-            [_z, _z, _z, _p, _p],
-            [_z, _z, _p, _p, _z],
-            [_p, _p, _z, _z, _p],
-            [_p, _p, _p, _z, _z],
-            [_z, _z, _z, _p, _p],
+            [_f, _z, _f, _p, _z],
+            [_f, _p, _f, _z, _p],
+            [_f, _p, _f, _z, _z],
+            [_f, _z, _f, _p, _p],
+            [_f, _z, _f, _p, _z],
+            [_f, _p, _f, _z, _p],
+            [_f, _p, _f, _z, _z],
+            [_f, _z, _f, _p, _p],
         ]
 
     def validate_full(self, poem, syllables):
@@ -189,16 +193,16 @@ class QilvTemplate(PoetryTemplate):
     syllables_per_line = [7] * 8
 
     def get_syllable_constraints(self):
-        _z, _p = _tone("仄"), _tone("平")
+        _z, _p, _f = _tone("仄"), _tone("平"), _FREE
         return [
-            [_z, _z, _p, _p, _p, _z, _z],
-            [_p, _p, _z, _z, _z, _p, _p],
-            [_p, _p, _z, _z, _p, _p, _z],
-            [_z, _z, _p, _p, _z, _z, _p],
-            [_z, _z, _p, _p, _p, _z, _z],
-            [_p, _p, _z, _z, _z, _p, _p],
-            [_p, _p, _z, _z, _p, _p, _z],
-            [_z, _z, _p, _p, _z, _z, _p],
+            [_f, _z, _f, _p, _f, _z, _z],
+            [_f, _p, _f, _z, _f, _p, _p],
+            [_f, _p, _f, _z, _f, _p, _z],
+            [_f, _z, _f, _p, _f, _z, _p],
+            [_f, _z, _f, _p, _f, _z, _z],
+            [_f, _p, _f, _z, _f, _p, _p],
+            [_f, _p, _f, _z, _f, _p, _z],
+            [_f, _z, _f, _p, _f, _z, _p],
         ]
 
     def validate_full(self, poem, syllables):
@@ -219,7 +223,16 @@ class XiangjianhuanTemplate(PoetryTemplate):
     syllables_per_line = [6, 3, 9, 3, 3, 3, 9]
 
     def get_syllable_constraints(self):
-        return None
+        _f = _FREE
+        return [
+            [_f] * 6,
+            [_f] * 3,
+            [_f] * 9,
+            [_f] * 3,
+            [_f] * 3,
+            [_f] * 3,
+            [_f] * 9,
+        ]
 
     def validate_full(self, poem, syllables):
         errors = []
