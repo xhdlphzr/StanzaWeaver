@@ -173,6 +173,92 @@ def handle_import_vocabulary(data):
     threading.Thread(target=run, daemon=True).start()
 
 
+@app.route("/api/templates/custom", methods=["POST"])
+def api_create_custom_template():
+    import importlib
+    import re
+    from pathlib import Path
+
+    data = request.get_json()
+    name = data.get("name", "").strip()
+    language = data.get("language", "zh")
+    lines = data.get("lines", 4)
+    syllables_per_line = data.get("syllables_per_line", [5] * lines)
+    constraints = data.get("constraints", [])
+    custom_code = data.get("code", "").strip()
+
+    if not name:
+        return jsonify({"status": "error", "message": "模板名称不能为空"}), 400
+
+    safe_name = re.sub(r"\W+", "_", name)
+    class_name = f"Custom{safe_name.title().replace('_', '')}Template"
+    file_key = f"custom_{safe_name}"
+    file_path = Path(__file__).parent / "src" / "templates" / f"{file_key}.py"
+
+    constraints_code = []
+    for line_c in constraints:
+        cells = []
+        for c in line_c:
+            tone = c.get("attributes", {}).get("tone", "")
+            stress = c.get("attributes", {}).get("stress", "")
+            if tone:
+                cells.append(f'_t("{tone}")')
+            elif stress:
+                cells.append(f'_make_syl(attributes={{"stress": "{stress}"}})')
+            else:
+                cells.append("_FREE")
+        constraints_code.append("[" + ", ".join(cells) + "]")
+
+    constraints_str = (
+        "[\n            " + ",\n            ".join(constraints_code) + "\n        ]"
+    )
+
+    code_body = (
+        f"# Copyright (c) 2026 xhdlphzr\n"
+        f"# SPDX-License-Identifier: MIT\n"
+        f"# Auto-generated custom template: {name}\n\n"
+        f"from . import PoetryTemplate, register\n"
+        f"from .zh import _make_syl, _FREE, _tone as _t\n\n\n"
+        f"class {class_name}(PoetryTemplate):\n"
+        f'    name = "{name}"\n'
+        f'    language = "{language}"\n'
+        f"    lines = {lines}\n"
+        f"    syllables_per_line = {syllables_per_line}\n\n"
+        f"    def get_syllable_constraints(self):\n"
+        f"        return {constraints_str}\n\n"
+        f"    def validate_full(self, poem, syllables):\n"
+        f"        errors = []\n"
+    )
+    if custom_code:
+        for line in custom_code.split("\n"):
+            code_body += f"        {line}\n"
+    else:
+        code_body += "        return errors\n"
+    code_body += "        return errors\n\n\n"
+    code_body += f"def register_custom_{safe_name}():\n"
+    code_body += f'    register("{file_key}", {class_name}())\n'
+
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(code_body, encoding="utf-8")
+
+    try:
+        module = importlib.import_module(f"src.templates.{file_key}")
+        reg_func = getattr(module, f"register_custom_{safe_name}", None)
+        if reg_func:
+            reg_func()
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"注册失败: {e}"}), 500
+
+    socketio.emit("templates_updated", {"count": len(load_templates())})
+    return jsonify(
+        {
+            "status": "ok",
+            "message": f"模板'{name}'已创建并注册",
+            "count": len(load_templates()),
+        }
+    )
+
+
 def start_server():
     socketio.run(app, host="127.0.0.1", port=5000, allow_unsafe_werkzeug=True)
 
