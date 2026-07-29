@@ -37,10 +37,15 @@ body::before {
 header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-end;
     padding: 16px 0 24px;
     margin-bottom: 8px;
     border-bottom: 1px solid rgba(139, 115, 85, 0.15);
+}
+
+.header-logo {
+    display: flex;
+    flex-direction: column;
 }
 
 header h1 {
@@ -51,11 +56,21 @@ header h1 {
     letter-spacing: 1px;
     text-shadow: 0 1px 2px rgba(90, 62, 43, 0.08);
     animation: title-in 0.8s ease-out;
+    line-height: 1.1;
 }
 
 @keyframes title-in {
     from { opacity: 0; transform: translateY(-6px) scale(0.97); }
     to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.slogan {
+    font-family: "Alex Brush", cursive;
+    font-size: 24px;
+    color: #8b7355;
+    margin-top: -4px;
+    letter-spacing: 0.5px;
+    animation: title-in 0.8s ease-out 0.2s both;
 }
 
 .btn-icon {
