@@ -74,6 +74,7 @@ _LANGUAGE_LABELS: dict[str, str] = {
     "zh": "汉语",
     "en": "英语",
     "it": "意大利语",
+    "fr": "法语",
 }
 
 
