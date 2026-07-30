@@ -136,6 +136,7 @@ def insert_words(words: list[Word]):
 
 def search_words(
     language: str,
+    query: str = "",
     syllable_count: Optional[int] = None,
     onset: str = "",
     nucleus: str = "",
@@ -202,6 +203,9 @@ def search_words(
                 "syllables": [s.to_dict() for s in syllables],
             }
         )
+    if query and results:
+        from .embeddings import rerank
+        results = rerank(query, results, top_k=limit)
     return results
 
 
