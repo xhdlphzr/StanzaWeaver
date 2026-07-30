@@ -22,7 +22,7 @@ _l = _make_syl(attributes={"stress": "light"})
 _h = _make_syl(attributes={"stress": "heavy"})
 
 
-class SonnetTemplate(PoetryTemplate):
+class ShakespeareSonnetTemplate(PoetryTemplate):
     name = "莎士比亚商籁体"
     language = "en"
     lines = 14
@@ -153,5 +153,5 @@ class VillanelleTemplate(PoetryTemplate):
 
 
 def register_english_templates():
-    register("en_sonnet", SonnetTemplate())
+    register("en_sonnet", ShakespeareSonnetTemplate())
     register("en_villanelle", VillanelleTemplate())
