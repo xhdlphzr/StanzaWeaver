@@ -23,7 +23,7 @@ _h = _make_syl(attributes={"stress": "heavy"})
 
 
 class SonnetTemplate(PoetryTemplate):
-    name = "十四行诗"
+    name = "莎士比亚商籁体"
     language = "en"
     lines = 14
     syllables_per_line = [10] * 14
