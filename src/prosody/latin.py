@@ -65,10 +65,7 @@ class LatinAnalyzer(SyllableAnalyzer):
                     is_long = True
                 length_val = "long" if is_long else "short"
             else:
-                if nucleus:
-                    onset += ch.lower()
-                else:
-                    onset += ch.lower()
+                onset += ch.lower()
             i += 1
 
         if nucleus:

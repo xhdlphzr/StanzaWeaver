@@ -86,7 +86,7 @@ class VillanelleTemplate(PoetryTemplate):
     _rhyme_b = [1, 4, 7, 10, 13, 16]
 
     def get_syllable_constraints(self):
-        return [None] * 19
+        return None
 
     def validate_full(self, poem, syllables):
         errors = []
