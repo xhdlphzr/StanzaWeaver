@@ -36,7 +36,7 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
         errors = []
         for i, syls in enumerate(syllables):
             stress_count = sum(1 for s in syls if s.attributes.get("stress") == "heavy")
-            if stress_count < 3:
+            if stress_count < 4:
                 errors.append(f"第{i + 1}行重音音节过少 ({stress_count}/10)")
 
         quatrains = [
@@ -93,7 +93,7 @@ class VillanelleTemplate(PoetryTemplate):
 
         for i, syls in enumerate(syllables):
             stress_count = sum(1 for s in syls if s.attributes.get("stress") == "heavy")
-            if stress_count < 3:
+            if stress_count < 4:
                 errors.append(f"第{i + 1}行重音音节过少 ({stress_count}/10)")
 
         base_a1 = poem[self._refrain_a1[0]] if len(poem) > self._refrain_a1[0] else ""
@@ -101,15 +101,11 @@ class VillanelleTemplate(PoetryTemplate):
 
         for ref_idx in self._refrain_a1[1:]:
             if ref_idx < len(poem) and poem[ref_idx].strip() != base_a1.strip():
-                errors.append(
-                    f"叠句A1不匹配: 第1行与第{ref_idx + 1}行文本不一致"
-                )
+                errors.append(f"叠句A1不匹配: 第1行与第{ref_idx + 1}行文本不一致")
 
         for ref_idx in self._refrain_a2[1:]:
             if ref_idx < len(poem) and poem[ref_idx].strip() != base_a2.strip():
-                errors.append(
-                    f"叠句A2不匹配: 第3行与第{ref_idx + 1}行文本不一致"
-                )
+                errors.append(f"叠句A2不匹配: 第3行与第{ref_idx + 1}行文本不一致")
 
         def _rhyme_key(syls_list, idx):
             if idx < len(syls_list) and syls_list[idx]:
@@ -120,28 +116,22 @@ class VillanelleTemplate(PoetryTemplate):
         a_keys = []
         for idx in self._rhyme_a:
             k = _rhyme_key(syllables, idx)
-            if k:
-                a_keys.append((idx, k))
+            if k: a_keys.append((idx, k))
         if len(a_keys) >= 2:
             base = a_keys[0][1]
             for idx, k in a_keys[1:]:
                 if k != base:
-                    errors.append(
-                        f"押韵A不匹配: 第{a_keys[0][0] + 1}行韵脚为'{base}'，第{idx + 1}行韵脚为'{k}'"
-                    )
+                    errors.append(f"押韵A不匹配: 第{a_keys[0][0] + 1}行韵脚为'{base}'，第{idx + 1}行韵脚为'{k}'")
 
         b_keys = []
         for idx in self._rhyme_b:
             k = _rhyme_key(syllables, idx)
-            if k:
-                b_keys.append((idx, k))
+            if k: b_keys.append((idx, k))
         if len(b_keys) >= 2:
             base = b_keys[0][1]
             for idx, k in b_keys[1:]:
                 if k != base:
-                    errors.append(
-                        f"押韵B不匹配: 第{b_keys[0][0] + 1}行韵脚为'{base}'，第{idx + 1}行韵脚为'{k}'"
-                    )
+                    errors.append(f"押韵B不匹配: 第{b_keys[0][0] + 1}行韵脚为'{base}'，第{idx + 1}行韵脚为'{k}'")
 
         if a_keys and b_keys:
             a_rhyme = a_keys[0][1]
@@ -152,6 +142,31 @@ class VillanelleTemplate(PoetryTemplate):
         return errors
 
 
+class HeroicCoupletTemplate(PoetryTemplate):
+    name = "英雄双行体"
+    language = "en"
+    lines = 2
+    syllables_per_line = [10, 10]
+
+    def get_syllable_constraints(self):
+        line = [_l, _h, _l, _h, _l, _h, _l, _h, _l, _h]
+        return [line, line]
+
+    def validate_full(self, poem, syllables):
+        errors = []
+        for i, syls in enumerate(syllables):
+            stress_count = sum(1 for s in syls if s.attributes.get("stress") == "heavy")
+            if stress_count < 4:
+                errors.append(f"第{i + 1}行重音音节过少 ({stress_count}/10)")
+        if len(syllables) >= 2 and syllables[0] and syllables[1]:
+            r0 = syllables[0][-1].nucleus + syllables[0][-1].coda
+            r1 = syllables[1][-1].nucleus + syllables[1][-1].coda
+            if r0 and r1 and r0 != r1:
+                errors.append(f"押韵不匹配: 第1行韵脚为'{r0}'，第2行韵脚为'{r1}'")
+        return errors
+
+
 def register_english_templates():
     register("en_sonnet", ShakespeareSonnetTemplate())
     register("en_villanelle", VillanelleTemplate())
+    register("en_heroic_couplet", HeroicCoupletTemplate())
