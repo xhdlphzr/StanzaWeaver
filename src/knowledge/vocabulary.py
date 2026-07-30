@@ -32,6 +32,23 @@ def init_db():
     conn = sqlite3.connect(str(db_path))
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
     conn.executescript(schema)
+    conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
+    conn.commit()
+    conn.close()
+
+
+def get_meta(key: str) -> str | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
+def set_meta(key: str, value: str):
+    conn = _get_conn()
+    conn.execute(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, value)
+    )
     conn.commit()
     conn.close()
 
