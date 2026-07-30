@@ -5,11 +5,13 @@ from .base import SyllableAnalyzer
 from .chinese import ChineseAnalyzer
 from .english import EnglishAnalyzer
 from .italian import ItalianAnalyzer
+from .french import FrenchAnalyzer
 
 _ANALYZERS: dict[str, SyllableAnalyzer] = {
     "zh": ChineseAnalyzer(),
     "en": EnglishAnalyzer(),
     "it": ItalianAnalyzer(),
+    "fr": FrenchAnalyzer(),
 }
 
 
