@@ -24,7 +24,7 @@
         <section class="input-section">
             <div class="field">
                 <label>主题</label>
-                <textarea id="topic" rows="1" placeholder="输入你想写的诗歌主题...也可以粘贴一首诗让AI帮忙修改"></textarea>
+                <textarea id="topic" placeholder="输入你想写的诗歌主题...也可以粘贴一首诗让AI帮忙修改"></textarea>
             </div>
             <div class="field field-inline">
                 <label>格律</label>
@@ -164,15 +164,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-close-history').addEventListener('click', closeHistory);
 
     const topicEl = document.getElementById('topic');
-    topicEl.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            var current = parseInt(this.rows) || 1;
-            if (current < 13) {
-                e.preventDefault();
-                this.rows = current + 1;
-                if (this.rows >= 13) this.style.overflow = 'auto';
-            }
-        }
+    topicEl.addEventListener('input', function() {
+        this.style.height = '0';
+        var h = this.scrollHeight;
+        this.style.height = Math.max(44, Math.min(h, 340)) + 'px';
+        this.style.overflowY = h > 340 ? 'auto' : 'hidden';
     });
     document.getElementById('tmpl-lines').addEventListener('change', function() {
         const n = parseInt(this.value) || 4;
