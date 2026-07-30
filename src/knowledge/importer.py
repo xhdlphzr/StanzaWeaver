@@ -145,7 +145,7 @@ def _import_french():
     if word_count("fr") > 0:
         print("  [fr] 已有数据，跳过")
         return
-    text = _download_text("https://www.lexique.org/databases/Lexique382/Lexique382.tsv", timeout=15)
+    text = _download_text("http://www.lexique.org/databases/Lexique382/Lexique382.tsv", timeout=15)
     total = 0
     if text:
         lines = text.splitlines()
