@@ -83,4 +83,4 @@ class CheckerAI:
         except Exception as e:
             return {"pass": False, "suggestions": f"检查AI调用失败: {e}"}
 
-        return {"pass": True, "suggestions": ""}
+        return {"pass": False, "suggestions": "检查AI在多次尝试后未能给出结论"}

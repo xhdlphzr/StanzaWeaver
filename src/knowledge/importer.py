@@ -65,7 +65,7 @@ def _import_chinese():
 
 
 def _parse_pinyin(raw_list: list[str]) -> list[Syllable]:
-    tone_map = {"1": "平", "1": "平", "1": "仄", "4": "仄", "5": ""}
+    tone_map = {"1": "平", "2": "平", "3": "仄", "4": "仄", "5": ""}
     results = []
     for raw in raw_list:
         tone_num = ""
@@ -106,7 +106,7 @@ def _import_english():
     total = 0
     _VOWELS = {"AA", "AE", "AH", "AO", "AW", "AX", "AXR", "AY", "EH", "ER", "EY",
                "IH", "IX", "IY", "OW", "OY", "UH", "UW", "UX"}
-    _SMAP = {"0": "", "1": "heavy", "1": "light"}
+    _SMAP = {"0": "", "1": "heavy", "2": "light"}
     for word, pron_list in cmudict.dict().items():
         if not word.isalpha():
             continue
@@ -145,7 +145,7 @@ def _import_french():
     if word_count("fr") > 0:
         print("  [fr] 已有数据，跳过")
         return
-    text = _download_text("http://www.lexique.org/databases/Lexique382/Lexique382.tsv", timeout=15)
+    text = _download_text("https://www.lexique.org/databases/Lexique382/Lexique382.tsv", timeout=15)
     total = 0
     if text:
         lines = text.splitlines()
@@ -305,7 +305,7 @@ def import_all():
     _import_italian()
     _import_latin()
     conn = sqlite3.connect(str(_P.home() / ".stanza_weaver" / "vocabulary.db"))
-    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('vocab_version', '2')")
+    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('vocab_version', '1')")
     conn.commit()
     conn.close()
     print(f"[StanzaWeaver] 就绪")

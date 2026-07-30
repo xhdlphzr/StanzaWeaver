@@ -6,7 +6,7 @@ import re
 from .base import SyllableAnalyzer
 from ..models.syllable import Syllable
 
-_VOWELS = set("aeiouyàâäéèêëîïôöùûüÿAEIOUY")
+_VOWELS = set("aeiouyàâäéèêëîïôöùûüÿ")
 _FR_DIGRAPHS = {"ou", "au", "eau", "ai", "ei", "eu", "oi", "œu", "œ", "an", "en", "in", "on", "un", "am", "em", "im", "om", "um", "ain", "ein", "oin"}
 _SILENT_E_RE = re.compile(r"e(s|nt)?$", re.I)
 _ELISION_WORDS = {"l'", "d'", "s'", "n'", "c'", "j'", "m'", "t'", "qu'", "jusqu'", "lorsqu'", "puisqu'", "quoiqu'"}
@@ -19,7 +19,7 @@ class FrenchAnalyzer(SyllableAnalyzer):
         w = word.lower().strip(".,;:!?\"'()[]{}")
         if not w:
             return 0
-        if w in _ELISION_WORDS or w.rstrip("'") in _ELISION_WORDS:
+        if w in _ELISION_WORDS:
             return 1
         if _SILENT_E_RE.search(w):
             w = _SILENT_E_RE.sub("", w)

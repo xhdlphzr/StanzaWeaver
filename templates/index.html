@@ -206,6 +206,7 @@ function loadTemplates() {
         .then(r => r.json())
         .then(templates => {
             const select = document.getElementById('template-select');
+            select.innerHTML = '<option value="">-- 选择模板 --</option>';
             templates.forEach(t => {
                 const opt = document.createElement('option');
                 opt.value = t.key;

@@ -179,10 +179,10 @@ def search_words(
         params.append(length)
 
     where_clause = " AND ".join(conditions)
-    query = f"SELECT text, language, meaning, onset, nucleus, coda, tone, stress, length, syllable_count FROM words WHERE {where_clause} LIMIT ?"
+    sql = f"SELECT text, language, meaning, onset, nucleus, coda, tone, stress, length, syllable_count FROM words WHERE {where_clause} LIMIT ?"
     params.append(limit)
 
-    rows = conn.execute(query, params).fetchall()
+    rows = conn.execute(sql, params).fetchall()
     conn.close()
 
     results = []

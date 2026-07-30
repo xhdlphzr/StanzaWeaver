@@ -22,15 +22,13 @@ register_french_templates()
 register_latin_templates()
 
 # Auto-import vocabulary on first run
-import threading as _threading
 def _auto_import():
     global _vocab_importing
     from src.knowledge.vocabulary import init_db, word_count
     import sqlite3
-    from pathlib import Path as _P
 
     init_db()
-    conn = sqlite3.connect(str(_P.home() / ".stanza_weaver" / "vocabulary.db"))
+    conn = sqlite3.connect(str(Path.home() / ".stanza_weaver" / "vocabulary.db"))
     conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
     conn.commit()
     cur_ver = conn.execute("SELECT value FROM meta WHERE key='vocab_version'").fetchone()

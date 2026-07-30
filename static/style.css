@@ -206,16 +206,6 @@ header h1 {
     border-color: rgba(139, 115, 85, 0.4);
 }
 
-@keyframes select-focus {
-    from { transform: scale(1); }
-    50% { transform: scale(1.02); }
-    to { transform: scale(1); }
-}
-
-.field select:focus {
-    animation: select-focus 0.4s ease;
-}
-
 .field select option {
     padding: 10px;
     background: #fdfaf5;
