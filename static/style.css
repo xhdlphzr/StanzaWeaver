@@ -230,17 +230,21 @@ header h1 {
 
 .field textarea {
     width: 100%;
-    padding: 11px 14px;
+    padding: 10px 14px;
     border: 1.5px solid rgba(180, 150, 120, 0.3);
     border-radius: 10px;
     font-size: 14px;
-    background: rgba(253, 250, 245, 0.8);
-    color: #3d3226;
     font-family: inherit;
     line-height: 1.6;
     resize: none;
-    overflow: hidden;
-    transition: all 0.3s;
+    overflow-y: hidden;
+    box-sizing: border-box;
+    height: 44px;
+    min-height: 44px;
+    max-height: 340px;
+    background: rgba(253, 250, 245, 0.8);
+    color: #3d3226;
+    transition: border-color 0.3s, box-shadow 0.3s;
 }
 
 .field textarea:focus {
