@@ -15,6 +15,27 @@ from src.templates import list_dicts
 register_chinese_templates()
 register_english_templates()
 
+# Auto-import vocabulary on first run
+import threading as _threading
+def _auto_import():
+    from src.knowledge.vocabulary import init_db, word_count
+    import sqlite3
+    from pathlib import Path as _Path
+
+    init_db()
+    hdb = _Path.home() / ".stanza_weaver" / "vocabulary.db"
+    conn = sqlite3.connect(str(hdb))
+    conn.execute("DELETE FROM words")
+    conn.commit()
+    conn.close()
+
+    print("[StanzaWeaver] 正在导入词库...")
+    from src.knowledge.importer import import_all
+
+    import_all()
+    print(f"[StanzaWeaver] 词库就绪: 中文 {word_count('zh')} 条, 英文 {word_count('en')} 条")
+_threading.Thread(target=_auto_import, daemon=True).start()
+
 app = Flask(__name__, template_folder="templates", static_folder="static")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
@@ -146,29 +167,6 @@ def handle_feedback(data):
             },
             to=session_id,
         )
-
-    threading.Thread(target=run, daemon=True).start()
-
-
-@socketio.on("import_vocabulary")
-def handle_import_vocabulary(data):
-    from src.knowledge.importer import import_all
-    from src.knowledge.vocabulary import word_count
-
-    limit = data.get("limit", 0)
-
-    def run():
-        socketio.emit("import_progress", {"message": "开始导入词库..."})
-        try:
-            import_all(limit_chinese=limit)
-            zh_count = word_count("zh")
-            en_count = word_count("en")
-            socketio.emit(
-                "import_progress",
-                {"message": f"词库导入完成。中文: {zh_count}条, 英文: {en_count}条"},
-            )
-        except Exception as e:
-            socketio.emit("import_progress", {"message": f"导入失败: {str(e)}"})
 
     threading.Thread(target=run, daemon=True).start()
 

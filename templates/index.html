@@ -31,7 +31,6 @@
                 <select id="template-select">
                     <option value="">-- 选择模板 --</option>
                 </select>
-                <button id="btn-import" class="btn-secondary btn-small" title="导入词库">导入词库</button>
                 <button id="btn-custom-template" class="btn-secondary btn-small">+ 自定义</button>
             </div>
             <div class="actions">
@@ -155,7 +154,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-config').addEventListener('click', openConfig);
     document.getElementById('btn-close-config').addEventListener('click', closeConfig);
     document.getElementById('btn-save-config').addEventListener('click', saveConfig);
-    document.getElementById('btn-import').addEventListener('click', importVocab);
     document.getElementById('btn-custom-template').addEventListener('click', openTemplateModal);
     document.getElementById('btn-create-template').addEventListener('click', createTemplate);
     document.getElementById('btn-close-template').addEventListener('click', closeTemplateModal);
@@ -184,7 +182,6 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('progress', handleProgress);
     socket.on('done', handleDone);
     socket.on('error', handleError);
-    socket.on('import_progress', handleImportProgress);
     socket.on('templates_updated', function() { loadTemplates(); });
 });
 
@@ -254,11 +251,6 @@ function showFeedbackInput() {
 function acceptFinal() {
     document.getElementById('feedback-section').classList.add('hidden');
     alert('诗歌定稿完成！感谢使用 StanzaWeaver。');
-}
-
-function importVocab() {
-    document.getElementById('btn-import').disabled = true;
-    socket.emit('import_vocabulary', { limit: 0 });
 }
 
 function updateStepDot(stepKey, state) {
@@ -457,11 +449,6 @@ function handleError(data) {
     document.getElementById('btn-generate').disabled = false;
     document.getElementById('btn-feedback').disabled = false;
     isGenerating = false;
-}
-
-function handleImportProgress(data) {
-    document.getElementById('btn-import').disabled = false;
-    alert(data.message);
 }
 
 function openConfig() {
