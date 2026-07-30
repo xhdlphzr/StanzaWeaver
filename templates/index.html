@@ -12,6 +12,12 @@
 </head>
 <body>
 <div id="app">
+    <div id="import-overlay" class="import-overlay">
+        <div class="import-overlay-content">
+            <div class="import-spinner"></div>
+            <p>导入词库中，请稍候...</p>
+        </div>
+    </div>
     <header>
         <div class="header-logo">
             <h1>StanzaWeaver</h1>
@@ -183,6 +189,16 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('done', handleDone);
     socket.on('error', handleError);
     socket.on('templates_updated', function() { loadTemplates(); });
+    var pollTimer = setInterval(function() {
+        fetch('/api/import-status')
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (!d.importing) {
+                    document.getElementById('import-overlay').classList.add('hidden');
+                    clearInterval(pollTimer);
+                }
+            });
+    }, 800);
 });
 
 function loadTemplates() {

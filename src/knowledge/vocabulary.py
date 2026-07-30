@@ -136,7 +136,6 @@ def insert_words(words: list[Word]):
 
 def search_words(
     language: str,
-    meaning: str = "",
     syllable_count: Optional[int] = None,
     onset: str = "",
     nucleus: str = "",
@@ -149,10 +148,6 @@ def search_words(
     conn = _get_conn()
     conditions = ["language = ?"]
     params = [language]
-
-    if meaning:
-        conditions.append("(meaning LIKE ? OR text LIKE ?)")
-        params.extend([f"%{meaning}%", f"%{meaning}%"])
 
     if syllable_count is not None:
         conditions.append("syllable_count = ?")

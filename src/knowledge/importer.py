@@ -3,290 +3,309 @@
 
 import re
 import urllib.request
-from pathlib import Path
 
 from ..models.word import Word
 from ..models.syllable import Syllable
 from ..prosody.chinese import FINAL_TO_PARTS, CHINESE_INITIALS
 from .vocabulary import init_db, insert_words, word_count
 
-_DATA_DIR = Path(__file__).parent / "data"
 
-_CEDICT_URLS = [
-    "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz",
-    "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.zip",
-]
-_CEDICT_RAW_FILENAME = "cedict_ts.u8"
-
-
-def _ensure_data_dir():
-    _DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def _download_file(url: str, dest: Path, timeout: int = 60):
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp, open(dest, "wb") as f:
-        f.write(resp.read())
-
-
-def _download_cedict() -> Path | None:
-    _ensure_data_dir()
-    raw_path = _DATA_DIR / _CEDICT_RAW_FILENAME
-    if raw_path.exists() and raw_path.stat().st_size > 1000:
-        return raw_path
-
-    last_error = None
-    for url in _CEDICT_URLS:
-        try:
-            is_gz = url.endswith(".gz")
-            is_zip = url.endswith(".zip")
-            dl_path = _DATA_DIR / (
-                "cedict_tmp" + (".gz" if is_gz else ".zip" if is_zip else "")
-            )
-
-            _download_file(url, dl_path)
-
-            if is_gz:
-                import gzip
-
-                with gzip.open(dl_path, "rb") as gz, open(raw_path, "wb") as out:
-                    out.write(gz.read())
-            elif is_zip:
-                import zipfile
-
-                with zipfile.ZipFile(dl_path, "r") as zf:
-                    names = zf.namelist()
-                    txt_name = next(
-                        (n for n in names if n.endswith(".txt") or n.endswith(".u8")),
-                        names[0],
-                    )
-                    with zf.open(txt_name) as zf_in, open(raw_path, "wb") as out:
-                        out.write(zf_in.read())
-            dl_path.unlink(missing_ok=True)
-
-            if raw_path.stat().st_size > 1000:
-                return raw_path
-            raw_path.unlink(missing_ok=True)
-        except Exception as e:
-            last_error = e
-            continue
-
-    print(f"\n[StanzaWeaver] CC-CEDICT 自动下载失败。")
-    print(f"  请手动从 https://www.mdbg.net/chinese/dictionary?page=cc-cedict 下载")
-    print(f"  将解压后的 cedict_ts.u8 放置到:")
-    print(f"  {_DATA_DIR}")
-    if last_error:
-        print(f"  错误详情: {last_error}")
-    print()
-    if raw_path.exists():
-        raw_path.unlink(missing_ok=True)
-    return None
-
-
-def _parse_cedict_line(line: str) -> Word | None:
-    line = line.strip()
-    if not line or line.startswith("#"):
-        return None
-    parts = line.split(" ", 2)
-    if len(parts) < 2:
-        return None
-    simplified = parts[1]
-    rest = parts[2] if len(parts) > 2 else ""
-
-    pinyin_match = re.search(r"\[(.+?)\]", rest)
-    meaning_match = re.search(r"/(.+?)/", rest)
-
-    if not pinyin_match or not meaning_match:
-        return None
-
-    pinyin_text = pinyin_match.group(1)
-    meaning = meaning_match.group(1)
-
-    syllables_raw = pinyin_text.split()
-    syllables = _parse_pinyin_syllables(syllables_raw)
-
-    return Word(
-        text=simplified,
-        language="zh",
-        syllables=syllables,
-        meaning=meaning.replace("/", "; "),
-    )
-
-
-def _parse_pinyin_syllables(syllables_raw: list[str]) -> list[Syllable]:
-    tone_map = {
-        "1": "平", "2": "平", "3": "仄", "4": "仄", "5": "",
-    }
-
-    results = []
-    for raw in syllables_raw:
-        tone_num = ""
-        base = raw.lower().rstrip("012345 ")
-        if raw and raw[-1].isdigit():
-            tone_num = raw[-1]
-            base = raw[:-1].lower()
-        elif raw and raw[-1] == " ":
-            base = raw[:-1].lower()
-
-        onset = ""
-        final_part = base
-        for init in sorted(CHINESE_INITIALS, key=len, reverse=True):
-            if base.startswith(init) and base != init:
-                onset = init
-                final_part = base[len(init) :]
-                break
-
-        if final_part and final_part[0] in {"y", "w"} and not onset:
-            final_part = final_part[1:]
-
-        nucleus, coda = FINAL_TO_PARTS.get(final_part, (final_part, ""))
-        if not nucleus and final_part:
-            nucleus = final_part
-
-        results.append(
-            Syllable(
-                onset=onset,
-                nucleus=nucleus,
-                coda=coda,
-                attributes={
-                    "tone": tone_map.get(tone_num, ""),
-                    "stress": "",
-                    "length": "",
-                },
-            )
-        )
-    return results
-
-
-def import_chinese(limit: int = 0):
-    if word_count("zh") > 0:
-        return
-    path = _download_cedict()
-    if path is None:
-        return
-    batch: list[Word] = []
-    count = 0
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            word = _parse_cedict_line(line)
-            if word is None:
-                continue
-            batch.append(word)
-            count += 1
-            if len(batch) >= 500:
-                insert_words(batch)
-                batch.clear()
-            if limit > 0 and count >= limit:
-                break
-    if batch:
-        insert_words(batch)
-
-
-def import_english():
-    if word_count("en") > 0:
-        return
+def _download_text(url: str, timeout: int = 10) -> str | None:
     try:
-        import nltk
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.read().decode("utf-8", errors="replace")
+    except Exception:
+        return None
 
-        nltk.data.find("corpora/cmudict.zip")
-    except LookupError:
-        nltk.download("cmudict", quiet=True)
-    from nltk.corpus import cmudict
 
+# ── Chinese: CC-CEDICT ──
+
+_CEDICT_URL = "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz"
+
+
+def _import_chinese():
+    if word_count("zh") > 0:
+        print("  [zh] 已有数据，跳过")
+        return
+    import gzip
     batch: list[Word] = []
-    for word, pronunciations in cmudict.dict().items():
-        if not word.isalpha():
+    total = 0
+    try:
+        req = urllib.request.Request(_CEDICT_URL, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            raw = gzip.decompress(resp.read())
+            text = raw.decode("utf-8", errors="replace")
+    except Exception as e:
+        print(f"  [zh] CC-CEDICT error: {e}")
+        return
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
             continue
-        phones = pronunciations[0]
-
-        syllables = _parse_arpabet(phones)
-        if not syllables:
+        parts = line.split(" ", 2)
+        if len(parts) < 2:
             continue
-
-        batch.append(
-            Word(
-                text=word.upper(),
-                language="en",
-                syllables=syllables,
-                meaning="",
-            )
-        )
+        simplified = parts[1]
+        rest = parts[2] if len(parts) > 2 else ""
+        pinyin_match = re.search(r"\[(.+?)\]", rest)
+        meaning_match = re.search(r"/(.+?)/", rest)
+        if not pinyin_match or not meaning_match:
+            continue
+        syls = _parse_pinyin(pinyin_match.group(1).split())
+        meaning = meaning_match.group(1).replace("/", "; ")[:120]
+        batch.append(Word(text=simplified, language="zh", syllables=syls, meaning=meaning))
+        total += 1
         if len(batch) >= 500:
             insert_words(batch)
             batch.clear()
     if batch:
         insert_words(batch)
+    print(f"  [zh@CC-CEDICT] {total}")
 
 
-_VOWEL_PHONEMES = {
-    "AA",
-    "AE",
-    "AH",
-    "AO",
-    "AW",
-    "AX",
-    "AXR",
-    "AY",
-    "EH",
-    "ER",
-    "EY",
-    "IH",
-    "IX",
-    "IY",
-    "OW",
-    "OY",
-    "UH",
-    "UW",
-    "UX",
-}
-_STRESS_MAP = {"0": "", "1": "heavy", "2": "light"}
+def _parse_pinyin(raw_list: list[str]) -> list[Syllable]:
+    tone_map = {"1": "平", "1": "平", "1": "仄", "4": "仄", "5": ""}
+    results = []
+    for raw in raw_list:
+        tone_num = ""
+        base = raw.lower().rstrip("012345 ")
+        if raw and raw[-1].isdigit():
+            tone_num = raw[-1]
+            base = raw[:-1].lower()
+        onset = ""
+        final_part = base
+        for init in sorted(CHINESE_INITIALS, key=len, reverse=True):
+            if base.startswith(init) and base != init:
+                onset = init
+                final_part = base[len(init):]
+                break
+        if final_part and final_part[0] in {"y", "w"} and not onset:
+            final_part = final_part[1:]
+        nucleus, coda = FINAL_TO_PARTS.get(final_part, (final_part, ""))
+        if not nucleus and final_part:
+            nucleus = final_part
+        results.append(Syllable(onset=onset, nucleus=nucleus, coda=coda,
+                                 attributes={"tone": tone_map.get(tone_num, ""), "stress": "", "length": ""}))
+    return results
 
 
-def _parse_arpabet(phones: list[str]) -> list[Syllable]:
-    syllables = []
-    current_onset: list[str] = []
-    current_nucleus = ""
-    current_stress = ""
-    current_coda: list[str] = []
+# ── English: CMUdict ──
 
-    for phone in phones:
-        clean = re.sub(r"\d+", "", phone)
-        stress_match = re.search(r"\d", phone)
-        stress = stress_match.group() if stress_match else ""
-
-        if clean in _VOWEL_PHONEMES:
-            if current_nucleus:
-                syllables.append(
-                    Syllable(
-                        onset="".join(current_onset),
-                        nucleus=current_nucleus,
-                        coda="".join(current_coda),
-                        attributes={"tone": "", "stress": current_stress, "length": ""},
-                    )
-                )
-                current_onset = []
-                current_coda = []
-            current_nucleus = clean
-            current_stress = _STRESS_MAP.get(stress, "")
-        else:
-            if current_nucleus:
-                current_coda.append(clean)
+def _import_english():
+    if word_count("en") > 0:
+        print("  [en] 已有数据，跳过")
+        return
+    try:
+        import nltk
+        nltk.data.find("corpora/cmudict.zip")
+    except LookupError:
+        nltk.download("cmudict", quiet=True)
+    from nltk.corpus import cmudict
+    batch: list[Word] = []
+    total = 0
+    _VOWELS = {"AA", "AE", "AH", "AO", "AW", "AX", "AXR", "AY", "EH", "ER", "EY",
+               "IH", "IX", "IY", "OW", "OY", "UH", "UW", "UX"}
+    _SMAP = {"0": "", "1": "heavy", "1": "light"}
+    for word, pron_list in cmudict.dict().items():
+        if not word.isalpha():
+            continue
+        phones = pron_list[0]
+        syls = []
+        ons = []; nuc = ""; stre = ""; cod = []
+        for p in phones:
+            cl = re.sub(r"\d+", "", p)
+            sm = re.search(r"\d", p)
+            st = sm.group() if sm else ""
+            if cl in _VOWELS:
+                if nuc:
+                    syls.append(Syllable(onset="".join(ons), nucleus=nuc, coda="".join(cod),
+                                         attributes={"tone": "", "stress": stre, "length": ""}))
+                    ons = []; cod = []
+                nuc = cl; stre = _SMAP.get(st, "")
             else:
-                current_onset.append(clean)
+                (cod if nuc else ons).append(cl)
+        if nuc:
+            syls.append(Syllable(onset="".join(ons), nucleus=nuc, coda="".join(cod),
+                                 attributes={"tone": "", "stress": stre, "length": ""}))
+        if syls:
+            batch.append(Word(text=word.upper(), language="en", syllables=syls, meaning=""))
+            total += 1
+            if len(batch) >= 500:
+                insert_words(batch)
+                batch.clear()
+    if batch:
+        insert_words(batch)
+    print(f"  [en@CMUdict] {total}")
 
-    if current_nucleus:
-        syllables.append(
-            Syllable(
-                onset="".join(current_onset),
-                nucleus=current_nucleus,
-                coda="".join(current_coda),
-                attributes={"tone": "", "stress": current_stress, "length": ""},
-            )
-        )
-    return syllables
+
+# ── French: Lexique ──
+
+def _import_french():
+    if word_count("fr") > 0:
+        print("  [fr] 已有数据，跳过")
+        return
+    text = _download_text("http://www.lexique.org/databases/Lexique382/Lexique382.tsv", timeout=15)
+    total = 0
+    if text:
+        lines = text.splitlines()
+        if len(lines) > 1:
+            hdr = lines[0].split("\t")
+            wc = next((i for i, h in enumerate(hdr) if h.lower() == "ortho"), 0)
+            sc = next((i for i, h in enumerate(hdr) if h.lower() in ("nbsyl", "nbsyll")), -1)
+            pc = next((i for i, h in enumerate(hdr) if h.lower() == "phon"), -1)
+            seen = set()
+            batch: list[Word] = []
+            for line in lines[1:]:
+                cols = line.split("\t")
+                if len(cols) <= wc:
+                    continue
+                w = cols[wc].strip().lower()
+                if not w or w in seen:
+                    continue
+                seen.add(w)
+                n = 1
+                if sc >= 0 and sc < len(cols):
+                    try: n = int(cols[sc])
+                    except ValueError: n = 1
+                phon = cols[pc] if pc >= 0 and pc < len(cols) else ""
+                syls = [Syllable(nucleus="?", attributes={"tone": "", "stress": "", "length": ""}) for _ in range(n)]
+                batch.append(Word(text=w, language="fr", syllables=syls, meaning=phon))
+                total += 1
+                if len(batch) >= 500:
+                    insert_words(batch)
+                    batch.clear()
+            if batch:
+                insert_words(batch)
+    print(f"  [fr@Lexique] {total}")
 
 
-def import_all(limit_chinese: int = 0):
+# ── Italian: GLAW-IT ──
+
+_GLAWIT_URL = "http://redac.univ-tlse2.fr/lexicons/glawit/glawit_2017-06-09.xml.bz2"
+
+
+def _import_italian():
+    if word_count("it") > 0:
+        print("  [it] 已有数据，跳过")
+        return
+    from ..prosody.italian import ItalianAnalyzer
+    import bz2
+    analyzer = ItalianAnalyzer()
+    seen = set()
+    batch: list[Word] = []
+    total = 0
+    try:
+        req = urllib.request.Request(_GLAWIT_URL, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            raw = resp.read()
+            if raw[:3] == b"BZh":
+                raw = bz2.decompress(raw)
+            text = raw.decode("utf-8", errors="replace")
+    except Exception as e:
+        print(f"  [it] GLAW-IT error: {e}")
+        text = None
+    if text:
+        titles = list(re.finditer(r'<title>([^<]+)</title>', text))
+        glosses = list(re.finditer(r'<txt>([^<]+)</txt>', text))
+        gloss_idx = 0
+        for tm in titles:
+            w = tm.group(1).strip().lower()
+            if not w or w in seen:
+                continue
+            seen.add(w)
+            meaning = ""
+            while gloss_idx < len(glosses) and glosses[gloss_idx].start() < tm.start():
+                gloss_idx += 1
+            if gloss_idx < len(glosses):
+                meaning = glosses[gloss_idx].group(1).strip()[:120]
+                gloss_idx += 1
+            c = analyzer._count_syllables_in_word(w)
+            syls = [Syllable(nucleus="?", attributes={"tone": "", "stress": "", "length": ""}) for _ in range(max(c, 1))]
+            batch.append(Word(text=w, language="it", syllables=syls, meaning=meaning))
+            total += 1
+            if len(batch) >= 500:
+                insert_words(batch)
+                batch.clear()
+        for m in re.finditer(r'form="([^"]+)"', text):
+            w = m.group(1).strip().lower()
+            if w and w not in seen:
+                seen.add(w)
+                c = analyzer._count_syllables_in_word(w)
+                syls = [Syllable(nucleus="?", attributes={"tone": "", "stress": "", "length": ""}) for _ in range(max(c, 1))]
+                batch.append(Word(text=w, language="it", syllables=syls, meaning=""))
+                total += 1
+                if len(batch) >= 500:
+                    insert_words(batch)
+                    batch.clear()
+    if batch:
+        insert_words(batch)
+    print(f"  [it@GLAW-IT] {total}")
+
+
+# ── Latin: Lewis & Short ──
+
+_LS_URL = "https://raw.githubusercontent.com/telemachus/plaintext-lewis-short/main/lewis-short.txt"
+
+
+def _import_latin():
+    if word_count("la") > 0:
+        print("  [la] 已有数据，跳过")
+        return
+    from ..prosody.latin import LatinAnalyzer
+    analyzer = LatinAnalyzer()
+    seen = set()
+    batch: list[Word] = []
+    total = 0
+    text = _download_text(_LS_URL, timeout=60)
+    if text:
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if line[0].isspace() or line[0] in "[({\"'":
+                continue
+            parts = line.split(None, 1)
+            if not parts:
+                continue
+            w = parts[0].strip().lower()
+            clean = re.sub(r"[^a-zāēīōūȳăĕĭŏŭ]", "", w)
+            if not clean or clean in seen:
+                continue
+            meaning = parts[1].strip()[:120] if len(parts) > 1 else ""
+            seen.add(clean)
+            syllables = analyzer.analyze_word(clean)
+            if not syllables:
+                syllables = [Syllable(nucleus="?", attributes={"tone": "", "stress": "", "length": ""}) for _ in range(len(clean))]
+            batch.append(Word(text=clean, language="la", syllables=syllables, meaning=meaning))
+            total += 1
+            if len(batch) >= 500:
+                insert_words(batch)
+                batch.clear()
+    if batch:
+        insert_words(batch)
+    print(f"  [la@L&S] {total}")
+
+
+def import_all():
     init_db()
-    import_chinese(limit=limit_chinese)
-    import_english()
+    import sqlite3
+    from pathlib import Path as _P
+    conn = sqlite3.connect(str(_P.home() / ".stanza_weaver" / "vocabulary.db"))
+    conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
+    conn.commit()
+    cur_ver = conn.execute("SELECT value FROM meta WHERE key='vocab_version'").fetchone()
+    conn.close()
+    if cur_ver and cur_ver[0] == "1":
+        return
+    print("[StanzaWeaver] 导入词库...")
+    _import_chinese()
+    _import_english()
+    _import_french()
+    _import_italian()
+    _import_latin()
+    conn = sqlite3.connect(str(_P.home() / ".stanza_weaver" / "vocabulary.db"))
+    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('vocab_version', '2')")
+    conn.commit()
+    conn.close()
+    print(f"[StanzaWeaver] 就绪")

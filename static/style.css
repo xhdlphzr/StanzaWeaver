@@ -916,6 +916,49 @@ header h1 {
     user-select: text;
 }
 
+/* ---- Import Overlay ---- */
+
+.import-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(245, 240, 232, 0.85);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+    animation: fade-in 0.4s ease-out;
+}
+
+.import-overlay.hidden {
+    display: none;
+}
+
+.import-overlay-content {
+    text-align: center;
+    color: #5a3e2b;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.import-overlay-content p {
+    margin-top: 20px;
+}
+
+.import-spinner {
+    width: 40px; height: 40px;
+    margin: 0 auto;
+    border: 3px solid rgba(180,150,120,0.3);
+    border-top-color: #5a3e2b;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 /* ---- Scrollbar ---- */
 
 ::-webkit-scrollbar {

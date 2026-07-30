@@ -24,32 +24,41 @@ register_latin_templates()
 # Auto-import vocabulary on first run
 import threading as _threading
 def _auto_import():
+    global _vocab_importing
     from src.knowledge.vocabulary import init_db, word_count
     import sqlite3
-    from pathlib import Path as _Path
+    from pathlib import Path as _P
 
     init_db()
-    hdb = _Path.home() / ".stanza_weaver" / "vocabulary.db"
-    conn = sqlite3.connect(str(hdb))
-    conn.execute("DELETE FROM words")
+    conn = sqlite3.connect(str(_P.home() / ".stanza_weaver" / "vocabulary.db"))
+    conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
     conn.commit()
+    cur_ver = conn.execute("SELECT value FROM meta WHERE key='vocab_version'").fetchone()
     conn.close()
+    if cur_ver and cur_ver[0] == "1":
+        _vocab_importing = False
+        return
 
-    print("[StanzaWeaver] 正在导入词库...")
     from src.knowledge.importer import import_all
-
     import_all()
-    print(f"[StanzaWeaver] 词库就绪: 中文 {word_count('zh')} 条, 英文 {word_count('en')} 条")
+    _vocab_importing = False
 _threading.Thread(target=_auto_import, daemon=True).start()
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 _active_states: dict[str, dict] = {}
+_vocab_importing = True
 
 
 def load_templates() -> list[dict]:
     return list_dicts()
+
+
+@app.route("/api/import-status")
+def api_import_status():
+    global _vocab_importing
+    return jsonify({"importing": _vocab_importing})
 
 
 @app.route("/")
