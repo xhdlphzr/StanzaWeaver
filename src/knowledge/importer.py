@@ -296,7 +296,7 @@ def import_all():
     conn.commit()
     cur_ver = conn.execute("SELECT value FROM meta WHERE key='vocab_version'").fetchone()
     conn.close()
-    if cur_ver and cur_ver[0] == "1":
+    if cur_ver and cur_ver[0] == "2":
         return
     print("[StanzaWeaver] 导入词库...")
     _import_chinese()
@@ -305,7 +305,7 @@ def import_all():
     _import_italian()
     _import_latin()
     conn = sqlite3.connect(str(_P.home() / ".stanza_weaver" / "vocabulary.db"))
-    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('vocab_version', '1')")
+    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('vocab_version', '2')")
     conn.commit()
     conn.close()
     print(f"[StanzaWeaver] 就绪")

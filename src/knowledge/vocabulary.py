@@ -1,6 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
+import json
 import sqlite3
 from pathlib import Path
 from typing import Optional
@@ -32,24 +33,6 @@ def init_db():
     conn = sqlite3.connect(str(db_path))
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
     conn.executescript(schema)
-    conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
-    conn.commit()
-    conn.close()
-
-
-def get_meta(key: str) -> str | None:
-    conn = _get_conn()
-    row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
-    conn.close()
-    return row[0] if row else None
-
-
-def set_meta(key: str, value: str):
-    conn = _get_conn()
-    conn.execute(
-        "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, value)
-    )
-    conn.commit()
     conn.close()
 
 
@@ -58,80 +41,41 @@ def _get_conn() -> sqlite3.Connection:
 
 
 def insert_word(word: Word):
-    conn = _get_conn()
-    syllables = word.syllables
-    if syllables:
-        s0 = syllables[0]
-        onset = s0.onset
-        nucleus = s0.nucleus
-        coda = s0.coda
-        tone = s0.attributes.get("tone", "")
-        stress = s0.attributes.get("stress", "")
-        length = s0.attributes.get("length", "")
-        syl_count = len(syllables)
-    else:
-        onset = nucleus = coda = tone = stress = length = ""
-        syl_count = 0
-
-    conn.execute(
-        """INSERT INTO words (text, language, meaning, onset, nucleus, coda, tone, stress, length, syllable_count)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (
-            word.text,
-            word.language,
-            word.meaning,
-            onset,
-            nucleus,
-            coda,
-            tone,
-            stress,
-            length,
-            syl_count,
-        ),
-    )
-    conn.commit()
-    conn.close()
+    insert_words([word])
 
 
 def insert_words(words: list[Word]):
     conn = _get_conn()
     rows = []
     for word in words:
-        syllables = word.syllables
-        if syllables:
-            s0 = syllables[0]
-            onset = s0.onset
-            nucleus = s0.nucleus
-            coda = s0.coda
-            tone = s0.attributes.get("tone", "")
-            stress = s0.attributes.get("stress", "")
-            length = s0.attributes.get("length", "")
-            syl_count = len(syllables)
-        else:
-            onset = nucleus = coda = tone = stress = length = ""
-            syl_count = 0
-        rows.append(
-            (
-                word.text,
-                word.language,
-                word.meaning,
-                onset,
-                nucleus,
-                coda,
-                tone,
-                stress,
-                length,
-                syl_count,
-            )
-        )
-
+        syls = word.syllables
+        sc = len(syls) if syls else 1
+        syls_data = json.dumps([s.to_dict() for s in syls], ensure_ascii=False) if syls else "[]"
+        rows.append((word.text, word.language, word.meaning, syls_data, sc))
     conn.executemany(
-        """INSERT INTO words (text, language, meaning, onset, nucleus, coda, tone, stress, length, syllable_count)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        "INSERT INTO words (text, language, meaning, syllables_json, syllable_count) VALUES (?, ?, ?, ?, ?)",
         rows,
     )
     conn.commit()
     conn.close()
+
+
+def _syl_from_json(d: dict) -> Syllable:
+    attrs = d.get("attributes", {})
+    return Syllable(
+        onset=d.get("onset", ""), nucleus=d.get("nucleus", ""), coda=d.get("coda", ""),
+        attributes={"tone": attrs.get("tone", ""), "stress": attrs.get("stress", ""), "length": attrs.get("length", "")},
+    )
+
+
+def _syl_matches(syl: Syllable, onset="", nucleus="", coda="", tone="", stress="", length="") -> bool:
+    if onset and syl.onset != onset: return False
+    if nucleus and syl.nucleus != nucleus: return False
+    if coda and syl.coda != coda: return False
+    if tone and syl.attributes.get("tone", "") != tone: return False
+    if stress and syl.attributes.get("stress", "") != stress: return False
+    if length and syl.attributes.get("length", "") != length: return False
+    return True
 
 
 def search_words(
@@ -148,73 +92,47 @@ def search_words(
 ) -> list[dict]:
     conn = _get_conn()
     conditions = ["language = ?"]
-    params = [language]
+    params: list = [language]
 
     if syllable_count is not None:
         conditions.append("syllable_count = ?")
         params.append(syllable_count)
 
-    if onset:
-        conditions.append("onset = ?")
-        params.append(onset)
-
-    if nucleus:
-        conditions.append("nucleus = ?")
-        params.append(nucleus)
-
-    if coda:
-        conditions.append("coda = ?")
-        params.append(coda)
-
-    if tone:
-        conditions.append("tone = ?")
-        params.append(tone)
-
-    if stress:
-        conditions.append("stress = ?")
-        params.append(stress)
-
-    if length:
-        conditions.append("length = ?")
-        params.append(length)
-
     where_clause = " AND ".join(conditions)
-    sql = f"SELECT text, language, meaning, onset, nucleus, coda, tone, stress, length, syllable_count FROM words WHERE {where_clause} LIMIT ?"
-    params.append(limit)
+    sql = f"SELECT text, language, meaning, syllables_json, syllable_count FROM words WHERE {where_clause} LIMIT ?"
+    params.append(limit * 4 if not onset and not nucleus and not coda and not tone and not stress and not length else limit * 8)
 
     rows = conn.execute(sql, params).fetchall()
     conn.close()
 
     results = []
     for row in rows:
-        text, lang, m, ons, nuc, cod, ton, stre, leng, sc = row
-        syl = Syllable(
-            onset=ons,
-            nucleus=nuc,
-            coda=cod,
-            attributes={"tone": ton, "stress": stre, "length": leng},
-        )
-        syllables = [syl] * sc
-        results.append(
-            {
-                "text": text,
-                "language": lang,
-                "meaning": m,
-                "syllables": [s.to_dict() for s in syllables],
-            }
-        )
+        text, lang, meaning, syls_json, sc = row
+        syllables = [_syl_from_json(s) for s in json.loads(syls_json)] if syls_json else []
+        if not syllables:
+            syllables = [Syllable(nucleus="?", attributes={"tone": "", "stress": "", "length": ""}) for _ in range(sc)]
+
+        if onset or nucleus or coda or tone or stress or length:
+            if not any(_syl_matches(s, onset, nucleus, coda, tone, stress, length) for s in syllables):
+                continue
+
+        results.append({
+            "text": text, "language": lang, "meaning": meaning,
+            "syllables": [s.to_dict() for s in syllables],
+        })
+        if len(results) >= limit:
+            break
+
     if query and results:
         from .embeddings import rerank
         results = rerank(query, results, top_k=limit)
-    return results
+    return results[:limit]
 
 
 def word_count(language: str = "") -> int:
     conn = _get_conn()
     if language:
-        count = conn.execute(
-            "SELECT COUNT(*) FROM words WHERE language = ?", (language,)
-        ).fetchone()[0]
+        count = conn.execute("SELECT COUNT(*) FROM words WHERE language = ?", (language,)).fetchone()[0]
     else:
         count = conn.execute("SELECT COUNT(*) FROM words").fetchone()[0]
     conn.close()

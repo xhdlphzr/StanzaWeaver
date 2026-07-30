@@ -4,7 +4,7 @@
 import numpy as np
 
 _MODEL = None
-_MODEL_NAME = "all-MiniLM-L12-v2"
+_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 
 
 def _get_model():

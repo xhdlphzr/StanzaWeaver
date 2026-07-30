@@ -33,7 +33,7 @@ def _auto_import():
     conn.commit()
     cur_ver = conn.execute("SELECT value FROM meta WHERE key='vocab_version'").fetchone()
     conn.close()
-    if cur_ver and cur_ver[0] == "1":
+    if cur_ver and cur_ver[0] == "2":
         _vocab_importing = False
         return
 
