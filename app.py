@@ -10,10 +10,12 @@ from flask_socketio import SocketIO, emit
 # Import and register all templates
 from src.templates.zh import register_chinese_templates
 from src.templates.en import register_english_templates
+from src.templates.it import register_italian_templates
 from src.templates import list_dicts
 
 register_chinese_templates()
 register_english_templates()
+register_italian_templates()
 
 # Auto-import vocabulary on first run
 import threading as _threading
