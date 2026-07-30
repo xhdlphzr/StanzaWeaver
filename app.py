@@ -40,7 +40,7 @@ def _auto_import():
     from src.knowledge.importer import import_all
     import_all()
     _vocab_importing = False
-_threading.Thread(target=_auto_import, daemon=True).start()
+threading.Thread(target=_auto_import, daemon=True).start()
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
