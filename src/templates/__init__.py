@@ -75,6 +75,7 @@ _LANGUAGE_LABELS: dict[str, str] = {
     "en": "英语",
     "it": "意大利语",
     "fr": "法语",
+    "la": "古典拉丁语",
 }
 
 
