@@ -228,7 +228,29 @@ header h1 {
     to { opacity: 1; transform: translateY(0); }
 }
 
-.field input::placeholder {
+.field textarea {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid rgba(180, 150, 120, 0.3);
+    border-radius: 10px;
+    font-size: 14px;
+    background: rgba(253, 250, 245, 0.8);
+    color: #3d3226;
+    font-family: inherit;
+    line-height: 1.6;
+    resize: none;
+    overflow: hidden;
+    transition: all 0.3s;
+}
+
+.field textarea:focus {
+    outline: none;
+    border-color: rgba(139, 115, 85, 0.5);
+    box-shadow: 0 0 0 4px rgba(139, 115, 85, 0.08);
+    background: #fdfaf5;
+}
+
+.field textarea::placeholder {
     color: #b5a48c;
 }
 
