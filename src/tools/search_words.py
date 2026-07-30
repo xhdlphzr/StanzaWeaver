@@ -6,7 +6,6 @@ from ..knowledge.vocabulary import search_words as db_search
 
 def execute_search_words(template: dict, arguments: dict) -> dict:
     language = template.get("language", "zh")
-    meaning = arguments.get("meaning", "")
     syllable_count = arguments.get("syllable_count")
     onset = arguments.get("onset", "")
     nucleus = arguments.get("nucleus", "")
@@ -18,7 +17,6 @@ def execute_search_words(template: dict, arguments: dict) -> dict:
 
     results = db_search(
         language=language,
-        meaning=meaning,
         syllable_count=syllable_count,
         onset=onset,
         nucleus=nucleus,

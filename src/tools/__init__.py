@@ -5,14 +5,10 @@ SEARCH_WORDS_TOOL = {
     "type": "function",
     "function": {
         "name": "search_words",
-        "description": "搜索候选词。按意思、音节约束、词性查找可用词汇，返回符合条件的所有候选词及其音节信息和释义。",
+        "description": "搜索候选词。按音节约束、词性查找可用词汇，返回符合条件的所有候选词及其音节信息。",
         "parameters": {
             "type": "object",
             "properties": {
-                "meaning": {
-                    "type": "string",
-                    "description": "语义关键词，用于模糊匹配词义或文本",
-                },
                 "syllable_count": {"type": "integer", "description": "音节数量约束"},
                 "onset": {"type": "string", "description": "声母约束（空=不限）"},
                 "nucleus": {"type": "string", "description": "韵母约束（空=不限）"},
