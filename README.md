@@ -121,3 +121,26 @@ StanzaWeaver/
 ```
 
 UI 齿轮按钮中直接编辑保存，或手动编辑 `~/.stanza_weaver/config.json`。
+
+### Ollama 本地部署
+
+```json
+{
+  "writer": {
+    "base_url": "http://127.0.0.1:11434/v1",
+    "api_key": "ollama",
+    "model": "你的本地模型名"
+  },
+  "checker": {
+    "base_url": "http://127.0.0.1:11434/v1",
+    "api_key": "ollama",
+    "model": "你的本地模型名"
+  }
+}
+```
+
+注意事项：
+
+- **Base URL 必须带 `/v1`**（Ollama 的 OpenAI 兼容端点），否则返回 404。
+- 模型名必须是 `ollama list` 中已安装的模型；`:cloud` 云模型需要 Ollama 订阅，否则返回 403。
+- **502 Bad Gateway**：通常是 shell 中设置了 `HTTP_PROXY`/`HTTPS_PROXY` 环境变量（如 Clash 等代理工具），本地请求被转发给代理导致。StanzaWeaver 已对 `127.0.0.1`/`localhost` 自动绕过代理直连，若仍出现 502，请检查启动 app 的终端环境变量。
