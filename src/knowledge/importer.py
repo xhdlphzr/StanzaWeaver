@@ -7,7 +7,7 @@ import urllib.request
 from ..models.word import Word
 from ..models.syllable import Syllable
 from ..prosody.chinese import FINAL_TO_PARTS, CHINESE_INITIALS
-from .vocabulary import init_db, insert_words, word_count
+from .vocabulary import init_db, insert_words
 
 
 def _download_text(url: str, timeout: int = 10) -> str | None:
@@ -19,20 +19,42 @@ def _download_text(url: str, timeout: int = 10) -> str | None:
         return None
 
 
-# ── Chinese: CC-CEDICT ──
+def _dataset_key(name: str) -> str:
+    return f"dataset_{name}"
 
-_CEDICT_URL = "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz"
+
+def _check_dataset(lang: str, expected: str) -> bool:
+    import sqlite3
+    from pathlib import Path as _P
+    conn = sqlite3.connect(str(_P.home() / ".stanza_weaver" / "vocabulary.db"))
+    conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
+    conn.commit()
+    cur = conn.execute("SELECT value FROM meta WHERE key = ?", (_dataset_key(lang),)).fetchone()
+    count = conn.execute("SELECT COUNT(*) FROM words WHERE language = ?", (lang,)).fetchone()[0]
+    conn.close()
+    return cur and cur[0] == expected and count > 0
+
+
+def _set_dataset(lang: str, name: str):
+    import sqlite3
+    from pathlib import Path as _P
+    conn = sqlite3.connect(str(_P.home() / ".stanza_weaver" / "vocabulary.db"))
+    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (_dataset_key(lang), name))
+    conn.commit()
+    conn.close()
 
 
 def _import_chinese():
-    if word_count("zh") > 0:
+    if _check_dataset("zh", "CC-CEDICT"):
         print("  [zh] 已有数据，跳过")
         return
     import gzip
     batch: list[Word] = []
     total = 0
     try:
-        req = urllib.request.Request(_CEDICT_URL, headers={"User-Agent": "Mozilla/5.0"})
+        req = urllib.request.Request(
+            "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz",
+            headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=60) as resp:
             raw = gzip.decompress(resp.read())
             text = raw.decode("utf-8", errors="replace")
@@ -61,6 +83,8 @@ def _import_chinese():
             batch.clear()
     if batch:
         insert_words(batch)
+    if total > 0:
+        _set_dataset("zh", "CC-CEDICT")
     print(f"  [zh@CC-CEDICT] {total}")
 
 
@@ -90,10 +114,18 @@ def _parse_pinyin(raw_list: list[str]) -> list[Syllable]:
     return results
 
 
+def _sqlite_delete(lang: str):
+    import sqlite3
+    from pathlib import Path as _P
+    conn = sqlite3.connect(str(_P.home() / ".stanza_weaver" / "vocabulary.db"))
+    conn.execute("DELETE FROM words WHERE language = ?", (lang,))
+    conn.commit()
+    conn.close()
+
 # ── English: CMUdict ──
 
 def _import_english():
-    if word_count("en") > 0:
+    if _check_dataset("en", "CMUdict"):
         print("  [en] 已有数据，跳过")
         return
     try:
@@ -136,13 +168,15 @@ def _import_english():
                 batch.clear()
     if batch:
         insert_words(batch)
+    if total > 0:
+        _set_dataset("en", "CMUdict")
     print(f"  [en@CMUdict] {total}")
 
 
 # ── French: Lexique ──
 
 def _import_french():
-    if word_count("fr") > 0:
+    if _check_dataset("fr", "Lexique382"):
         print("  [fr] 已有数据，跳过")
         return
     text = _download_text("http://www.lexique.org/databases/Lexique382/Lexique382.tsv", timeout=15)
@@ -177,6 +211,8 @@ def _import_french():
                     batch.clear()
             if batch:
                 insert_words(batch)
+    if total > 0:
+        _set_dataset("fr", "Lexique382")
     print(f"  [fr@Lexique] {total}")
 
 
@@ -186,7 +222,7 @@ _GLAWIT_URL = "http://redac.univ-tlse2.fr/lexicons/glawit/glawit_2017-06-09.xml.
 
 
 def _import_italian():
-    if word_count("it") > 0:
+    if _check_dataset("it", "GLAW-IT"):
         print("  [it] 已有数据，跳过")
         return
     from ..prosody.italian import ItalianAnalyzer
@@ -240,6 +276,8 @@ def _import_italian():
                     batch.clear()
     if batch:
         insert_words(batch)
+    if total > 0:
+        _set_dataset("it", "GLAW-IT")
     print(f"  [it@GLAW-IT] {total}")
 
 
@@ -249,7 +287,7 @@ _LS_URL = "https://raw.githubusercontent.com/telemachus/plaintext-lewis-short/ma
 
 
 def _import_latin():
-    if word_count("la") > 0:
+    if _check_dataset("la", "Lewis-Short"):
         print("  [la] 已有数据，跳过")
         return
     from ..prosody.latin import LatinAnalyzer
@@ -284,28 +322,17 @@ def _import_latin():
                 batch.clear()
     if batch:
         insert_words(batch)
+    if total > 0:
+        _set_dataset("la", "Lewis-Short")
     print(f"  [la@L&S] {total}")
 
 
 def import_all():
     init_db()
-    import sqlite3
-    from pathlib import Path as _P
-    conn = sqlite3.connect(str(_P.home() / ".stanza_weaver" / "vocabulary.db"))
-    conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
-    conn.commit()
-    cur_ver = conn.execute("SELECT value FROM meta WHERE key='vocab_version'").fetchone()
-    conn.close()
-    if cur_ver and cur_ver[0] == "2":
-        return
     print("[StanzaWeaver] 导入词库...")
     _import_chinese()
     _import_english()
     _import_french()
     _import_italian()
     _import_latin()
-    conn = sqlite3.connect(str(_P.home() / ".stanza_weaver" / "vocabulary.db"))
-    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('vocab_version', '2')")
-    conn.commit()
-    conn.close()
     print(f"[StanzaWeaver] 就绪")
