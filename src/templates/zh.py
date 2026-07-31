@@ -74,11 +74,25 @@ def _check_alternation(syllables: list[Syllable], even_pattern: list[str]) -> li
     return errors
 
 
+# 拼音省写映射: iou→iu, uei→ui, uen→un, üen→vn，押韵取省写前的韵腹+韵尾
+_RHYME_MEDIAL_MAP = {
+    "iu": "ou",
+    "ui": "ei",
+    "un": "en",
+    "vn": "en",
+    "ün": "en",
+}
+
+
 def _rhyme_key(syl: Syllable) -> str:
     """韵脚 key：忽略介音（韵头），只取韵腹+韵尾，如 ang/uang/iang 视为同韵。"""
     nucleus = syl.nucleus
     if len(nucleus) > 1 and nucleus[0] in ("i", "u", "ü", "v"):
+        if nucleus in _RHYME_MEDIAL_MAP:
+            return _RHYME_MEDIAL_MAP[nucleus] + syl.coda
         nucleus = nucleus[1:]
+    if nucleus in _RHYME_MEDIAL_MAP:
+        return _RHYME_MEDIAL_MAP[nucleus] + syl.coda
     return nucleus + syl.coda
 
 
@@ -107,6 +121,98 @@ def _check_rhyme(
     return errors
 
 
+def _check_jinti_rhyme(
+    syllables_list: list[list[Syllable]],
+    rhyme_lines: list[int],
+    description: str = "押韵",
+) -> list[str]:
+    """近体诗押韵检查：偶数行必须押平声韵；首句尾字为平声时一并入韵（首句入韵式），
+    为仄声时不入韵（首句不入韵式）。"""
+    errors = []
+    keys = []
+    for line_idx in rhyme_lines:
+        if line_idx < len(syllables_list) and syllables_list[line_idx]:
+            last = syllables_list[line_idx][-1]
+            if last.attributes.get("tone", "") != "平":
+                errors.append(f"第{line_idx + 1}行韵脚应为平声字，实际为'{last.attributes.get('tone') or '未知'}'")
+            keys.append((line_idx, _rhyme_key(last)))
+    first = syllables_list[0][-1] if syllables_list and syllables_list[0] else None
+    if first is not None and first.attributes.get("tone") == "平":
+        keys.insert(0, (0, _rhyme_key(first)))
+    if len(keys) < 2:
+        return errors
+    base_idx, base_rhyme = keys[0]
+    if not base_rhyme:
+        return errors
+    for line_idx, rhyme in keys[1:]:
+        if rhyme and rhyme != base_rhyme:
+            errors.append(
+                f"{description}: 第{base_idx + 1}行韵脚为'{base_rhyme}'，第{line_idx + 1}行韵脚为'{rhyme}'，不押韵"
+            )
+    return errors
+
+
+def _check_jinti_structure(
+    syllables_list: list[list[Syllable]],
+) -> list[str]:
+    """近体诗句式结构检查：每句第2/4(6)字平仄相间（四种基本句式特征）、
+    联内相对（出句与对句在 2/4(6) 位平仄相反）、联间相粘（下一联出句与
+    上一联对句在 2/4(6) 位平仄相同）。tone 未知的字跳过不判。"""
+    errors = []
+    if len(syllables_list) < 2:
+        return errors
+    first_len = len(syllables_list[0])
+    positions = [1, 3] if first_len <= 5 else [1, 3, 5]
+
+    def line_tones(idx: int) -> list[str]:
+        syls = syllables_list[idx]
+        return [syls[p].attributes.get("tone", "") for p in positions if p < len(syls)]
+
+    prev_couplet_in: list[str] | None = None
+    for i in range(0, len(syllables_list) - 1, 2):
+        out = line_tones(i)
+        in_ = line_tones(i + 1)
+
+        # 出句(第3行起奇数行)仄脚；首句例外(可押韵平尾可仄尾)
+        if i >= 2 and syllables_list[i]:
+            last_tone = syllables_list[i][-1].attributes.get("tone", "")
+            if last_tone == "平":
+                errors.append(f"第{i + 1}行为出句，尾字应为仄声，实际为平")
+        # 对句(偶数行)平脚
+        if syllables_list[i + 1]:
+            last_tone = syllables_list[i + 1][-1].attributes.get("tone", "")
+            if last_tone == "仄":
+                errors.append(f"第{i + 2}行为对句，尾字应为平声，实际为仄")
+
+        # 每句 2/4(6) 位平仄相间
+        for j in range(len(positions) - 1):
+            for idx, tones in ((i, out), (i + 1, in_)):
+                a = tones[j] if j < len(tones) else ""
+                b = tones[j + 1] if j + 1 < len(tones) else ""
+                if a and b and a == b:
+                    errors.append(
+                        f"第{idx + 1}行第{positions[j] + 1}字与第{positions[j + 1] + 1}字平仄应相间，实际均为'{a}'"
+                    )
+
+        # 联内相对
+        for j, (a, b) in enumerate(zip(out, in_)):
+            if a and b and a == b:
+                errors.append(
+                    f"第{i + 1}行与第{i + 2}行应相对: 第{positions[j] + 1}字平仄应相反，实际均为'{a}'"
+                )
+
+        # 联间相粘
+        if prev_couplet_in is not None:
+            for j, (a, b) in enumerate(zip(prev_couplet_in, out)):
+                if a and b and a != b:
+                    errors.append(
+                        f"第{i + 1}行应与第{i}行相粘: 第{positions[j] + 1}字平仄应相同，实际'{a}'与'{b}'"
+                    )
+
+        prev_couplet_in = in_
+    return errors
+
+
 def _check_lv_alternation(
     syllables: list[Syllable], line_idx: int, constraints: list[list[dict]]
 ) -> list[str]:
@@ -130,15 +236,14 @@ class WujueTemplate(PoetryTemplate):
     language = "zh"
     lines = 4
     syllables_per_line = [5, 5, 5, 5]
+    rule_description = (
+        "格律规则：每句第2、4字平仄相间；每联上下句第2、4字平仄相对；"
+        "下一联首句与上一联对句第2、4字平仄相粘；"
+        "偶数句押平声韵，首句尾字可押韵(平)可不押韵(仄)；忌三平尾、三仄尾、孤平。"
+    )
 
     def get_syllable_constraints(self):
-        _z, _p, _f = _tone("仄"), _tone("平"), _FREE
-        return [
-            [_f, _z, _f, _p, _z],
-            [_f, _p, _f, _z, _p],
-            [_f, _p, _f, _z, _z],
-            [_f, _z, _f, _p, _p],
-        ]
+        return None
 
     def validate_full(self, poem, syllables):
         errors = []
@@ -146,7 +251,8 @@ class WujueTemplate(PoetryTemplate):
             errors.extend(_check_sanpingwei(syls))
             errors.extend(_check_sanzewei(syls))
             errors.extend(_check_guping(syls))
-        errors.extend(_check_rhyme(syllables, [1, 3], "押韵(二四行)"))
+        errors.extend(_check_jinti_structure(syllables))
+        errors.extend(_check_jinti_rhyme(syllables, [1, 3], "押韵(二四行)"))
         return errors
 
 
@@ -155,15 +261,14 @@ class QijueTemplate(PoetryTemplate):
     language = "zh"
     lines = 4
     syllables_per_line = [7, 7, 7, 7]
+    rule_description = (
+        "格律规则：每句第2、4、6字平仄相间；每联上下句第2、4、6字平仄相对；"
+        "下一联首句与上一联对句第2、4、6字平仄相粘；"
+        "偶数句押平声韵，首句尾字可押韵(平)可不押韵(仄)；忌三平尾、三仄尾、孤平。"
+    )
 
     def get_syllable_constraints(self):
-        _z, _p, _f = _tone("仄"), _tone("平"), _FREE
-        return [
-            [_f, _z, _f, _p, _f, _z, _z],
-            [_f, _p, _f, _z, _f, _p, _p],
-            [_f, _p, _f, _z, _f, _p, _z],
-            [_f, _z, _f, _p, _f, _z, _p],
-        ]
+        return None
 
     def validate_full(self, poem, syllables):
         errors = []
@@ -171,7 +276,8 @@ class QijueTemplate(PoetryTemplate):
             errors.extend(_check_sanpingwei(syls))
             errors.extend(_check_sanzewei(syls))
             errors.extend(_check_guping(syls))
-        errors.extend(_check_rhyme(syllables, [1, 3], "押韵(二四行)"))
+        errors.extend(_check_jinti_structure(syllables))
+        errors.extend(_check_jinti_rhyme(syllables, [1, 3], "押韵(二四行)"))
         return errors
 
 
@@ -180,29 +286,19 @@ class WulvTemplate(PoetryTemplate):
     language = "zh"
     lines = 8
     syllables_per_line = [5] * 8
+    rule_description = WujueTemplate.rule_description
 
     def get_syllable_constraints(self):
-        _z, _p, _f = _tone("仄"), _tone("平"), _FREE
-        return [
-            [_f, _z, _f, _p, _z],
-            [_f, _p, _f, _z, _p],
-            [_f, _p, _f, _z, _z],
-            [_f, _z, _f, _p, _p],
-            [_f, _z, _f, _p, _z],
-            [_f, _p, _f, _z, _p],
-            [_f, _p, _f, _z, _z],
-            [_f, _z, _f, _p, _p],
-        ]
+        return None
 
     def validate_full(self, poem, syllables):
         errors = []
-        constraints = self.get_syllable_constraints()
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
             errors.extend(_check_sanzewei(syls))
             errors.extend(_check_guping(syls))
-            errors.extend(_check_lv_alternation(syls, i, constraints))
-        errors.extend(_check_rhyme(syllables, [1, 3, 5, 7], "押韵(二四六八行)"))
+        errors.extend(_check_jinti_structure(syllables))
+        errors.extend(_check_jinti_rhyme(syllables, [1, 3, 5, 7], "押韵(二四六八行)"))
         return errors
 
 
@@ -211,29 +307,19 @@ class QilvTemplate(PoetryTemplate):
     language = "zh"
     lines = 8
     syllables_per_line = [7] * 8
+    rule_description = QijueTemplate.rule_description
 
     def get_syllable_constraints(self):
-        _z, _p, _f = _tone("仄"), _tone("平"), _FREE
-        return [
-            [_f, _z, _f, _p, _f, _z, _z],
-            [_f, _p, _f, _z, _f, _p, _p],
-            [_f, _p, _f, _z, _f, _p, _z],
-            [_f, _z, _f, _p, _f, _z, _p],
-            [_f, _z, _f, _p, _f, _z, _z],
-            [_f, _p, _f, _z, _f, _p, _p],
-            [_f, _p, _f, _z, _f, _p, _z],
-            [_f, _z, _f, _p, _f, _z, _p],
-        ]
+        return None
 
     def validate_full(self, poem, syllables):
         errors = []
-        constraints = self.get_syllable_constraints()
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
             errors.extend(_check_sanzewei(syls))
             errors.extend(_check_guping(syls))
-            errors.extend(_check_lv_alternation(syls, i, constraints))
-        errors.extend(_check_rhyme(syllables, [1, 3, 5, 7], "押韵(二四六八行)"))
+        errors.extend(_check_jinti_structure(syllables))
+        errors.extend(_check_jinti_rhyme(syllables, [1, 3, 5, 7], "押韵(二四六八行)"))
         return errors
 
 

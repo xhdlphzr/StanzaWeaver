@@ -10,6 +10,7 @@ class PoetryTemplate(ABC):
     language: str = ""
     lines: int = 0
     syllables_per_line: list[int] = []
+    rule_description: str = ""
 
     def get_syllable_constraints(self) -> list[list[dict]] | None:
         return None
@@ -52,6 +53,8 @@ class PoetryTemplate(ABC):
                 if parts:
                     line_info += "\n" + "\n".join(parts)
             lines_desc += "\n" + line_info
+        if self.rule_description:
+            lines_desc += "\n" + self.rule_description
         return lines_desc
 
 
