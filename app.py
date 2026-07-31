@@ -24,22 +24,17 @@ register_latin_templates()
 # Auto-import vocabulary on first run
 def _auto_import():
     global _vocab_importing
-    from src.knowledge.vocabulary import init_db, word_count
-    import sqlite3
+    from src.knowledge.vocabulary import init_db
 
-    init_db()
-    conn = sqlite3.connect(str(Path.home() / ".stanza_weaver" / "vocabulary.db"))
-    conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
-    conn.commit()
-    cur_ver = conn.execute("SELECT value FROM meta WHERE key='vocab_version'").fetchone()
-    conn.close()
-    if cur_ver and cur_ver[0] == "2":
+    try:
+        init_db()
+        print("[StanzaWeaver] 检查词库...")
+        from src.knowledge.importer import import_all
+        import_all()
+    except Exception as e:
+        print(f"[StanzaWeaver] 词库导入失败: {e}")
+    finally:
         _vocab_importing = False
-        return
-
-    from src.knowledge.importer import import_all
-    import_all()
-    _vocab_importing = False
 threading.Thread(target=_auto_import, daemon=True).start()
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
