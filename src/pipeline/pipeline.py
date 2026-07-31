@@ -220,9 +220,10 @@ class PoetryPipeline:
                 }
             )
 
+            # 防御分支: 无轮数上限后 refine() 仅在提交成功时返回，此处理论不可达
             if not submitted:
                 state.checker_pass = False
-                state.checker_suggestions = "炼句未完成提交"
+                state.checker_suggestions = _describe_unsubmitted(history, detail)
                 self._report(state)
                 break
 
@@ -281,3 +282,32 @@ def json_dumps_safe(obj, default=""):
         return json.dumps(obj, ensure_ascii=False)
     except Exception:
         return str(obj)
+
+
+def _describe_unsubmitted(history: list[dict], detail: str) -> str:
+    """生成'炼句未完成提交'的诊断说明，让用户看到卡在哪个环节。"""
+    rejected = sum(
+        1
+        for h in history
+        if h.get("tool") == "submit" and h.get("result") == "rejected_no_changes"
+    )
+    failed = sum(
+        1
+        for h in history
+        if isinstance(h.get("result"), dict) and h.get("result").get("error")
+    )
+    tool_calls = [h.get("tool") for h in history if h.get("tool") not in ("submit", "")]
+    stats = []
+    if not tool_calls:
+        stats.append("AI未调用任何工具(可能模型不支持工具调用)")
+    else:
+        if rejected:
+            stats.append(f"submit被拒{rejected}次(须先成功修改一行)")
+        if failed:
+            stats.append(f"工具调用失败{failed}次(多为格律未通过)")
+        stats.append(f"已执行工具: {'、'.join(dict.fromkeys(tool_calls))}")
+    tail_lines = detail.strip().splitlines()[-6:] if detail else []
+    msg = "炼句未完成提交(20轮内未成功提交): " + "；".join(stats)
+    if tail_lines:
+        msg += "\n最近日志:\n" + "\n".join(tail_lines)
+    return msg

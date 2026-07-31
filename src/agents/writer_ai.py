@@ -195,7 +195,6 @@ class WriterAI:
         poem: list[str],
         template: dict,
         template_obj=None,
-        max_rounds: int = 20,
         feedback: str = "",
         on_step: object = None,
         on_stream: object = None,
@@ -219,9 +218,13 @@ class WriterAI:
         detail_parts = []
         modifications = 0
         executed_rounds = 0
+        round_idx = 0
+        last_poem_key = tuple(current_poem)
+        no_progress_streak = 0
 
-        for _round in range(max_rounds):
-            round_num = start_round + _round + 1
+        while True:
+            round_idx += 1
+            round_num = start_round + round_idx
             if on_stream:
                 on_stream("")
                 _fire_stream(on_stream, f"[第{round_num}轮] 思考中...")
@@ -353,6 +356,19 @@ class WriterAI:
                 description, current_poem, template, template_obj, feedback
             )
             messages[0] = {"role": "system", "content": system_prompt}
+
+            # 空转引导: 连续多轮未成功修改也未提交时，提示 AI 继续推进(不中断循环)
+            changed = tuple(current_poem) != last_poem_key
+            last_poem_key = tuple(current_poem)
+            no_progress_streak = no_progress_streak + 1 if not changed else 0
+            if no_progress_streak >= 3:
+                no_progress_streak = 0
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "你已连续多轮未成功修改诗句或提交。请调用 refine_line 或 rewrite 修改诗句；若对当前诗稿满意，请直接调用 submit 提交。",
+                    }
+                )
 
         return (
             current_poem,
