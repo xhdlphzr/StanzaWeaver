@@ -448,6 +448,11 @@ header h1 {
     box-shadow: 0 0 0 3px rgba(90, 138, 60, 0.15);
 }
 
+.step-dot.failed {
+    background: #b3402e;
+    box-shadow: 0 0 0 3px rgba(179, 64, 46, 0.15);
+}
+
 @keyframes dot-breathing {
     0%, 100% {
         box-shadow: 0 0 0 0 rgba(90, 138, 60, 0.45);
@@ -491,23 +496,46 @@ header h1 {
     padding-bottom: 0;
 }
 
-.step-detail {
-    font-size: 12px;
-    color: #6b5d4e;
+.step-record {
+    margin-bottom: 8px;
     background: rgba(240, 230, 214, 0.4);
     border: 1px solid rgba(180, 150, 120, 0.15);
     border-radius: 8px;
-    padding: 12px 14px;
+    padding: 10px 14px;
+    transition: background 0.3s;
+}
+
+.step-record:last-child {
+    margin-bottom: 0;
+}
+
+.step-record:hover {
+    background: rgba(240, 230, 214, 0.6);
+}
+
+.step-record.pending {
+    opacity: 0.85;
+    background: rgba(240, 230, 214, 0.25);
+}
+
+.step-record-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #8b7355;
+    margin-bottom: 6px;
+}
+
+.step-record pre {
+    font-family: inherit;
+    font-size: 12px;
+    color: #6b5d4e;
     white-space: pre-wrap;
     word-break: break-all;
     max-height: 220px;
     overflow-y: auto;
     line-height: 1.6;
-    transition: background 0.3s;
-}
-
-.step-detail:hover {
-    background: rgba(240, 230, 214, 0.6);
+    user-select: text;
+    cursor: text;
 }
 
 /* ---- Poem Display ---- */
@@ -558,6 +586,8 @@ header h1 {
     font-size: 12px;
     color: #8b7355;
     text-align: center;
+    user-select: text;
+    cursor: text;
     animation: fade-in 0.35s ease-out;
 }
 
@@ -622,6 +652,8 @@ header h1 {
     border-left: 3px solid #d4a017;
     padding: 10px 14px;
     border-radius: 0 8px 8px 0;
+    user-select: text;
+    cursor: text;
     animation: fade-in 0.4s ease-out 0.2s both;
 }
 

@@ -47,6 +47,12 @@ class PoetryPipeline:
         self.validator = MeterValidator()
         self._on_progress: Optional[Callable] = None
         self._template_obj = None
+        self._detail_seq = 0
+
+    def _append_detail(self, state: PipelineState, **kwargs):
+        kwargs["seq"] = self._detail_seq
+        self._detail_seq += 1
+        state.step_details.append(kwargs)
 
     def _init_agents(self):
         if self.writer is None:
@@ -91,6 +97,7 @@ class PoetryPipeline:
         if existing_state and user_feedback:
             state = existing_state
             state.user_feedback = user_feedback
+            self._detail_seq = len(state.step_details)
             self._load_template(state.template_key)
             self._run_refine_loop(state)
             return state
@@ -99,6 +106,7 @@ class PoetryPipeline:
         state = PipelineState(
             topic=topic, template_key=template_key, template=template_dict
         )
+        self._detail_seq = 0
         self._run_step1(state)
         self._run_step2(state)
         self._run_refine_loop(state)
@@ -127,12 +135,11 @@ class PoetryPipeline:
         state.description = description
         state.stream_text = ""
         state.current_detail = ""
-        state.step_details.append(
-            {
-                "step": "step1_description",
-                "title": "Step 1: 生成现代文描述",
-                "content": detail,
-            }
+        self._append_detail(
+            state,
+            step="step1_description",
+            title="Step 1: 生成现代文描述",
+            content=detail,
         )
         self._report(state)
 
@@ -158,12 +165,11 @@ class PoetryPipeline:
         )
         state.draft = draft
         state.stream_text = ""
-        state.step_details.append(
-            {
-                "step": "step2_draft",
-                "title": "Step 2: 生成初稿",
-                "content": detail,
-            }
+        self._append_detail(
+            state,
+            step="step2_draft",
+            title="Step 2: 生成初稿",
+            content=detail,
         )
         self._report(state)
 
@@ -211,14 +217,14 @@ class PoetryPipeline:
             state.draft = poem
             state.refine_history = history
             state.refine_rounds += tool_rounds
-            state.step_details.append(
-                {
-                    "step": "step3_refine",
-                    "title": "Step 3: 炼句优化",
-                    "content": detail,
-                    "rounds": state.refine_rounds,
-                }
+            self._append_detail(
+                state,
+                step="step3_refine",
+                title="Step 3: 炼句优化",
+                content=detail,
+                rounds=state.refine_rounds,
             )
+            state.current_detail = ""
 
             # 防御分支: 无轮数上限后 refine() 仅在提交成功时返回，此处理论不可达
             if not submitted:
@@ -243,12 +249,11 @@ class PoetryPipeline:
                 state.checker_pass = False
                 state.checker_suggestions = f"检查AI异常: {e}"
 
-            state.step_details.append(
-                {
-                    "step": "step4_check",
-                    "title": "Step 4: 检查AI终审",
-                    "content": f"pass={state.checker_pass}\n{state.checker_suggestions}",
-                }
+            self._append_detail(
+                state,
+                step="step4_check",
+                title="Step 4: 检查AI终审",
+                content=f"pass={state.checker_pass}\n{state.checker_suggestions}",
             )
             self._report(state)
 
