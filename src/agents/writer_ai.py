@@ -42,7 +42,7 @@ def _build_writer_system(
         prompt_parts.append(template_obj.describe())
     else:
         prompt_parts.append(f"共 {template.get('lines', len(lines_spec))} 行")
-        constraints = template.get("syllable_constraints", [])
+        constraints = template.get("syllable_constraints") or []
         for i, count in enumerate(lines_spec):
             line_constraints = constraints[i] if i < len(constraints) else []
             parts = [f"  第{i + 1}行: {format_count(count)}音节"]
