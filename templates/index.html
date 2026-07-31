@@ -246,6 +246,7 @@ function startGenerate() {
     document.getElementById('user-feedback').value = '';
     lastPoem = [];
     currentStep = '';
+    renderedSeqs.clear();
 
     socket.emit('generate', { topic: topic, template_key: templateKey });
 }
@@ -255,7 +256,6 @@ function sendFeedback() {
     if (!feedback) return;
 
     document.getElementById('btn-feedback').disabled = true;
-    document.getElementById('progress-list').innerHTML = '';
     document.getElementById('checker-inline').classList.add('hidden');
     document.getElementById('tool-status').classList.add('hidden');
     document.getElementById('feedback-section').classList.add('hidden');
@@ -290,9 +290,33 @@ function ensureStepItem(list, stepKey) {
     return item;
 }
 
-function removeStepItem(stepKey) {
-    const item = document.getElementById('progress-' + stepKey);
-    if (item) item.remove();
+const renderedSeqs = new Set();
+
+function renderStepDetail(list, d) {
+    if (d.seq !== undefined && renderedSeqs.has(d.seq)) return;
+    const item = ensureStepItem(list, d.step);
+    const title = item.querySelector('.step-title');
+    if (d.rounds !== undefined) {
+        title.textContent = (d.title || '') + ' (' + d.rounds + ')';
+    } else if (d.title) {
+        title.textContent = d.title;
+    }
+    const body = item.querySelector('.progress-body');
+    body.querySelectorAll('.step-record.pending').forEach(el => el.remove());
+    const count = body.querySelectorAll('.step-record:not(.pending)').length + 1;
+    const rec = document.createElement('div');
+    rec.className = 'step-record';
+    if (d.content) {
+        const label = document.createElement('div');
+        label.className = 'step-record-label';
+        label.textContent = (d.title || '') + (count > 1 ? '（第' + count + '次）' : '');
+        rec.appendChild(label);
+        const pre = document.createElement('pre');
+        pre.textContent = d.content;
+        rec.appendChild(pre);
+    }
+    body.appendChild(rec);
+    if (d.seq !== undefined) renderedSeqs.add(d.seq);
 }
 
 function handleProgress(data) {
@@ -301,11 +325,9 @@ function handleProgress(data) {
     if (data.step !== currentStep) {
         const prevIdx = STEP_ORDER.indexOf(currentStep);
         const newIdx = STEP_ORDER.indexOf(data.step);
-        if (prevIdx >= 0) updateStepDot(currentStep, 'done');
-
-        for (let i = newIdx + 1; i < STEP_ORDER.length; i++) {
-            removeStepItem(STEP_ORDER[i]);
-        }
+        const goingBack = prevIdx >= 0 && newIdx < prevIdx;
+        if (prevIdx >= 0 && !goingBack) updateStepDot(currentStep, 'done');
+        if (goingBack) updateStepDot(currentStep, 'failed');
 
         currentStep = data.step;
 
@@ -321,20 +343,11 @@ function handleProgress(data) {
 
     if (data.step_details) {
         data.step_details.forEach(d => {
+            renderStepDetail(list, d);
             const item = ensureStepItem(list, d.step);
             const dot = item.querySelector('.step-dot');
             if (d.step === currentStep) {
                 dot.className = 'step-dot running';
-            }
-            const title = item.querySelector('.step-title');
-            if (d.rounds !== undefined) {
-                title.textContent = (d.title || '') + ' (' + d.rounds + ')';
-            } else if (d.title) {
-                title.textContent = d.title;
-            }
-            if (d.content) {
-                const pre = item.querySelector('.step-detail');
-                pre.textContent = d.content;
             }
         });
     }
@@ -365,8 +378,14 @@ function handleProgress(data) {
     if (data.current_detail_step && data.current_detail) {
         const item = document.getElementById('progress-' + data.current_detail_step);
         if (item) {
-            const pre = item.querySelector('.step-detail');
+            const body = item.querySelector('.progress-body');
+            body.querySelectorAll('.step-record.pending').forEach(el => el.remove());
+            const rec = document.createElement('div');
+            rec.className = 'step-record pending';
+            const pre = document.createElement('pre');
             pre.textContent = data.current_detail;
+            rec.appendChild(pre);
+            body.appendChild(rec);
         }
     }
 }
@@ -382,7 +401,6 @@ function createStepItem(stepKey, title) {
 
     const body = document.createElement('div');
     body.className = 'progress-body';
-    body.innerHTML = '<pre class="step-detail"></pre>';
 
     header.addEventListener('click', () => {
         body.classList.toggle('collapsed');
@@ -433,20 +451,9 @@ function handleDone(data) {
     if (data.step_details) {
         const list = document.getElementById('progress-list');
         data.step_details.forEach(d => {
-            const item = ensureStepItem(list, d.step);
-            const dot = item.querySelector('.step-dot');
-            dot.className = 'step-dot done';
-            const title = item.querySelector('.step-title');
-            if (d.rounds !== undefined) {
-                title.textContent = (d.title || '') + ' (' + d.rounds + ')';
-            } else if (d.title) {
-                title.textContent = d.title;
-            }
-            if (d.content) {
-                const pre = item.querySelector('.step-detail');
-                pre.textContent = d.content;
-            }
+            renderStepDetail(list, d);
         });
+        STEP_ORDER.forEach(k => updateStepDot(k, 'done'));
     }
 
     document.getElementById('feedback-section').classList.remove('hidden');
