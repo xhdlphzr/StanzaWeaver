@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -44,6 +45,10 @@ class Config:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with open(self._path, "w", encoding="utf-8") as f:
             json.dump(self._data, f, indent=2, ensure_ascii=False)
+        try:
+            os.chmod(self._path, 0o600)
+        except OSError:
+            pass
 
     @property
     def writer(self) -> dict:

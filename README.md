@@ -20,7 +20,7 @@ StanzaWeaver 是一个基于 **神经符号方法**（Neuro-Symbolic）的多语
 
 - **四步流水线**：描述生成 → 初稿（仅验音节数）→ ReAct 炼句循环（搜词 + 整行替换 + 整体重写，每次改完自动跑全部格律约束）→ 检查 AI 句意终审
 - **三要素反馈闭环**：编写 AI → 检查 AI → 用户，任意一环不通过即可打回 Step 3 继续炼句
-- **多语言支持**：中文（绝句、律诗、词牌）、英文（Sonnet），模板以 Python 类定义，可无限扩展
+- **多语言支持**：中文（绝句、律诗、词牌）、英文（商籁体、维拉内拉、英雄双行体）、意大利语、法语、古典拉丁语，模板以 Python 类定义，可无限扩展
 - **多层格律校验**：逐位平仄/轻重约束 + 三平尾 + 孤平 + 二四六分明 + 押韵检测
 - **实时流式输出**：LLM 生成过程逐 token 推送到前端，Step 详情区默认展开持续更新
 - **双重 AI 代理**：编写 AI（4 工具）+ 检查 AI（1 工具），可独立配置不同 LLM 端点/模型
@@ -58,25 +58,31 @@ StanzaWeaver/
     │   ├── base.py          # SyllableAnalyzer 抽象基类
     │   ├── chinese.py       # 中文分析器（pypinyin）
     │   ├── english.py       # 英文分析器（CMUdict）
+    │   ├── italian.py       # 意大利语分析器
+    │   ├── french.py        # 法语分析器
+    │   ├── latin.py         # 拉丁语分析器
     │   ├── syllable_counter.py  # 多语言统一音节计数
     │   └── meter_validator.py   # 格律总校验
     ├── knowledge/           # 本地词库
     │   ├── schema.sql       # SQLite 建表
     │   ├── vocabulary.py    # 查询接口
-    │   └── importer.py      # 数据集导入（CC-CEDICT / CMUdict）
+    │   ├── embeddings.py    # sentence-transformers 向量重排
+    │   └── importer.py      # 数据集导入（CC-CEDICT / CMUdict / Lexique / GLAW-IT / Lewis & Short）
     ├── agents/              # 神经层：AI Agent
     │   ├── base.py          # LLM 调用封装
     │   ├── writer_ai.py     # 编写 AI（4 工具）
     │   └── checker_ai.py    # 检查 AI（1 工具）
     ├── tools/               # Agent 工具定义
-    │   ├── __init__.py      # OpenAI Tool JSON Schema
+    │   ├── __init__.py      # OpenAI Tool JSON Schema（search_words / refine_line / rewrite / submit）
     │   ├── search_words.py  # 搜词执行
-    │   ├── refine_line.py   # 整行替换执行
-    │   └── submit.py        # 提交执行
+    │   └── refine_line.py   # 整行替换执行
     ├── templates/           # 格律模板（Python 类）
     │   ├── __init__.py      # PoetryTemplate 基类 + 注册表
     │   ├── zh.py            # 中文模板（五绝/七绝/五律/七律/相见欢）
-    │   └── en.py            # 英文模板（十四行诗）
+    │   ├── en.py            # 英文模板（商籁体/维拉内拉/英雄双行体）
+    │   ├── it.py            # 意大利语模板（三行体/八行体/歌谣）
+    │   ├── fr.py            # 法语模板（回旋诗/三韵叠句诗/叙事歌）
+    │   └── la.py            # 拉丁语模板（六步格/哀歌双行体/十一音节诗）
     └── pipeline/
         └── pipeline.py      # 4 步流水线 + 打回循环
 ```
@@ -91,9 +97,9 @@ StanzaWeaver/
 | `validate_full()` | 完整规则检查（三平尾、孤平、押韵等） |
 | `describe()` | 人类可读的格律描述（供 AI prompt 使用） |
 
-内置模板：五言绝句、七言绝句、五言律诗、七言律诗、相见欢、十四行诗。
+内置模板：五言绝句、七言绝句、五言律诗、七言律诗、相见欢、莎士比亚商籁体、维拉内拉诗、英雄双行体、意大利语三行体/八行体/歌谣、法语回旋诗/三韵叠句诗/叙事歌、拉丁语六步格/哀歌双行体/十一音节诗。
 
-扩展方式：在 `src/templates/` 下新增 Python 文件，实现模板类后在 `app.py` 中注册。
+扩展方式：在 `src/templates/` 下新增 Python 文件，实现模板类后在 `app.py` 中注册；或在 UI 中通过「+ 自定义」生成模板（自动落盘到 `src/templates/custom_*.py`，重启后自动恢复注册）。
 
 ## LLM 配置
 

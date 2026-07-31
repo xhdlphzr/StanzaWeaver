@@ -140,6 +140,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
 <script>
 const socket = io();
+const CSRF_TOKEN = '{{ csrf_token }}';
+function csrfHeaders() {
+    return { 'X-CSRF-Token': CSRF_TOKEN };
+}
 let isGenerating = false;
 let lastPoem = [];
 let currentStep = '';
@@ -453,11 +457,11 @@ function handleDone(data) {
         const poemText = poem.join('\n');
         const topic = document.getElementById('topic').value;
         const tmplName = document.getElementById('template-select').selectedOptions[0].textContent;
-        fetch('/api/history', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topic: topic, template_name: tmplName, poem: poemText })
-        });
+    fetch('/api/history', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, csrfHeaders()),
+        body: JSON.stringify({ topic: topic, template_name: tmplName, poem: poemText })
+    });
     }
 }
 
@@ -469,7 +473,7 @@ function handleError(data) {
 }
 
 function openConfig() {
-    fetch('/api/config')
+    fetch('/api/config', { headers: csrfHeaders() })
         .then(r => r.json())
         .then(cfg => {
             document.getElementById('cfg-writer-url').value = cfg.writer.base_url;
@@ -501,7 +505,7 @@ function saveConfig() {
     };
     fetch('/api/config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: Object.assign({ 'Content-Type': 'application/json' }, csrfHeaders()),
         body: JSON.stringify(data)
     }).then(r => r.json()).then(() => {
         closeConfig();
@@ -648,7 +652,7 @@ function createTemplate() {
 
     fetch('/api/templates/custom', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: Object.assign({ 'Content-Type': 'application/json' }, csrfHeaders()),
         body: JSON.stringify({
             name: name,
             language: language,

@@ -5,7 +5,7 @@ SEARCH_WORDS_TOOL = {
     "type": "function",
     "function": {
         "name": "search_words",
-        "description": "搜索候选词。按音节约束查找词汇，用向量相似度排序，返回最匹配的候选词。",
+        "description": "搜索候选词。按音节约束查找词汇（约束匹配词内任一音节位，结果中 matched_syllable 标注匹配位置），用向量相似度排序，返回最匹配的候选词。",
         "parameters": {
             "type": "object",
             "properties": {

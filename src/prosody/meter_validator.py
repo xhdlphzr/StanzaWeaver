@@ -4,6 +4,13 @@
 from dataclasses import dataclass, field
 
 from .syllable_counter import analyze_line, count_syllables
+from ..templates import format_count
+
+
+def _count_matches(actual: int, expected) -> bool:
+    if isinstance(expected, (tuple, list)) and len(expected) == 2:
+        return expected[0] <= actual <= expected[1]
+    return actual == expected
 
 
 @dataclass
@@ -42,9 +49,9 @@ class MeterValidator:
         for i in range(min(len(poem), len(syllables_expected))):
             actual_count = len(all_syllables[i])
             expected_count = syllables_expected[i]
-            if actual_count != expected_count:
+            if not _count_matches(actual_count, expected_count):
                 result.add_error(
-                    f"第{i + 1}行音节数不匹配: 期望 {expected_count}, 实际 {actual_count}"
+                    f"第{i + 1}行音节数不匹配: 期望 {format_count(expected_count)}, 实际 {actual_count}"
                 )
 
         if constraints:
@@ -90,9 +97,9 @@ class MeterValidator:
             expected_count = syllables_expected[i]
             actual_count = count_syllables(line, language)
 
-            if actual_count != expected_count:
+            if not _count_matches(actual_count, expected_count):
                 result.add_error(
-                    f"第{i + 1}行音节数不匹配: 期望 {expected_count}, 实际 {actual_count}"
+                    f"第{i + 1}行音节数不匹配: 期望 {format_count(expected_count)}, 实际 {actual_count}"
                 )
 
         return result
@@ -112,9 +119,9 @@ class MeterValidator:
         if line_index < len(syllables_expected):
             expected_count = syllables_expected[line_index]
             actual_count = count_syllables(line_text, language)
-            if actual_count != expected_count:
+            if not _count_matches(actual_count, expected_count):
                 result.add_error(
-                    f"音节数不匹配: 期望 {expected_count}, 实际 {actual_count}"
+                    f"音节数不匹配: 期望 {format_count(expected_count)}, 实际 {actual_count}"
                 )
 
         if constraints and line_index < len(constraints):

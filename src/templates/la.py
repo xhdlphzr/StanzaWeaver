@@ -26,33 +26,64 @@ class HexameterTemplate(PoetryTemplate):
     name = "六步格"
     language = "la"
     lines = 1
-    syllables_per_line = [17]
+    syllables_per_line = [(15, 17)]
 
     def get_syllable_constraints(self):
-        return [[
-            _L, _S, _S, _L, _S, _S, _L, _S, _S, _L, _S, _S,
-            _L, _L, _L, _L, {},
-        ]]
+        # 音步可为扬扬格(LL)或扬抑抑格(LSS)，音步边界随替换而移动，
+        # 故不做固定位置约束，由 validate_full 贪心扫描逐音步校验
+        return None
+
+    @staticmethod
+    def _scan_feet(syls):
+        """贪心扫描六步格音步：每个音步以长音节开头，若后两个音节皆短则为扬抑抑格，否则为扬扬格。"""
+        feet = []
+        i = 0
+        n = len(syls)
+        for foot_idx in range(6):
+            if i >= n:
+                break
+            if foot_idx == 5:
+                if n - i >= 1:
+                    feet.append((i, n))
+                    i = n
+                break
+            if (
+                i + 2 < n
+                and syls[i + 1].attributes.get("length") == "short"
+                and syls[i + 2].attributes.get("length") == "short"
+            ):
+                feet.append((i, i + 3))
+                i += 3
+            elif i + 1 < n:
+                feet.append((i, i + 2))
+                i += 2
+            else:
+                feet.append((i, n))
+                i = n
+        return feet
 
     def validate_full(self, poem, syllables):
         errors = []
         if not syllables or not syllables[0]:
             return errors
         syls = syllables[0]
-        if len(syls) < 13:
-            errors.append(f"音节数不足: 至少13个，实际{len(syls)}个")
-        feet = [(0, 3), (3, 6), (6, 9), (9, 12), (12, 14), (14, 17)]
+        n = len(syls)
+        if n < 13:
+            errors.append(f"音节数不足: 至少13个，实际{n}个")
+            return errors
+        feet = self._scan_feet(syls)
+        if len(feet) < 6:
+            errors.append(f"音步不足: 需要6个音步，实际扫描出{len(feet)}个")
+            return errors
         for foot_idx, (start, end) in enumerate(feet):
-            if end > len(syls):
-                continue
             foot = syls[start:end]
             length_sum = sum(1 for s in foot if s.attributes.get("length") == "long")
-            if foot_idx <= 3:
-                if length_sum < 1:
-                    errors.append(f"第{foot_idx + 1}音步无效: 至少需要1个长音节")
-            elif foot_idx == 4:
-                if length_sum < 2:
-                    errors.append(f"第5音步应为扬扬格(spondee)，当前长音节={length_sum}")
+            if length_sum < 1:
+                errors.append(f"第{foot_idx + 1}音步无效: 至少需要1个长音节")
+            if foot_idx == 5 and len(foot) < 2:
+                errors.append(
+                    f"第6音步应为扬扬格(spondee)，当前仅{len(foot)}个音节"
+                )
         return errors
 
 
@@ -60,13 +91,11 @@ class DistichonTemplate(PoetryTemplate):
     name = "哀歌双行体"
     language = "la"
     lines = 2
-    syllables_per_line = [17, 14]
+    syllables_per_line = [(15, 17), (12, 14)]
 
     def get_syllable_constraints(self):
-        return [
-            [_L, _S, _S, _L, _S, _S, _L, _S, _S, _L, _S, _S, _L, _L, _L, _L, {}],
-            [_L, _S, _S, _L, _S, _S, _L, {}, _L, _S, _S, _L, _S, _S],
-        ]
+        # 同六步格：音步可替换导致边界移动，固定位置约束与扬扬格替换互斥
+        return None
 
     def validate_full(self, poem, syllables):
         errors = []

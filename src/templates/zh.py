@@ -74,6 +74,14 @@ def _check_alternation(syllables: list[Syllable], even_pattern: list[str]) -> li
     return errors
 
 
+def _rhyme_key(syl: Syllable) -> str:
+    """韵脚 key：忽略介音（韵头），只取韵腹+韵尾，如 ang/uang/iang 视为同韵。"""
+    nucleus = syl.nucleus
+    if len(nucleus) > 1 and nucleus[0] in ("i", "u", "ü", "v"):
+        nucleus = nucleus[1:]
+    return nucleus + syl.coda
+
+
 def _check_rhyme(
     syllables_list: list[list[Syllable]],
     rhyme_lines: list[int],
@@ -85,7 +93,7 @@ def _check_rhyme(
     for line_idx in rhyme_lines:
         if line_idx < len(syllables_list) and syllables_list[line_idx]:
             last = syllables_list[line_idx][-1]
-            rhyme_keys.append((line_idx, last.nucleus + last.coda))
+            rhyme_keys.append((line_idx, _rhyme_key(last)))
     if len(rhyme_keys) < 2:
         return errors
     base_idx, base_rhyme = rhyme_keys[0]

@@ -112,13 +112,19 @@ def search_words(
         if not syllables:
             syllables = [Syllable(nucleus="?", attributes={"tone": "", "stress": "", "length": ""}) for _ in range(sc)]
 
+        match_idx = None
         if onset or nucleus or coda or tone or stress or length:
-            if not any(_syl_matches(s, onset, nucleus, coda, tone, stress, length) for s in syllables):
+            for idx, s in enumerate(syllables):
+                if _syl_matches(s, onset, nucleus, coda, tone, stress, length):
+                    match_idx = idx
+                    break
+            if match_idx is None:
                 continue
 
         results.append({
             "text": text, "language": lang, "meaning": meaning,
             "syllables": [s.to_dict() for s in syllables],
+            "matched_syllable": match_idx if match_idx is not None else None,
         })
         if len(results) >= limit:
             break
