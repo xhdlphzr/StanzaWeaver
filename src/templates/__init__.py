@@ -33,7 +33,7 @@ class PoetryTemplate(ABC):
         lines_desc = f"共 {self.lines} 行"
         for i, cnt in enumerate(self.syllables_per_line):
             constraints = self.get_syllable_constraints()
-            line_info = f"  第{i + 1}行: {cnt}音节"
+            line_info = f"  第{i + 1}行: {format_count(cnt)}音节"
             if constraints and i < len(constraints):
                 parts = []
                 for j, c in enumerate(constraints[i]):
@@ -60,6 +60,13 @@ _registry: dict[str, PoetryTemplate] = {}
 
 def register(key: str, template: PoetryTemplate):
     _registry[key] = template
+
+
+def format_count(cnt) -> str:
+    """Format a syllable count for prompts/errors: int -> '5', (min, max) -> '15-17'."""
+    if isinstance(cnt, (tuple, list)) and len(cnt) == 2:
+        return f"{cnt[0]}-{cnt[1]}"
+    return str(cnt)
 
 
 def get(key: str) -> PoetryTemplate:

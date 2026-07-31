@@ -4,6 +4,8 @@
 from .base import LLMClient
 from ..tools import CHECKER_TOOLS
 
+import json
+
 
 def _build_checker_system(description: str, poem: list[str], template: dict) -> str:
     language = template.get("language", "zh")
@@ -65,13 +67,30 @@ class CheckerAI:
                 response = self.client.chat(messages, tools=CHECKER_TOOLS)
 
                 if response["tool_calls"]:
+                    submit_args = None
                     for tc in response["tool_calls"]:
                         if tc["name"] == "submit":
-                            args = tc["arguments"]
-                            return {
-                                "pass": args.get("pass", False),
-                                "suggestions": args.get("suggestions", ""),
-                            }
+                            submit_args = tc["arguments"]
+                            break
+                    if submit_args is not None:
+                        return {
+                            "pass": submit_args.get("pass", False),
+                            "suggestions": submit_args.get("suggestions", ""),
+                        }
+
+                    messages.append(LLMClient.assistant_to_message(response))
+                    messages.extend(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tc["id"],
+                            "content": json.dumps(
+                                {"error": "请调用 submit 工具给出评审结论（pass 和 suggestions）。"},
+                                ensure_ascii=False,
+                            ),
+                        }
+                        for tc in response["tool_calls"]
+                    )
+                    continue
 
                 messages.append(LLMClient.assistant_to_message(response))
                 messages.append(

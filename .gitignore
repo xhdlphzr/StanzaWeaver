@@ -2,3 +2,6 @@
 __pycache__/
 *.pyc
 *.pyo
+*.db
+src/knowledge/data/
+src/templates/custom_*.py

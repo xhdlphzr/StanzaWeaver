@@ -7,7 +7,7 @@ import urllib.request
 from ..models.word import Word
 from ..models.syllable import Syllable
 from ..prosody.chinese import FINAL_TO_PARTS, CHINESE_INITIALS
-from .vocabulary import init_db, insert_words
+from .vocabulary import init_db, insert_words, get_db_path
 
 
 def _download_text(url: str, timeout: int = 10) -> str | None:
@@ -25,8 +25,7 @@ def _dataset_key(name: str) -> str:
 
 def _check_dataset(lang: str, expected: str) -> bool:
     import sqlite3
-    from pathlib import Path as _P
-    conn = sqlite3.connect(str(_P.home() / ".stanza_weaver" / "vocabulary.db"))
+    conn = sqlite3.connect(str(get_db_path()))
     conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
     conn.commit()
     cur = conn.execute("SELECT value FROM meta WHERE key = ?", (_dataset_key(lang),)).fetchone()
@@ -37,8 +36,7 @@ def _check_dataset(lang: str, expected: str) -> bool:
 
 def _set_dataset(lang: str, name: str):
     import sqlite3
-    from pathlib import Path as _P
-    conn = sqlite3.connect(str(_P.home() / ".stanza_weaver" / "vocabulary.db"))
+    conn = sqlite3.connect(str(get_db_path()))
     conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (_dataset_key(lang), name))
     conn.commit()
     conn.close()
@@ -116,8 +114,7 @@ def _parse_pinyin(raw_list: list[str]) -> list[Syllable]:
 
 def _sqlite_delete(lang: str):
     import sqlite3
-    from pathlib import Path as _P
-    conn = sqlite3.connect(str(_P.home() / ".stanza_weaver" / "vocabulary.db"))
+    conn = sqlite3.connect(str(get_db_path()))
     conn.execute("DELETE FROM words WHERE language = ?", (lang,))
     conn.commit()
     conn.close()
@@ -301,7 +298,7 @@ def _import_latin():
             line = line.strip()
             if not line:
                 continue
-            if line[0].isspace() or line[0] in "[({\"'":
+            if line[0] in "[({\"'":
                 continue
             parts = line.split(None, 1)
             if not parts:

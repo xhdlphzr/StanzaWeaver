@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import json
+import time
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
@@ -110,10 +111,15 @@ class PoetryPipeline:
         state.current_detail = ""
         self._report(state)
 
+        last_report_time = [0.0]
+
         def on_stream(text: str):
-            state.stream_text = text
-            state.current_detail = text
-            self._report(state)
+            now = time.monotonic()
+            if now - last_report_time[0] >= 0.25 or not text:
+                last_report_time[0] = now
+                state.stream_text = text
+                state.current_detail = text
+                self._report(state)
 
         description, detail = self.writer.generate_description(
             state.topic, on_stream=on_stream
@@ -137,10 +143,15 @@ class PoetryPipeline:
         state.current_detail = ""
         self._report(state)
 
+        last_report_time = [0.0]
+
         def on_stream(text: str):
-            state.stream_text = text
-            state.current_detail = text
-            self._report(state)
+            now = time.monotonic()
+            if now - last_report_time[0] >= 0.25 or not text:
+                last_report_time[0] = now
+                state.stream_text = text
+                state.current_detail = text
+                self._report(state)
 
         draft, detail = self.writer.generate_draft(
             state.description, state.template, self._template_obj, on_stream=on_stream
@@ -175,13 +186,18 @@ class PoetryPipeline:
                 state.stream_text = step_info.get("stream_text", state.stream_text)
                 self._report(state)
 
-            def on_stream(text: str):
-                state.stream_text = text
-                state.last_tool = "_thinking"
-                state.last_tool_result = text
-                self._report(state)
+            last_report_time = [0.0]
 
-            poem, submitted, history, detail = self.writer.refine(
+            def on_stream(text: str):
+                now = time.monotonic()
+                if now - last_report_time[0] >= 0.25 or not text:
+                    last_report_time[0] = now
+                    state.stream_text = text
+                    state.last_tool = "_thinking"
+                    state.last_tool_result = text
+                    self._report(state)
+
+            poem, submitted, history, detail, tool_rounds = self.writer.refine(
                 description=state.description,
                 poem=state.draft,
                 template=state.template,
@@ -194,9 +210,7 @@ class PoetryPipeline:
 
             state.draft = poem
             state.refine_history = history
-            state.refine_rounds += len(
-                [h for h in history if h.get("tool") not in ("submit",)]
-            )
+            state.refine_rounds += tool_rounds
             state.step_details.append(
                 {
                     "step": "step3_refine",

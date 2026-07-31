@@ -9,7 +9,7 @@ class RondeauTemplate(PoetryTemplate):
     language = "fr"
     lines = 15
     syllables_per_line = [8] * 15
-    _refrain = [0, 9, 15]
+    _refrain_lines = (8, 14)  # 0-based: 叠句出现在第 9、15 行
 
     def get_syllable_constraints(self):
         return None
@@ -32,13 +32,12 @@ class RondeauTemplate(PoetryTemplate):
                     if r != base:
                         errors.append(f"押韵{label}不匹配: 第{rhymes[0][0] + 1}行韵脚为'{base}'，第{idx + 1}行韵脚为'{r}'")
         base_refrain = poem[0] if len(poem) > 0 else ""
-        for ref_idx in [9, 15]:
-            ref_idx_0 = ref_idx - 1
-            if ref_idx_0 < len(poem):
+        for ref_idx in self._refrain_lines:
+            if ref_idx < len(poem):
                 first_words = " ".join(base_refrain.split()[:4])
-                curr_words = " ".join(poem[ref_idx_0].split()[:4])
+                curr_words = " ".join(poem[ref_idx].split()[:4])
                 if first_words and curr_words and first_words != curr_words:
-                    errors.append(f"叠句不匹配: 第1行开头'{first_words}'与第{ref_idx}行开头'{curr_words}'不一致")
+                    errors.append(f"叠句不匹配: 第1行开头'{first_words}'与第{ref_idx + 1}行开头'{curr_words}'不一致")
         return errors
 
 
@@ -90,9 +89,11 @@ class BalladeTemplate(PoetryTemplate):
 
     def validate_full(self, poem, syllables):
         errors = []
-        rhyme_a = [0, 2, 4, 7, 8, 10, 12, 15, 16, 18, 20, 23, 24, 26, 27]
-        rhyme_b = [1, 3, 5, 6, 9, 11, 13, 14, 19, 21, 22]
-        rhyme_c = [17, 25]
+        # 传统叙事歌韵式: 每节 8 行 ababbcbc，结句(第 8/16/24 行)与末节(第 28 行)为叠句，押 c 韵；末节 4 行 bcbc
+        # 0-based 行号: 各节 a=0,2 / b=1,3,4,6 / c=5,7；末节 b=24,26 / c=25,27
+        rhyme_a = [0, 2, 8, 10, 16, 18]
+        rhyme_b = [1, 3, 4, 6, 9, 11, 12, 14, 17, 19, 20, 22, 24, 26]
+        rhyme_c = [5, 7, 13, 15, 21, 23, 25, 27]
 
         for label, indices in [("A", rhyme_a), ("B", rhyme_b), ("C", rhyme_c)]:
             if len(indices) < 2:

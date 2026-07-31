@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 import json
+import secrets
 import threading
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify
@@ -22,6 +23,9 @@ register_french_templates()
 register_latin_templates()
 
 # Auto-import vocabulary on first run
+_vocab_importing = True
+
+
 def _auto_import():
     global _vocab_importing
     from src.knowledge.vocabulary import init_db
@@ -41,7 +45,37 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 _active_states: dict[str, dict] = {}
-_vocab_importing = True
+_CSRF_TOKEN = secrets.token_hex(16)
+
+
+def _register_custom_templates():
+    import importlib
+
+    tpl_dir = Path(__file__).parent / "src" / "templates"
+    if not tpl_dir.exists():
+        return
+    for f in sorted(tpl_dir.glob("custom_*.py")):
+        try:
+            module = importlib.import_module(f"src.templates.{f.stem}")
+            for attr in dir(module):
+                if attr.startswith("register_custom_"):
+                    getattr(module, attr)()
+        except Exception as e:
+            print(f"[StanzaWeaver] 自定义模板注册失败 {f.name}: {e}")
+
+
+_register_custom_templates()
+
+
+@app.before_request
+def _guard_local_access():
+    host = request.host or ""
+    if not host.startswith(("127.0.0.1", "localhost")):
+        return jsonify({"status": "error", "message": "拒绝非本机访问"}), 403
+
+
+def _require_csrf():
+    return request.headers.get("X-CSRF-Token", "") == _CSRF_TOKEN
 
 
 def load_templates() -> list[dict]:
@@ -56,7 +90,7 @@ def api_import_status():
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", csrf_token=_CSRF_TOKEN)
 
 
 @app.route("/api/templates")
@@ -66,6 +100,8 @@ def api_templates():
 
 @app.route("/api/config", methods=["GET"])
 def api_get_config():
+    if not _require_csrf():
+        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
     from src.config import get_config
 
     config = get_config()
@@ -79,14 +115,20 @@ def api_get_config():
 
 @app.route("/api/config", methods=["POST"])
 def api_save_config():
+    if not _require_csrf():
+        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
     from src.config import get_config
 
     config = get_config()
-    data = request.get_json()
-    if "writer" in data:
-        config.writer = data["writer"]
-    if "checker" in data:
-        config.checker = data["checker"]
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"status": "error", "message": "请求格式错误"}), 400
+    for key in ("writer", "checker"):
+        if key in data:
+            value = data[key]
+            if not isinstance(value, dict):
+                return jsonify({"status": "error", "message": f"{key} 配置格式错误"}), 400
+            config.__setattr__(key, value)
     config.save()
     return jsonify({"status": "ok"})
 
@@ -114,11 +156,15 @@ def handle_generate(data):
         socketio.emit("progress", state_dict, to=session_id)
 
     def run():
-        result = pipeline.run(
-            topic=topic,
-            template_key=template_key,
-            on_progress=on_progress,
-        )
+        try:
+            result = pipeline.run(
+                topic=topic,
+                template_key=template_key,
+                on_progress=on_progress,
+            )
+        except Exception as e:
+            socketio.emit("error", {"message": f"生成失败: {e}"}, to=session_id)
+            return
         _active_states[session_id] = {
             "pipeline_state": result,
         }
@@ -156,11 +202,15 @@ def handle_feedback(data):
         socketio.emit("progress", state_dict, to=session_id)
 
     def run():
-        result = pipeline.continue_with_feedback(
-            state=pipeline_state,
-            user_feedback=feedback,
-            on_progress=on_progress,
-        )
+        try:
+            result = pipeline.continue_with_feedback(
+                state=pipeline_state,
+                user_feedback=feedback,
+                on_progress=on_progress,
+            )
+        except Exception as e:
+            socketio.emit("error", {"message": f"反馈处理失败: {e}"}, to=session_id)
+            return
         _active_states[session_id] = {
             "pipeline_state": result,
         }
@@ -179,24 +229,58 @@ def handle_feedback(data):
     threading.Thread(target=run, daemon=True).start()
 
 
+@socketio.on("disconnect")
+def handle_disconnect():
+    _active_states.pop(request.sid, None)
+
+
 @app.route("/api/templates/custom", methods=["POST"])
 def api_create_custom_template():
     import importlib
     import re
     from pathlib import Path
 
-    data = request.get_json()
-    name = data.get("name", "").strip()
-    language = data.get("language", "zh")
-    lines = data.get("lines", 4)
+    if not _require_csrf():
+        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"status": "error", "message": "请求格式错误"}), 400
+    name = str(data.get("name", "")).strip()
+    language = str(data.get("language", "zh"))
+    try:
+        lines = int(data.get("lines", 4))
+    except (TypeError, ValueError):
+        lines = 4
+    lines = max(1, min(lines, 30))
     syllables_per_line = data.get("syllables_per_line", [5] * lines)
     constraints = data.get("constraints", [])
-    custom_code = data.get("code", "").strip()
+    custom_code = str(data.get("code", "")).strip()
 
     if not name:
         return jsonify({"status": "error", "message": "模板名称不能为空"}), 400
+    if language not in ("zh", "en"):
+        return jsonify({"status": "error", "message": "不支持的语言"}), 400
+    try:
+        syllables_per_line = [
+            max(1, int(s)) for s in syllables_per_line
+        ][:lines]
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "message": "每行音节数格式错误"}), 400
+    if len(syllables_per_line) != lines:
+        return jsonify({"status": "error", "message": "音节数列表长度必须等于行数"}), 400
 
-    safe_name = re.sub(r"\W+", "_", name)
+    safe_name = re.sub(r"\W+", "_", name).strip("_")
+    if not safe_name:
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": "模板名需包含字母或数字（当前名称无法生成合法标识符）",
+                }
+            ),
+            400,
+        )
     class_name = f"Custom{safe_name.title().replace('_', '')}Template"
     file_key = f"custom_{safe_name}"
     file_path = Path(__file__).parent / "src" / "templates" / f"{file_key}.py"
@@ -224,7 +308,11 @@ def api_create_custom_template():
         f"# SPDX-License-Identifier: MIT\n"
         f"# Auto-generated custom template: {name}\n\n"
         f"from . import PoetryTemplate, register\n"
-        f"from .zh import _make_syl, _FREE, _tone as _t\n\n\n"
+        f"from .zh import (\n"
+        f"    _make_syl, _FREE, _tone as _t,\n"
+        f"    _check_sanpingwei, _check_sanzewei, _check_guping,\n"
+        f"    _check_rhyme, _check_alternation, _check_lv_alternation,\n"
+        f")\n\n\n"
         f"class {class_name}(PoetryTemplate):\n"
         f'    name = "{name}"\n'
         f'    language = "{language}"\n'
@@ -237,15 +325,17 @@ def api_create_custom_template():
     )
     if custom_code:
         for line in custom_code.split("\n"):
-            code_body += f"        {line}\n"
-    else:
-        code_body += "        return errors\n"
+            if line.strip():
+                code_body += f"        {line}\n"
     code_body += "        return errors\n\n\n"
     code_body += f"def register_custom_{safe_name}():\n"
     code_body += f'    register("{file_key}", {class_name}())\n'
 
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    file_path.write_text(code_body, encoding="utf-8")
+    try:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(code_body, encoding="utf-8")
+    except OSError as e:
+        return jsonify({"status": "error", "message": f"模板文件写入失败: {e}"}), 500
 
     try:
         module = importlib.import_module(f"src.templates.{file_key}")

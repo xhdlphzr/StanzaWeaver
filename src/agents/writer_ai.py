@@ -8,6 +8,7 @@ from ..tools import WRITER_TOOLS
 from ..tools.search_words import execute_search_words
 from ..tools.refine_line import execute_refine_line
 from ..prosody.meter_validator import MeterValidator
+from ..templates import format_count
 
 
 def _fire_stream(cb, text: str):
@@ -44,7 +45,7 @@ def _build_writer_system(
         constraints = template.get("syllable_constraints", [])
         for i, count in enumerate(lines_spec):
             line_constraints = constraints[i] if i < len(constraints) else []
-            parts = [f"  第{i + 1}行: {count}音节"]
+            parts = [f"  第{i + 1}行: {format_count(count)}音节"]
             if line_constraints:
                 constraint_strs = []
                 for j, c in enumerate(line_constraints):
@@ -129,7 +130,10 @@ class WriterAI:
         if template_obj is not None and hasattr(template_obj, "describe"):
             constraints_desc = template_obj.describe()
         else:
-            constraints_desc = f"- 语言: {language}\n- 行数: {lines}\n- 每行音节数: {syllables_per_line}"
+            constraints_desc = (
+                f"- 语言: {language}\n- 行数: {lines}\n"
+                f"- 每行音节数: {', '.join(format_count(c) for c in syllables_per_line)}"
+            )
 
         sys_prompt = f"""你是一位精通{language}诗歌创作的AI诗人。
 请根据以下主题描述和格律要求，创作一首诗。
@@ -196,7 +200,7 @@ class WriterAI:
         on_step: object = None,
         on_stream: object = None,
         start_round: int = 0,
-    ) -> tuple[list[str], bool, list[dict], str]:
+    ) -> tuple[list[str], bool, list[dict], str, int]:
         current_poem = list(poem)
         system_prompt = _build_writer_system(
             description, current_poem, template, template_obj, feedback
@@ -214,6 +218,7 @@ class WriterAI:
         history = []
         detail_parts = []
         modifications = 0
+        executed_rounds = 0
 
         for _round in range(max_rounds):
             round_num = start_round + _round + 1
@@ -222,10 +227,6 @@ class WriterAI:
                 _fire_stream(on_stream, f"[第{round_num}轮] 思考中...")
 
             response = self.client.chat(messages, tools=WRITER_TOOLS)
-
-            if on_stream:
-                _fire_stream(on_stream, f"[第{round_num}轮] 思考完成" +
-                             (f" → 调用工具: {response['tool_calls'][0]['name']}" if response.get('tool_calls') else ""))
 
             if not response["tool_calls"]:
                 messages.append(LLMClient.assistant_to_message(response))
@@ -237,6 +238,12 @@ class WriterAI:
                 )
                 continue
 
+            executed_rounds += 1
+            if on_stream:
+                _fire_stream(on_stream, f"[第{round_num}轮] 思考完成" +
+                             (f" → 调用工具: {response['tool_calls'][0]['name']}" if response.get('tool_calls') else ""))
+
+            results_by_id: dict[str, dict] = {}
             for tool_call in response["tool_calls"]:
                 name = tool_call["name"]
                 args = tool_call["arguments"]
@@ -246,7 +253,7 @@ class WriterAI:
                         detail_parts.append(
                             f"[第{round_num}轮] submit: 拒绝 - 尚未进行任何修改，必须先调用 refine_line 或 rewrite"
                         )
-                        result_for_msg = {
+                        results_by_id[tool_call["id"]] = {
                             "error": "不允许直接提交。你必须至少调用一次 refine_line 或 rewrite 成功修改诗句后，才能调用 submit。"
                         }
                         history.append(
@@ -256,23 +263,6 @@ class WriterAI:
                                 "result": "rejected_no_changes",
                             }
                         )
-                        assistant_msg = LLMClient.assistant_to_message(response)
-                        tool_msgs = [
-                            {
-                                "role": "tool",
-                                "tool_call_id": tc["id"],
-                                "content": json.dumps(
-                                    result_for_msg, ensure_ascii=False
-                                ),
-                            }
-                            for tc in response["tool_calls"]
-                        ]
-                        messages.append(assistant_msg)
-                        messages.extend(tool_msgs)
-                        system_prompt = _build_writer_system(
-                            description, current_poem, template, template_obj, feedback
-                        )
-                        messages[0] = {"role": "system", "content": system_prompt}
                         continue
                     submitted = True
                     history.append({"tool": "submit", "result": "submitted"})
@@ -326,24 +316,8 @@ class WriterAI:
                             detail += f" (格律问题: {result['validation_errors']})"
                     detail_parts.append(detail)
 
+                results_by_id[tool_call["id"]] = result
                 history.append({"tool": name, "arguments": args, "result": result})
-
-                assistant_msg = LLMClient.assistant_to_message(response)
-                tool_msgs = [
-                    {
-                        "role": "tool",
-                        "tool_call_id": tc["id"],
-                        "content": json.dumps(result, ensure_ascii=False),
-                    }
-                    for tc in response["tool_calls"]
-                ]
-                messages.append(assistant_msg)
-                messages.extend(tool_msgs)
-
-                system_prompt = _build_writer_system(
-                    description, current_poem, template, template_obj, feedback
-                )
-                messages[0] = {"role": "system", "content": system_prompt}
 
                 if "poem" in (result or {}):
                     detail_parts.append("当前诗稿:\n" + "\n".join(current_poem))
@@ -362,11 +336,30 @@ class WriterAI:
             if submitted:
                 break
 
+            messages.append(LLMClient.assistant_to_message(response))
+            messages.extend(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": json.dumps(
+                        results_by_id.get(tc["id"], {"error": "工具未执行"}),
+                        ensure_ascii=False,
+                    ),
+                }
+                for tc in response["tool_calls"]
+            )
+
+            system_prompt = _build_writer_system(
+                description, current_poem, template, template_obj, feedback
+            )
+            messages[0] = {"role": "system", "content": system_prompt}
+
         return (
             current_poem,
             submitted,
             history,
             "\n".join(detail_parts) if detail_parts else "",
+            executed_rounds,
         )
 
     def _handle_rewrite(
