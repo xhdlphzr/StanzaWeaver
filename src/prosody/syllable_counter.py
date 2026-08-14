@@ -35,12 +35,7 @@ def analyze_line(line: str, language: str) -> list:
     analyzer = get_analyzer(language)
     if language == "zh":
         chars = analyzer.tokenize_line(line)
-        syllables = []
-        for ch in chars:
-            analyzed = analyzer.analyze_word(ch)
-            if analyzed:
-                syllables.append(analyzed[0])
-        return syllables
+        return analyzer.analyze_word("".join(chars))
     else:
         words = analyzer.tokenize_line(line)
         syllables = []
