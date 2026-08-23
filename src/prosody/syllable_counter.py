@@ -36,6 +36,8 @@ def analyze_line(line: str, language: str) -> list:
     if language == "zh":
         chars = analyzer.tokenize_line(line)
         return analyzer.analyze_word("".join(chars))
+    elif language == "it":
+        return analyzer.syllabify_line(line)
     else:
         words = analyzer.tokenize_line(line)
         syllables = []

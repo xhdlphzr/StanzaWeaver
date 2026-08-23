@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: MIT
 
 from . import PoetryTemplate, register
+from ..prosody.latin import LatinAnalyzer
+
+_LATIN = LatinAnalyzer()
 
 
 def _make_syl(**kwargs) -> dict:
@@ -22,68 +25,89 @@ _L = _make_syl(attributes={"length": "long"})
 _S = _make_syl(attributes={"length": "short"})
 
 
+def _validate_hex(syls) -> list[str]:
+    """六步格完整校验：第1-4音步为扬抑抑格(长短短)或扬扬格(长长)自由替换，
+    第5音步必须为扬抑抑格（长短短），第6音步为扬扬格或扬抑格（2音节，首音节长）。"""
+    errors = []
+    n = len(syls)
+    if n < 13:
+        errors.append(f"音节数不足: 至少13个，实际{n}个")
+        return errors
+    i = 0
+    feet = []
+    for foot_idx in range(4):
+        if i >= n:
+            break
+        if (
+            i + 2 < n
+            and syls[i + 1].attributes.get("length") == "short"
+            and syls[i + 2].attributes.get("length") == "short"
+        ):
+            feet.append((foot_idx, i, i + 3))
+            i += 3
+        else:
+            feet.append((foot_idx, i, i + 2))
+            i += 2
+    if i + 3 <= n:
+        feet.append((4, i, i + 3))
+        i += 3
+    else:
+        feet.append((4, i, n))
+        i = n
+    if i < n:
+        feet.append((5, i, n))
+
+    if len(feet) < 6:
+        errors.append(f"音步不足: 需要6个音步，实际扫描出{len(feet)}个")
+        return errors
+
+    for foot_idx, start, end in feet:
+        foot = syls[start:end]
+        first_len = foot[0].attributes.get("length", "")
+        if foot_idx < 4:
+            if first_len != "long":
+                errors.append(f"第{foot_idx + 1}音步应以长音节开头，实际为{first_len or '未知'}")
+            if len(foot) == 3:
+                if foot[1].attributes.get("length") != "short" or foot[2].attributes.get("length") != "short":
+                    errors.append(f"第{foot_idx + 1}音步扬抑抑格应为长短短，实际不满足")
+            elif len(foot) == 2 and foot[1].attributes.get("length") != "long":
+                errors.append(f"第{foot_idx + 1}音步扬扬格应两个长音节，实际第二个为{foot[1].attributes.get('length') or '未知'}")
+        elif foot_idx == 4:
+            if len(foot) != 3:
+                errors.append(f"第5音步必须为扬抑抑格（3音节），实际{len(foot)}个")
+            elif (
+                first_len != "long"
+                or foot[1].attributes.get("length") != "short"
+                or foot[2].attributes.get("length") != "short"
+            ):
+                errors.append(f"第5音步必须为扬抑抑格（长短短），实际不满足")
+        else:
+            if len(foot) != 2:
+                errors.append(f"第6音步应为2音节（扬扬格或扬抑格），实际{len(foot)}个")
+            elif first_len != "long":
+                errors.append(f"第6音步应以长音节开头，实际为{first_len or '未知'}")
+    return errors
+
+
 class HexameterTemplate(PoetryTemplate):
     name = "六步格"
     language = "la"
     lines = 1
-    syllables_per_line = [(15, 17)]
+    syllables_per_line = [(13, 17)]
+    rule_description = (
+        "格律规则：共6音步；第1-4音步可为扬抑抑格(长短短)或扬扬格(长长)自由替换；"
+        "第5音步必须为扬抑抑格(长短短)；第6音步为扬扬格或扬抑格，末音节可长可短；"
+        "音长判定：词典标注优先，无标注时双元音及元音后跟两个及以上辅音(含跨词)为长音。"
+    )
 
     def get_syllable_constraints(self):
-        # 音步可为扬扬格(LL)或扬抑抑格(LSS)，音步边界随替换而移动，
-        # 故不做固定位置约束，由 validate_full 贪心扫描逐音步校验
+        # 音步可替换导致边界移动，不做固定位置约束，由 validate_full 逐音步校验
         return None
-
-    @staticmethod
-    def _scan_feet(syls):
-        """贪心扫描六步格音步：每个音步以长音节开头，若后两个音节皆短则为扬抑抑格，否则为扬扬格。"""
-        feet = []
-        i = 0
-        n = len(syls)
-        for foot_idx in range(6):
-            if i >= n:
-                break
-            if foot_idx == 5:
-                if n - i >= 1:
-                    feet.append((i, n))
-                    i = n
-                break
-            if (
-                i + 2 < n
-                and syls[i + 1].attributes.get("length") == "short"
-                and syls[i + 2].attributes.get("length") == "short"
-            ):
-                feet.append((i, i + 3))
-                i += 3
-            elif i + 1 < n:
-                feet.append((i, i + 2))
-                i += 2
-            else:
-                feet.append((i, n))
-                i = n
-        return feet
 
     def validate_full(self, poem, syllables):
         errors = []
-        if not syllables or not syllables[0]:
-            return errors
-        syls = syllables[0]
-        n = len(syls)
-        if n < 13:
-            errors.append(f"音节数不足: 至少13个，实际{n}个")
-            return errors
-        feet = self._scan_feet(syls)
-        if len(feet) < 6:
-            errors.append(f"音步不足: 需要6个音步，实际扫描出{len(feet)}个")
-            return errors
-        for foot_idx, (start, end) in enumerate(feet):
-            foot = syls[start:end]
-            length_sum = sum(1 for s in foot if s.attributes.get("length") == "long")
-            if length_sum < 1:
-                errors.append(f"第{foot_idx + 1}音步无效: 至少需要1个长音节")
-            if foot_idx == 5 and len(foot) < 2:
-                errors.append(
-                    f"第6音步应为扬扬格(spondee)，当前仅{len(foot)}个音节"
-                )
+        if syllables and syllables[0]:
+            errors.extend(_validate_hex(syllables[0]))
         return errors
 
 
@@ -91,7 +115,13 @@ class DistichonTemplate(PoetryTemplate):
     name = "哀歌双行体"
     language = "la"
     lines = 2
-    syllables_per_line = [(15, 17), (12, 14)]
+    syllables_per_line = [(13, 17), (11, 13)]
+    rule_description = (
+        "格律规则：第1行完全遵循六步格规则；"
+        "第2行五步格：前2.5音步可为扬抑抑格或扬扬格（自由），中间必有停顿，"
+        "后2.5音步必须为两个完整的扬抑抑格（长短短长短短）收尾；"
+        "两行末字必须押韵（AA）。"
+    )
 
     def get_syllable_constraints(self):
         # 同六步格：音步可替换导致边界移动，固定位置约束与扬扬格替换互斥
@@ -101,15 +131,20 @@ class DistichonTemplate(PoetryTemplate):
         errors = []
         if not syllables or len(syllables) < 2:
             return errors
-        hex_syls = syllables[0]
+        if syllables[0]:
+            errors.extend(_validate_hex(syllables[0]))
         pent_syls = syllables[1]
-        for i, s in enumerate(hex_syls[:12]):
-            if s.attributes.get("length", "") == "short":
-                if i % 3 == 0:
-                    errors.append(f"第1行第{i + 1}音节: 六步格第1位应为长音节")
-        for i, s in enumerate(pent_syls[:6]):
-            if s.attributes.get("length") == "short" and i % 3 == 0:
-                errors.append(f"第2行第{i + 1}音节: 应为长音节")
+        if len(pent_syls) >= 6:
+            tail = pent_syls[-6:]
+            expected = ["long", "short", "short", "long", "short", "short"]
+            for j, (s, exp) in enumerate(zip(tail, expected)):
+                actual = s.attributes.get("length", "")
+                if actual and actual != exp:
+                    errors.append(
+                        f"第2行倒数第{6 - j}音节应为{exp}（后2.5音步须为两个完整扬抑抑格），实际为{actual}"
+                    )
+        elif len(pent_syls) >= 2:
+            errors.append("第2行音节数不足: 至少11个")
         if len(poem) >= 2:
             if syllables[0] and syllables[1]:
                 r0 = syllables[0][-1].nucleus + syllables[0][-1].coda
@@ -124,10 +159,17 @@ class HendecasyllabusTemplate(PoetryTemplate):
     language = "la"
     lines = 1
     syllables_per_line = [11]
+    rule_description = (
+        "格律规则：共5音步11音节；第1音步为扬扬格或扬抑格（首音节必长）；"
+        "第2音步固定扬抑抑格(长短短)；第3-5音步均为扬抑格(长短)；"
+        "全行第5与第6音节之间必须是音步边界（不得跨词）；"
+        "第3、6、8、10音节（全行）必须为长音。"
+    )
 
     def get_syllable_constraints(self):
+        # 第1音步: 扬扬格(LL)或扬抑格(L∪) -> 首音节必长
         return [[
-            {}, {}, _L, _S, _S, _L, _S, _L, _S, _L, _S,
+            _L, {}, _L, _S, _S, _L, _S, _L, _S, _L, _S,
         ]]
 
     def validate_full(self, poem, syllables):
@@ -145,6 +187,25 @@ class HendecasyllabusTemplate(PoetryTemplate):
                 actual = syls[pos].attributes.get("length", "")
                 if actual and actual != expected:
                     errors.append(f"第{pos + 1}音节应为长音节，实际为{actual}")
+
+        # 硬性边界: 第5与第6音节（1-based）之间必须是词边界
+        if poem:
+            line = poem[0]
+            cum = 0
+            boundary_ok = False
+            for w in line.split():
+                w_clean = w.strip(".,;:!?\"'()[]{}")
+                if not w_clean:
+                    continue
+                n = len(_LATIN.analyze_word(w_clean))
+                if n == 0:
+                    continue
+                if cum + n == 5:
+                    boundary_ok = True
+                    break
+                cum += n
+            if not boundary_ok:
+                errors.append("第5与第6音节之间必须是音步边界（词边界），当前边界缺失")
         return errors
 
 

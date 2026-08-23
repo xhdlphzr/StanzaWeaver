@@ -135,34 +135,39 @@ def _import_english():
     total = 0
     _VOWELS = {"AA", "AE", "AH", "AO", "AW", "AX", "AXR", "AY", "EH", "ER", "EY",
                "IH", "IX", "IY", "OW", "OY", "UH", "UW", "UX"}
-    _SMAP = {"0": "", "1": "heavy", "2": "light"}
+    _SMAP = {"0": "", "1": "heavy", "2": "heavy"}
     for word, pron_list in cmudict.dict().items():
         if not word.isalpha():
             continue
-        phones = pron_list[0]
-        syls = []
-        ons = []; nuc = ""; stre = ""; cod = []
-        for p in phones:
-            cl = re.sub(r"\d+", "", p)
-            sm = re.search(r"\d", p)
-            st = sm.group() if sm else ""
-            if cl in _VOWELS:
-                if nuc:
-                    syls.append(Syllable(onset="".join(ons), nucleus=nuc, coda="".join(cod),
-                                         attributes={"tone": "", "stress": stre, "length": ""}))
-                    ons = []; cod = []
-                nuc = cl; stre = _SMAP.get(st, "")
-            else:
-                (cod if nuc else ons).append(cl)
-        if nuc:
-            syls.append(Syllable(onset="".join(ons), nucleus=nuc, coda="".join(cod),
-                                 attributes={"tone": "", "stress": stre, "length": ""}))
-        if syls:
-            batch.append(Word(text=word.upper(), language="en", syllables=syls, meaning=""))
-            total += 1
-            if len(batch) >= 500:
-                insert_words(batch)
-                batch.clear()
+        seen = set()
+        for phones in pron_list:
+            pron_key = tuple(phones)
+            if pron_key in seen:
+                continue
+            seen.add(pron_key)
+            syls = []
+            ons = []; nuc = ""; stre = ""; cod = []
+            for p in phones:
+                cl = re.sub(r"\d+", "", p)
+                sm = re.search(r"\d", p)
+                st = sm.group() if sm else ""
+                if cl in _VOWELS:
+                    if nuc:
+                        syls.append(Syllable(onset="".join(ons), nucleus=nuc, coda="".join(cod),
+                                             attributes={"tone": "", "stress": stre, "length": ""}))
+                        ons = []; cod = []
+                    nuc = cl; stre = _SMAP.get(st, "")
+                else:
+                    (cod if nuc else ons).append(cl)
+            if nuc:
+                syls.append(Syllable(onset="".join(ons), nucleus=nuc, coda="".join(cod),
+                                     attributes={"tone": "", "stress": stre, "length": ""}))
+            if syls:
+                batch.append(Word(text=word.upper(), language="en", syllables=syls, meaning=""))
+                total += 1
+                if len(batch) >= 500:
+                    insert_words(batch)
+                    batch.clear()
     if batch:
         insert_words(batch)
     if total > 0:
