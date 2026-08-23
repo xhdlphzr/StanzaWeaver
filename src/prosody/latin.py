@@ -32,6 +32,23 @@ class LatinAnalyzer(SyllableAnalyzer):
 
         while i < n:
             ch = word[i]
+            # 辅音性 u: qu / gu / su 后接元音时 u 不构成音节（quō, lingua, suāvis）
+            if (
+                ch.lower() == "q"
+                or (
+                    ch.lower() in "gs"
+                    and i + 1 < n
+                    and word[i + 1].lower() == "u"
+                    and i + 2 < n
+                    and word[i + 2] in _VOWELS
+                )
+            ):
+                onset += ch.lower()
+                if i + 1 < n and word[i + 1].lower() == "u":
+                    onset += "u"
+                    i += 1
+                i += 1
+                continue
             if ch in _VOWELS:
                 if nucleus:
                     syllables.append(Syllable(

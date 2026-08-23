@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass, field
 
-from .syllable_counter import analyze_line, count_syllables
+from .syllable_counter import analyze_line, count_syllables, get_analyzer
 from ..templates import format_count
 
 
@@ -42,14 +42,21 @@ class MeterValidator:
                 f"行数不匹配: 期望 {lines_expected} 行, 实际 {len(poem)} 行"
             )
 
-        all_syllables: list[list] = []
+        all_syllables: list[list[list]] = []
         for i in range(len(poem)):
-            all_syllables.append(analyze_line(poem[i], language))
+            if language == "en":
+                # 英语多音词：保留全部发音的组合切分，任一变体满足格律即通过
+                all_syllables.append(get_analyzer(language).analyze_line_variants(poem[i]))
+            else:
+                all_syllables.append([analyze_line(poem[i], language)])
 
         for i in range(min(len(poem), len(syllables_expected))):
-            actual_count = len(all_syllables[i])
             expected_count = syllables_expected[i]
-            if not _count_matches(actual_count, expected_count):
+            if not any(
+                _count_matches(len(v), expected_count)
+                for v in all_syllables[i]
+            ):
+                actual_count = len(all_syllables[i][0])
                 result.add_error(
                     f"第{i + 1}行音节数不匹配: 期望 {format_count(expected_count)}, 实际 {actual_count}"
                 )
@@ -58,7 +65,12 @@ class MeterValidator:
             min_constraint_lines = min(len(poem), len(constraints))
             for i in range(min_constraint_lines):
                 line_constraints = constraints[i]
-                syllables = all_syllables[i]
+                if any(
+                    self._line_matches_variant(v, line_constraints)
+                    for v in all_syllables[i]
+                ):
+                    continue
+                syllables = all_syllables[i][0]
                 min_syl = min(len(syllables), len(line_constraints))
                 for j in range(min_syl):
                     if not syllables[j].match_constraint(line_constraints[j]):
@@ -67,13 +79,23 @@ class MeterValidator:
                         result.add_error(
                             f"第{i + 1}行第{j + 1}音节不匹配: 要求{constraint_desc}, 实际{actual_desc}"
                         )
+                        break
 
         if template_obj is not None and hasattr(template_obj, "validate_full"):
-            full_errors = template_obj.validate_full(poem, all_syllables)
+            primary = [v[0] for v in all_syllables]
+            full_errors = template_obj.validate_full(poem, primary)
             for err in full_errors:
                 result.add_error(err)
 
         return result
+
+    @staticmethod
+    def _line_matches_variant(variant: list, line_constraints: list) -> bool:
+        min_syl = min(len(variant), len(line_constraints))
+        for j in range(min_syl):
+            if not variant[j].match_constraint(line_constraints[j]):
+                return False
+        return True
 
     def validate_count_only(
         self,
@@ -126,7 +148,16 @@ class MeterValidator:
 
         if constraints and line_index < len(constraints):
             line_constraints = constraints[line_index]
-            syllables = analyze_line(line_text, language)
+            if language == "en":
+                variants = get_analyzer(language).analyze_line_variants(line_text)
+                if any(
+                    self._line_matches_variant(v, line_constraints)
+                    for v in variants
+                ):
+                    return result
+                syllables = variants[0]
+            else:
+                syllables = analyze_line(line_text, language)
             min_syl = min(len(syllables), len(line_constraints))
             for j in range(min_syl):
                 if not syllables[j].match_constraint(line_constraints[j]):

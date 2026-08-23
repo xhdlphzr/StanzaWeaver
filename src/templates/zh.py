@@ -336,19 +336,40 @@ class XiangjianhuanTemplate(PoetryTemplate):
             [_z, _p, _p],
             [_f, _z, _f, _p, _f, _z, _z, _p, _p],
             [_f, _f, _z],
-            [_f, _f, _z],
+            [_f, _p, _z],
             [_z, _p, _p],
             [_f, _z, _f, _p, _f, _z, _z, _p, _p],
         ]
 
     def validate_full(self, poem, syllables):
         errors = []
-        for i, syls in enumerate(syllables):
-            errors.extend(_check_sanpingwei(syls))
-            errors.extend(_check_sanzewei(syls))
+        # 禁忌: 上下阕末句（第3、第7行）末三字不宜全平（非铁律，提示但不断然否决）
+        for line_idx in (2, 6):
+            if line_idx < len(syllables) and syllables[line_idx]:
+                last3 = [s.attributes.get("tone", "") for s in syllables[line_idx][-3:]]
+                if last3 == ["平", "平", "平"]:
+                    errors.append(f"第{line_idx + 1}行末三字全平，宜规避")
         errors.extend(_check_rhyme(syllables, [0, 1, 2], "押韵(上阕·平韵)"))
         errors.extend(_check_rhyme(syllables, [3, 4], "押韵(下阕·仄韵·换韵)"))
         errors.extend(_check_rhyme(syllables, [5, 6], "押韵(下阕·平韵·换回)"))
+
+        # 下阕平韵应转回上阕平声韵部；下阕仄韵须与平韵不同部（换韵）
+        def tail(idx):
+            if idx < len(syllables) and syllables[idx]:
+                return _rhyme_key(syllables[idx][-1])
+            return ""
+
+        upper = tail(0)
+        lower_ping = tail(5)
+        lower_ze = tail(3)
+        if upper and lower_ping and upper != lower_ping:
+            errors.append(
+                f"下阕平韵应转回上阕平声韵部: 上阕'{upper}'，下阕'{lower_ping}'"
+            )
+        if upper and lower_ze and lower_ze == upper:
+            errors.append(
+                f"下阕仄韵应与平韵不同部（换韵）: 均为'{lower_ze}'"
+            )
         return errors
 
 

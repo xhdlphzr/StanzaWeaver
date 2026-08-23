@@ -1,7 +1,12 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
+import re
+
 from . import PoetryTemplate, register
+from ..prosody.english import EnglishAnalyzer
+
+_EN_ANALYZER = EnglishAnalyzer()
 
 
 def _make_syl(**kwargs) -> dict:
@@ -18,8 +23,51 @@ def _make_syl(**kwargs) -> dict:
     }
 
 
-_l = _make_syl(attributes={"stress": "light"})
+_l = _make_syl(attributes={"stress": ""})
 _h = _make_syl(attributes={"stress": "heavy"})
+
+
+def _last_word(line: str) -> str:
+    if not line.strip():
+        return ""
+    return re.sub(r"[^A-Za-z0-9'-]", "", line.strip().split()[-1]).lower()
+
+
+def _en_rhyme_key(line_text: str) -> str | None:
+    """严格重音押韵 key：最后一个重读（主/次重音）元音起到词尾的音素串（含重音层级）。
+
+    无重读音节的词不能作韵脚（返回 None）。"""
+    word = _last_word(line_text)
+    if not word:
+        return None
+    return _EN_ANALYZER.rhyme_tail(word)
+
+
+def _check_stress_count(poem, syllables, min_stress: int, errors: list[str]) -> None:
+    for i, syls in enumerate(syllables):
+        stress_count = sum(1 for s in syls if s.attributes.get("stress") == "heavy")
+        if stress_count < min_stress:
+            errors.append(f"第{i + 1}行重音音节过少 ({stress_count})")
+
+
+def _check_rhyme_group(poem, indices, label, errors) -> None:
+    keys = []
+    for idx in indices:
+        if idx >= len(poem):
+            continue
+        k = _en_rhyme_key(poem[idx])
+        if k is None:
+            errors.append(f"第{idx + 1}行韵脚未落在主重音或次重音音节上")
+            continue
+        keys.append((idx, k))
+    if len(keys) >= 2:
+        base_idx, base = keys[0]
+        for idx, k in keys[1:]:
+            if k != base:
+                errors.append(
+                    f"押韵{label}不匹配: 第{base_idx + 1}行韵脚'{base}'，"
+                    f"第{idx + 1}行韵脚'{k}'（要求自重读音节起音素及重音完全一致）"
+                )
 
 
 class ShakespeareSonnetTemplate(PoetryTemplate):
@@ -27,6 +75,12 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
     language = "en"
     lines = 14
     syllables_per_line = [10] * 14
+    rule_description = (
+        "格律规则：每行抑扬格五音步（10音节，重音在偶数位，次重音亦算重读）；"
+        "韵式 ABAB CDCD EFEF GG；每组四行内A/B两韵必须不同；"
+        "押韵须为严格重音押韵：韵脚必须落在主重音或次重音音节上，"
+        "且该音节起全部音素（含重音层级）完全一致。"
+    )
 
     def get_syllable_constraints(self):
         line = [_l, _h, _l, _h, _l, _h, _l, _h, _l, _h]
@@ -34,43 +88,32 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
 
     def validate_full(self, poem, syllables):
         errors = []
-        for i, syls in enumerate(syllables):
-            stress_count = sum(1 for s in syls if s.attributes.get("stress") == "heavy")
-            if stress_count < 4:
-                errors.append(f"第{i + 1}行重音音节过少 ({stress_count}/10)")
+        _check_stress_count(poem, syllables, 4, errors)
 
-        quatrains = [
+        rhyme_groups = [
             ("A", [0, 2], 0), ("B", [1, 3], 0),
             ("C", [4, 6], 1), ("D", [5, 7], 1),
             ("E", [8, 10], 2), ("F", [9, 11], 2),
             ("G", [12, 13], 3),
         ]
-        quatrain_rhymes: dict[int, dict[str, str]] = {}
-
-        for letter, indices, q_idx in quatrains:
+        quatrain_rhymes: dict[int, dict[str, str | None]] = {}
+        for letter, indices, q_idx in rhyme_groups:
             if q_idx not in quatrain_rhymes:
                 quatrain_rhymes[q_idx] = {}
-            rhymes = []
+            _check_rhyme_group(poem, indices, letter, errors)
+            keys = []
             for idx in indices:
-                if idx < len(syllables) and syllables[idx]:
-                    last = syllables[idx][-1]
-                    rhyme_key = last.nucleus + last.coda
-                    rhymes.append((idx, rhyme_key))
-            if len(rhymes) >= 2:
-                base_rhyme = rhymes[0][1]
-                quatrain_rhymes[q_idx][letter] = base_rhyme
-                for idx, r in rhymes[1:]:
-                    if r and base_rhyme and r != base_rhyme:
-                        errors.append(
-                            f"押韵不匹配 {letter}: 第{rhymes[0][0] + 1}行韵脚为'{base_rhyme}'，第{idx + 1}行韵脚为'{r}'"
-                        )
+                if idx < len(poem):
+                    keys.append(_en_rhyme_key(poem[idx]))
+            if keys and keys[0] is not None:
+                quatrain_rhymes[q_idx][letter] = keys[0]
 
         for q_idx in range(3):
-            if q_idx in quatrain_rhymes:
-                rhyme_set = set(quatrain_rhymes[q_idx].values())
-                if len(rhyme_set) < 2:
-                    a_rhyme = list(quatrain_rhymes[q_idx].values())[0]
-                    errors.append(f"第{q_idx + 1}段对韵: A/B 韵脚应不同，当前均为'{a_rhyme}'")
+            values = quatrain_rhymes.get(q_idx, {})
+            distinct = {v for v in values.values() if v is not None}
+            if len(distinct) < 2 and len(values) >= 2:
+                a_rhyme = list(values.values())[0]
+                errors.append(f"第{q_idx + 1}段对韵: A/B 韵脚应不同，当前均为'{a_rhyme}'")
 
         return errors
 
@@ -79,7 +122,14 @@ class VillanelleTemplate(PoetryTemplate):
     name = "维拉内拉诗"
     language = "en"
     lines = 19
-    syllables_per_line = [10] * 19
+    syllables_per_line = []
+    rule_description = (
+        "格律规则：全诗19行（5个三行联句+1个四行联句）；韵式 ABA ABA ABA ABA ABA ABAA；"
+        "第1行(A1)在第6、12、18行原样重复，第3行(A2)在第9、15、19行原样重复；"
+        "每行至少4个重读音节，总音节数不限（次重音亦算重读）；"
+        "押韵须为严格重音押韵：韵脚落在主重音或次重音音节上，"
+        "该音节起全部音素（含重音层级）完全一致。"
+    )
     _refrain_a1 = [0, 5, 11, 17]
     _refrain_a2 = [2, 8, 14, 18]
     _rhyme_a = [0, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18]
@@ -90,54 +140,26 @@ class VillanelleTemplate(PoetryTemplate):
 
     def validate_full(self, poem, syllables):
         errors = []
+        _check_stress_count(poem, syllables, 4, errors)
 
-        for i, syls in enumerate(syllables):
-            stress_count = sum(1 for s in syls if s.attributes.get("stress") == "heavy")
-            if stress_count < 4:
-                errors.append(f"第{i + 1}行重音音节过少 ({stress_count}/10)")
+        if len(poem) > 0:
+            base_a1 = poem[0].strip()
+            for ref_idx in self._refrain_a1[1:]:
+                if ref_idx < len(poem) and poem[ref_idx].strip() != base_a1:
+                    errors.append(f"叠句A1不匹配: 第1行与第{ref_idx + 1}行文本不一致")
+        if len(poem) > 2:
+            base_a2 = poem[2].strip()
+            for ref_idx in self._refrain_a2[1:]:
+                if ref_idx < len(poem) and poem[ref_idx].strip() != base_a2:
+                    errors.append(f"叠句A2不匹配: 第3行与第{ref_idx + 1}行文本不一致")
 
-        base_a1 = poem[self._refrain_a1[0]] if len(poem) > self._refrain_a1[0] else ""
-        base_a2 = poem[self._refrain_a2[0]] if len(poem) > self._refrain_a2[0] else ""
+        _check_rhyme_group(poem, self._rhyme_a, "A", errors)
+        _check_rhyme_group(poem, self._rhyme_b, "B", errors)
 
-        for ref_idx in self._refrain_a1[1:]:
-            if ref_idx < len(poem) and poem[ref_idx].strip() != base_a1.strip():
-                errors.append(f"叠句A1不匹配: 第1行与第{ref_idx + 1}行文本不一致")
-
-        for ref_idx in self._refrain_a2[1:]:
-            if ref_idx < len(poem) and poem[ref_idx].strip() != base_a2.strip():
-                errors.append(f"叠句A2不匹配: 第3行与第{ref_idx + 1}行文本不一致")
-
-        def _rhyme_key(syls_list, idx):
-            if idx < len(syls_list) and syls_list[idx]:
-                last = syls_list[idx][-1]
-                return last.nucleus + last.coda
-            return ""
-
-        a_keys = []
-        for idx in self._rhyme_a:
-            k = _rhyme_key(syllables, idx)
-            if k: a_keys.append((idx, k))
-        if len(a_keys) >= 2:
-            base = a_keys[0][1]
-            for idx, k in a_keys[1:]:
-                if k != base:
-                    errors.append(f"押韵A不匹配: 第{a_keys[0][0] + 1}行韵脚为'{base}'，第{idx + 1}行韵脚为'{k}'")
-
-        b_keys = []
-        for idx in self._rhyme_b:
-            k = _rhyme_key(syllables, idx)
-            if k: b_keys.append((idx, k))
-        if len(b_keys) >= 2:
-            base = b_keys[0][1]
-            for idx, k in b_keys[1:]:
-                if k != base:
-                    errors.append(f"押韵B不匹配: 第{b_keys[0][0] + 1}行韵脚为'{base}'，第{idx + 1}行韵脚为'{k}'")
-
-        if a_keys and b_keys:
-            a_rhyme = a_keys[0][1]
-            b_rhyme = b_keys[0][1]
-            if a_rhyme and b_rhyme and a_rhyme == b_rhyme:
-                errors.append(f"A/B韵脚应不同，当前均为'{a_rhyme}'")
+        a_key = _en_rhyme_key(poem[0]) if poem else None
+        b_key = _en_rhyme_key(poem[1]) if len(poem) > 1 else None
+        if a_key and b_key and a_key == b_key:
+            errors.append(f"A/B韵脚应不同，当前均为'{a_key}'")
 
         return errors
 
@@ -147,6 +169,11 @@ class HeroicCoupletTemplate(PoetryTemplate):
     language = "en"
     lines = 2
     syllables_per_line = [10, 10]
+    rule_description = (
+        "格律规则：每行抑扬格五音步（10音节），全行重音音节数不少于4（次重音亦算重读）；"
+        "两行末字押同韵（AA），押韵须为严格重音押韵：韵脚落在主重音或次重音音节上，"
+        "该音节起全部音素（含重音层级）完全一致。"
+    )
 
     def get_syllable_constraints(self):
         line = [_l, _h, _l, _h, _l, _h, _l, _h, _l, _h]
@@ -154,15 +181,8 @@ class HeroicCoupletTemplate(PoetryTemplate):
 
     def validate_full(self, poem, syllables):
         errors = []
-        for i, syls in enumerate(syllables):
-            stress_count = sum(1 for s in syls if s.attributes.get("stress") == "heavy")
-            if stress_count < 4:
-                errors.append(f"第{i + 1}行重音音节过少 ({stress_count}/10)")
-        if len(syllables) >= 2 and syllables[0] and syllables[1]:
-            r0 = syllables[0][-1].nucleus + syllables[0][-1].coda
-            r1 = syllables[1][-1].nucleus + syllables[1][-1].coda
-            if r0 and r1 and r0 != r1:
-                errors.append(f"押韵不匹配: 第1行韵脚为'{r0}'，第2行韵脚为'{r1}'")
+        _check_stress_count(poem, syllables, 4, errors)
+        _check_rhyme_group(poem, [0, 1], "AA", errors)
         return errors
 
 
