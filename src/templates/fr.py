@@ -64,7 +64,9 @@ class RondeauTemplate(PoetryTemplate):
                 first_words = " ".join(base_refrain.split()[:4])
                 curr_words = " ".join(poem[ref_idx].split()[:4])
                 if first_words and curr_words and first_words != curr_words:
-                    errors.append(f"叠句不匹配: 第1行开头'{first_words}'与第{ref_idx + 1}行开头'{curr_words}'不一致")
+                    errors.append(
+                        f"叠句不匹配: 第1行开头'{first_words}'与第{ref_idx + 1}行开头'{curr_words}'不一致"
+                    )
         return errors
 
 

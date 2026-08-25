@@ -1,681 +1,886 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StanzaWeaver</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Alex+Brush&family=JetBrains+Mono:ital,wght@0,400;0,500&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-<link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-<div id="app">
-    <div id="import-overlay" class="import-overlay">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StanzaWeaver</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Alex+Brush&family=JetBrains+Mono:ital,wght@0,400;0,500&family=Noto+Serif+SC:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css"
+    />
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="import-overlay" class="import-overlay">
         <div class="import-overlay-content">
-            <div class="import-spinner"></div>
-            <p>导入词库中，请稍候...</p>
+          <div class="import-spinner"></div>
+          <p>导入词库中，请稍候...</p>
         </div>
-    </div>
-    <header>
+      </div>
+      <header>
         <div class="header-logo">
-            <h1>StanzaWeaver</h1>
-            <p class="slogan">Let&rsquo;s weave stanzas with StanzaWeaver!</p>
+          <h1>StanzaWeaver</h1>
+          <p class="slogan">Let&rsquo;s weave stanzas with StanzaWeaver!</p>
         </div>
-        <button id="btn-config" class="btn-icon" title="LLM配置">&#9881;</button>
-    </header>
+        <button id="btn-config" class="btn-icon" title="LLM配置">
+          &#9881;
+        </button>
+      </header>
 
-    <main>
+      <main>
         <section class="input-section">
-            <div class="field">
-                <label>主题</label>
-                <textarea id="topic" placeholder="输入你想写的诗歌主题...也可以粘贴一首诗让AI帮忙修改"></textarea>
-            </div>
-            <div class="field field-inline">
-                <label>格律</label>
-                <select id="template-select">
-                    <option value="">-- 选择模板 --</option>
-                </select>
-                <button id="btn-custom-template" class="btn-secondary btn-small">+ 自定义</button>
-            </div>
-            <div class="actions">
-                <button id="btn-generate" class="btn-primary">开始生成</button>
-            </div>
+          <div class="field">
+            <label>主题</label>
+            <textarea
+              id="topic"
+              placeholder="输入你想写的诗歌主题...也可以粘贴一首诗让AI帮忙修改"
+            ></textarea>
+          </div>
+          <div class="field field-inline">
+            <label>格律</label>
+            <select id="template-select">
+              <option value="">-- 选择模板 --</option>
+            </select>
+            <button id="btn-custom-template" class="btn-secondary btn-small">
+              + 自定义
+            </button>
+          </div>
+          <div class="actions">
+            <button id="btn-generate" class="btn-primary">开始生成</button>
+          </div>
         </section>
 
         <section id="progress-section" class="hidden card">
-            <div class="section-header">生成进度</div>
-            <div id="progress-list"></div>
+          <div class="section-header">生成进度</div>
+          <div id="progress-list"></div>
         </section>
 
         <section id="poem-section" class="hidden card">
-            <div class="section-header-row">
-                <span class="section-header">诗稿</span>
-                <button id="btn-copy" class="btn-copy" title="复制诗稿">&#128203;</button>
-                <button id="btn-history" class="btn-history-link" title="历史记录">&#128220;</button>
-            </div>
-            <div id="poem-display"></div>
-            <div id="checker-inline" class="checker-inline hidden"></div>
-            <div id="tool-status" class="tool-status hidden"></div>
+          <div class="section-header-row">
+            <span class="section-header">诗稿</span>
+            <button id="btn-copy" class="btn-copy" title="复制诗稿">
+              &#128203;
+            </button>
+            <button id="btn-history" class="btn-history-link" title="历史记录">
+              &#128220;
+            </button>
+          </div>
+          <div id="poem-display"></div>
+          <div id="checker-inline" class="checker-inline hidden"></div>
+          <div id="tool-status" class="tool-status hidden"></div>
         </section>
 
         <section id="feedback-section" class="hidden card">
-            <div class="feedback-buttons">
-                <button id="btn-accept" class="btn-accept">定稿</button>
-                <button id="btn-reject" class="btn-reject">不定稿</button>
+          <div class="feedback-buttons">
+            <button id="btn-accept" class="btn-accept">定稿</button>
+            <button id="btn-reject" class="btn-reject">不定稿</button>
+          </div>
+          <div id="feedback-input-area" class="hidden">
+            <div class="field">
+              <input
+                type="text"
+                id="user-feedback"
+                placeholder="输入修改意见..."
+              />
             </div>
-            <div id="feedback-input-area" class="hidden">
-                <div class="field">
-                    <input type="text" id="user-feedback" placeholder="输入修改意见...">
-                </div>
-                <button id="btn-feedback" class="btn-send">发送反馈</button>
-            </div>
+            <button id="btn-feedback" class="btn-send">发送反馈</button>
+          </div>
         </section>
-    </main>
-</div>
+      </main>
+    </div>
 
-<div id="config-modal" class="modal hidden">
-    <div class="modal-content">
+    <div id="config-modal" class="modal hidden">
+      <div class="modal-content">
         <h2>LLM 配置</h2>
         <div class="config-group">
-            <h3>编写AI</h3>
-            <label>Base URL <input type="text" id="cfg-writer-url"></label>
-            <label>API Key <input type="password" id="cfg-writer-key"></label>
-            <label>Model <input type="text" id="cfg-writer-model"></label>
+          <h3>编写AI</h3>
+          <label>Base URL <input type="text" id="cfg-writer-url" /></label>
+          <label>API Key <input type="password" id="cfg-writer-key" /></label>
+          <label>Model <input type="text" id="cfg-writer-model" /></label>
         </div>
         <div class="config-group">
-            <h3>检查AI</h3>
-            <label>Base URL <input type="text" id="cfg-checker-url"></label>
-            <label>API Key <input type="password" id="cfg-checker-key"></label>
-            <label>Model <input type="text" id="cfg-checker-model"></label>
+          <h3>检查AI</h3>
+          <label>Base URL <input type="text" id="cfg-checker-url" /></label>
+          <label>API Key <input type="password" id="cfg-checker-key" /></label>
+          <label>Model <input type="text" id="cfg-checker-model" /></label>
         </div>
         <div class="modal-actions">
-            <button id="btn-save-config" class="btn-primary">保存</button>
-            <button id="btn-close-config" class="btn-secondary">取消</button>
+          <button id="btn-save-config" class="btn-primary">保存</button>
+          <button id="btn-close-config" class="btn-secondary">取消</button>
         </div>
+      </div>
     </div>
-</div>
 
-<div id="history-modal" class="modal hidden">
-    <div class="modal-content modal-wide">
+    <div id="history-modal" class="modal hidden">
+      <div class="modal-content modal-wide">
         <h2>历史记录</h2>
         <div id="history-list" class="history-list"></div>
         <div class="modal-actions">
-            <button id="btn-close-history" class="btn-secondary">关闭</button>
+          <button id="btn-close-history" class="btn-secondary">关闭</button>
         </div>
+      </div>
     </div>
-</div>
 
-<div id="template-modal" class="modal hidden">
-    <div class="modal-content modal-wide">
+    <div id="template-modal" class="modal hidden">
+      <div class="modal-content modal-wide">
         <h2>自定义格律模板</h2>
         <div class="config-group">
-            <label>模板名称 <input type="text" id="tmpl-name" placeholder="如：浣溪沙"></label>
+          <label
+            >模板名称
+            <input type="text" id="tmpl-name" placeholder="如：浣溪沙"
+          /></label>
         </div>
         <div class="config-group config-row">
-            <label>语言
-                <select id="tmpl-language"><option value="zh">汉语</option><option value="en">英语</option></select>
-            </label>
-            <label>行数 <input type="number" id="tmpl-lines" value="4" min="1" max="30"></label>
-            <label>每行音节 <input type="text" id="tmpl-syl-per-line" value="7,7,7,7" placeholder="逗号分隔"></label>
+          <label
+            >语言
+            <select id="tmpl-language">
+              <option value="zh">汉语</option>
+              <option value="en">英语</option>
+            </select>
+          </label>
+          <label
+            >行数
+            <input type="number" id="tmpl-lines" value="4" min="1" max="30"
+          /></label>
+          <label
+            >每行音节
+            <input
+              type="text"
+              id="tmpl-syl-per-line"
+              value="7,7,7,7"
+              placeholder="逗号分隔"
+          /></label>
         </div>
         <div class="config-group">
-            <div class="section-header" style="margin-top:8px">每行音节约束</div>
-            <div id="tmpl-syllable-table" class="syllable-table"></div>
+          <div class="section-header" style="margin-top: 8px">每行音节约束</div>
+          <div id="tmpl-syllable-table" class="syllable-table"></div>
         </div>
         <div class="config-group">
-            <label>自定义检测代码（Python，可选）</label>
-            <div id="tmpl-code" class="code-editor"></div>
+          <label>自定义检测代码（Python，可选）</label>
+          <div id="tmpl-code" class="code-editor"></div>
         </div>
         <div class="modal-actions">
-            <button id="btn-create-template" class="btn-primary">生成模板</button>
-            <button id="btn-close-template" class="btn-secondary">取消</button>
+          <button id="btn-create-template" class="btn-primary">生成模板</button>
+          <button id="btn-close-template" class="btn-secondary">取消</button>
         </div>
+      </div>
     </div>
-</div>
 
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
-<script>
-const socket = io();
-const CSRF_TOKEN = '{{ csrf_token }}';
-function csrfHeaders() {
-    return { 'X-CSRF-Token': CSRF_TOKEN };
-}
-let isGenerating = false;
-let lastPoem = [];
-let currentStep = '';
-const STEP_NAMES = {
-    'step1_description': '生成描述',
-    'step2_draft': '生成初稿',
-    'step3_refine': '炼句优化',
-    'step4_check': '终审',
-};
-const STEP_ORDER = ['step1_description', 'step2_draft', 'step3_refine', 'step4_check'];
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+    <script>
+      const socket = io();
+      const CSRF_TOKEN = "{{ csrf_token }}";
+      function csrfHeaders() {
+        return { "X-CSRF-Token": CSRF_TOKEN };
+      }
+      let isGenerating = false;
+      let lastPoem = [];
+      let currentStep = "";
+      const STEP_NAMES = {
+        step1_description: "生成描述",
+        step2_draft: "生成初稿",
+        step3_refine: "炼句优化",
+        step4_check: "终审",
+      };
+      const STEP_ORDER = [
+        "step1_description",
+        "step2_draft",
+        "step3_refine",
+        "step4_check",
+      ];
 
-document.addEventListener('DOMContentLoaded', () => {
-    loadTemplates();
-    document.getElementById('btn-generate').addEventListener('click', startGenerate);
-    document.getElementById('btn-feedback').addEventListener('click', sendFeedback);
-    document.getElementById('btn-reject').addEventListener('click', showFeedbackInput);
-    document.getElementById('btn-accept').addEventListener('click', acceptFinal);
-    document.getElementById('btn-config').addEventListener('click', openConfig);
-    document.getElementById('btn-close-config').addEventListener('click', closeConfig);
-    document.getElementById('btn-save-config').addEventListener('click', saveConfig);
-    document.getElementById('btn-custom-template').addEventListener('click', openTemplateModal);
-    document.getElementById('btn-create-template').addEventListener('click', createTemplate);
-    document.getElementById('btn-close-template').addEventListener('click', closeTemplateModal);
-    document.getElementById('btn-copy').addEventListener('click', copyPoem);
-    document.getElementById('btn-history').addEventListener('click', openHistory);
-    document.getElementById('btn-close-history').addEventListener('click', closeHistory);
+      document.addEventListener("DOMContentLoaded", () => {
+        loadTemplates();
+        document
+          .getElementById("btn-generate")
+          .addEventListener("click", startGenerate);
+        document
+          .getElementById("btn-feedback")
+          .addEventListener("click", sendFeedback);
+        document
+          .getElementById("btn-reject")
+          .addEventListener("click", showFeedbackInput);
+        document
+          .getElementById("btn-accept")
+          .addEventListener("click", acceptFinal);
+        document
+          .getElementById("btn-config")
+          .addEventListener("click", openConfig);
+        document
+          .getElementById("btn-close-config")
+          .addEventListener("click", closeConfig);
+        document
+          .getElementById("btn-save-config")
+          .addEventListener("click", saveConfig);
+        document
+          .getElementById("btn-custom-template")
+          .addEventListener("click", openTemplateModal);
+        document
+          .getElementById("btn-create-template")
+          .addEventListener("click", createTemplate);
+        document
+          .getElementById("btn-close-template")
+          .addEventListener("click", closeTemplateModal);
+        document.getElementById("btn-copy").addEventListener("click", copyPoem);
+        document
+          .getElementById("btn-history")
+          .addEventListener("click", openHistory);
+        document
+          .getElementById("btn-close-history")
+          .addEventListener("click", closeHistory);
 
-    const topicEl = document.getElementById('topic');
-    topicEl.addEventListener('input', function() {
-        this.style.height = '0';
-        var h = this.scrollHeight;
-        this.style.height = Math.max(44, Math.min(h, 340)) + 'px';
-        this.style.overflowY = h > 340 ? 'auto' : 'hidden';
-    });
-    document.getElementById('tmpl-lines').addEventListener('change', function() {
-        const n = parseInt(this.value) || 4;
-        const raw = document.getElementById('tmpl-syl-per-line').value.trim();
-        const arr = raw ? raw.split(',').map(function(s) { return parseInt(s.trim()) || 7; }) : [];
-        while (arr.length < n) arr.push(arr.length > 0 ? arr[arr.length - 1] : 7);
-        document.getElementById('tmpl-syl-per-line').value = arr.slice(0, n).join(',');
-        rebuildSyllableTable();
-    });
-    document.getElementById('tmpl-syl-per-line').addEventListener('change', rebuildSyllableTable);
-    document.getElementById('tmpl-language').addEventListener('change', rebuildSyllableTable);
-
-    socket.on('progress', handleProgress);
-    socket.on('done', handleDone);
-    socket.on('error', handleError);
-    socket.on('templates_updated', function() { loadTemplates(); });
-    var pollTimer = setInterval(function() {
-        fetch('/api/import-status')
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-                if (!d.importing) {
-                    document.getElementById('import-overlay').classList.add('hidden');
-                    clearInterval(pollTimer);
-                }
-            });
-    }, 800);
-});
-
-function loadTemplates() {
-    fetch('/api/templates')
-        .then(r => r.json())
-        .then(templates => {
-            const select = document.getElementById('template-select');
-            select.innerHTML = '<option value="">-- 选择模板 --</option>';
-            templates.forEach(t => {
-                const opt = document.createElement('option');
-                opt.value = t.key;
-                opt.textContent = t.display_name || t.name;
-                select.appendChild(opt);
-            });
+        const topicEl = document.getElementById("topic");
+        topicEl.addEventListener("input", function () {
+          this.style.height = "0";
+          var h = this.scrollHeight;
+          this.style.height = Math.max(44, Math.min(h, 340)) + "px";
+          this.style.overflowY = h > 340 ? "auto" : "hidden";
         });
-}
+        document
+          .getElementById("tmpl-lines")
+          .addEventListener("change", function () {
+            const n = parseInt(this.value) || 4;
+            const raw = document
+              .getElementById("tmpl-syl-per-line")
+              .value.trim();
+            const arr = raw
+              ? raw.split(",").map(function (s) {
+                  return parseInt(s.trim()) || 7;
+                })
+              : [];
+            while (arr.length < n)
+              arr.push(arr.length > 0 ? arr[arr.length - 1] : 7);
+            document.getElementById("tmpl-syl-per-line").value = arr
+              .slice(0, n)
+              .join(",");
+            rebuildSyllableTable();
+          });
+        document
+          .getElementById("tmpl-syl-per-line")
+          .addEventListener("change", rebuildSyllableTable);
+        document
+          .getElementById("tmpl-language")
+          .addEventListener("change", rebuildSyllableTable);
 
-function getSelectedTemplate() {
-    const select = document.getElementById('template-select');
-    const val = select.value;
-    if (!val) return null;
-    return val;
-}
+        socket.on("progress", handleProgress);
+        socket.on("done", handleDone);
+        socket.on("error", handleError);
+        socket.on("templates_updated", function () {
+          loadTemplates();
+        });
+        var pollTimer = setInterval(function () {
+          fetch("/api/import-status")
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (d) {
+              if (!d.importing) {
+                document
+                  .getElementById("import-overlay")
+                  .classList.add("hidden");
+                clearInterval(pollTimer);
+              }
+            });
+        }, 800);
+      });
 
-function startGenerate() {
-    const topic = document.getElementById('topic').value.trim();
-    const templateKey = getSelectedTemplate();
-    if (!topic) { alert('请输入主题'); return; }
-    if (!templateKey) { alert('请选择格律模板'); return; }
+      function loadTemplates() {
+        fetch("/api/templates")
+          .then((r) => r.json())
+          .then((templates) => {
+            const select = document.getElementById("template-select");
+            select.innerHTML = '<option value="">-- 选择模板 --</option>';
+            templates.forEach((t) => {
+              const opt = document.createElement("option");
+              opt.value = t.key;
+              opt.textContent = t.display_name || t.name;
+              select.appendChild(opt);
+            });
+          });
+      }
 
-    isGenerating = true;
-    document.getElementById('btn-generate').disabled = true;
-    document.getElementById('progress-section').classList.remove('hidden');
-    document.getElementById('poem-section').classList.remove('hidden');
-    document.getElementById('feedback-section').classList.add('hidden');
-    document.getElementById('checker-inline').classList.add('hidden');
-    document.getElementById('tool-status').classList.add('hidden');
-    document.getElementById('progress-list').innerHTML = '';
-    document.getElementById('poem-display').innerHTML = '';
-    document.getElementById('feedback-input-area').classList.add('hidden');
-    document.getElementById('user-feedback').value = '';
-    lastPoem = [];
-    currentStep = '';
-    renderedSeqs.clear();
+      function getSelectedTemplate() {
+        const select = document.getElementById("template-select");
+        const val = select.value;
+        if (!val) return null;
+        return val;
+      }
 
-    socket.emit('generate', { topic: topic, template_key: templateKey });
-}
+      function startGenerate() {
+        const topic = document.getElementById("topic").value.trim();
+        const templateKey = getSelectedTemplate();
+        if (!topic) {
+          alert("请输入主题");
+          return;
+        }
+        if (!templateKey) {
+          alert("请选择格律模板");
+          return;
+        }
 
-function sendFeedback() {
-    const feedback = document.getElementById('user-feedback').value.trim();
-    if (!feedback) return;
+        isGenerating = true;
+        document.getElementById("btn-generate").disabled = true;
+        document.getElementById("progress-section").classList.remove("hidden");
+        document.getElementById("poem-section").classList.remove("hidden");
+        document.getElementById("feedback-section").classList.add("hidden");
+        document.getElementById("checker-inline").classList.add("hidden");
+        document.getElementById("tool-status").classList.add("hidden");
+        document.getElementById("progress-list").innerHTML = "";
+        document.getElementById("poem-display").innerHTML = "";
+        document.getElementById("feedback-input-area").classList.add("hidden");
+        document.getElementById("user-feedback").value = "";
+        lastPoem = [];
+        currentStep = "";
+        renderedSeqs.clear();
 
-    document.getElementById('btn-feedback').disabled = true;
-    document.getElementById('checker-inline').classList.add('hidden');
-    document.getElementById('tool-status').classList.add('hidden');
-    document.getElementById('feedback-section').classList.add('hidden');
-    lastPoem = [];
-    currentStep = '';
-    socket.emit('feedback', { feedback: feedback });
-}
+        socket.emit("generate", { topic: topic, template_key: templateKey });
+      }
 
-function showFeedbackInput() {
-    document.getElementById('feedback-input-area').classList.remove('hidden');
-    document.getElementById('user-feedback').focus();
-}
+      function sendFeedback() {
+        const feedback = document.getElementById("user-feedback").value.trim();
+        if (!feedback) return;
 
-function acceptFinal() {
-    document.getElementById('feedback-section').classList.add('hidden');
-    alert('诗歌定稿完成！感谢使用 StanzaWeaver。');
-}
+        document.getElementById("btn-feedback").disabled = true;
+        document.getElementById("checker-inline").classList.add("hidden");
+        document.getElementById("tool-status").classList.add("hidden");
+        document.getElementById("feedback-section").classList.add("hidden");
+        lastPoem = [];
+        currentStep = "";
+        socket.emit("feedback", { feedback: feedback });
+      }
 
-function updateStepDot(stepKey, state) {
-    const item = document.getElementById('progress-' + stepKey);
-    if (!item) return;
-    const dot = item.querySelector('.step-dot');
-    dot.className = 'step-dot ' + state;
-}
+      function showFeedbackInput() {
+        document
+          .getElementById("feedback-input-area")
+          .classList.remove("hidden");
+        document.getElementById("user-feedback").focus();
+      }
 
-function ensureStepItem(list, stepKey) {
-    let item = document.getElementById('progress-' + stepKey);
-    if (!item) {
-        item = createStepItem(stepKey, STEP_NAMES[stepKey] || stepKey);
-        list.appendChild(item);
-    }
-    return item;
-}
+      function acceptFinal() {
+        document.getElementById("feedback-section").classList.add("hidden");
+        alert("诗歌定稿完成！感谢使用 StanzaWeaver。");
+      }
 
-const renderedSeqs = new Set();
+      function updateStepDot(stepKey, state) {
+        const item = document.getElementById("progress-" + stepKey);
+        if (!item) return;
+        const dot = item.querySelector(".step-dot");
+        dot.className = "step-dot " + state;
+      }
 
-function renderStepDetail(list, d) {
-    if (d.seq !== undefined && renderedSeqs.has(d.seq)) return;
-    const item = ensureStepItem(list, d.step);
-    const title = item.querySelector('.step-title');
-    if (d.rounds !== undefined) {
-        title.textContent = (d.title || '') + ' (' + d.rounds + ')';
-    } else if (d.title) {
-        title.textContent = d.title;
-    }
-    const body = item.querySelector('.progress-body');
-    body.querySelectorAll('.step-record.pending').forEach(el => el.remove());
-    const count = body.querySelectorAll('.step-record:not(.pending)').length + 1;
-    const rec = document.createElement('div');
-    rec.className = 'step-record';
-    if (d.content) {
-        const label = document.createElement('div');
-        label.className = 'step-record-label';
-        label.textContent = (d.title || '') + (count > 1 ? '（第' + count + '次）' : '');
-        rec.appendChild(label);
-        const pre = document.createElement('pre');
-        pre.textContent = d.content;
-        rec.appendChild(pre);
-    }
-    body.appendChild(rec);
-    if (d.seq !== undefined) renderedSeqs.add(d.seq);
-}
+      function ensureStepItem(list, stepKey) {
+        let item = document.getElementById("progress-" + stepKey);
+        if (!item) {
+          item = createStepItem(stepKey, STEP_NAMES[stepKey] || stepKey);
+          list.appendChild(item);
+        }
+        return item;
+      }
 
-function handleProgress(data) {
-    const list = document.getElementById('progress-list');
+      const renderedSeqs = new Set();
 
-    if (data.step !== currentStep) {
-        const prevIdx = STEP_ORDER.indexOf(currentStep);
-        const newIdx = STEP_ORDER.indexOf(data.step);
-        const goingBack = prevIdx >= 0 && newIdx < prevIdx;
-        if (prevIdx >= 0 && !goingBack) updateStepDot(currentStep, 'done');
-        if (goingBack) updateStepDot(currentStep, 'failed');
+      function renderStepDetail(list, d) {
+        if (d.seq !== undefined && renderedSeqs.has(d.seq)) return;
+        const item = ensureStepItem(list, d.step);
+        const title = item.querySelector(".step-title");
+        if (d.rounds !== undefined) {
+          title.textContent = (d.title || "") + " (" + d.rounds + ")";
+        } else if (d.title) {
+          title.textContent = d.title;
+        }
+        const body = item.querySelector(".progress-body");
+        body
+          .querySelectorAll(".step-record.pending")
+          .forEach((el) => el.remove());
+        const count =
+          body.querySelectorAll(".step-record:not(.pending)").length + 1;
+        const rec = document.createElement("div");
+        rec.className = "step-record";
+        if (d.content) {
+          const label = document.createElement("div");
+          label.className = "step-record-label";
+          label.textContent =
+            (d.title || "") + (count > 1 ? "（第" + count + "次）" : "");
+          rec.appendChild(label);
+          const pre = document.createElement("pre");
+          pre.textContent = d.content;
+          rec.appendChild(pre);
+        }
+        body.appendChild(rec);
+        if (d.seq !== undefined) renderedSeqs.add(d.seq);
+      }
 
-        currentStep = data.step;
+      function handleProgress(data) {
+        const list = document.getElementById("progress-list");
 
-        for (let i = 0; i <= newIdx; i++) {
+        if (data.step !== currentStep) {
+          const prevIdx = STEP_ORDER.indexOf(currentStep);
+          const newIdx = STEP_ORDER.indexOf(data.step);
+          const goingBack = prevIdx >= 0 && newIdx < prevIdx;
+          if (prevIdx >= 0 && !goingBack) updateStepDot(currentStep, "done");
+          if (goingBack) updateStepDot(currentStep, "failed");
+
+          currentStep = data.step;
+
+          for (let i = 0; i <= newIdx; i++) {
             ensureStepItem(list, STEP_ORDER[i]);
+          }
+
+          for (let i = 0; i < newIdx; i++) {
+            updateStepDot(STEP_ORDER[i], "done");
+          }
+          updateStepDot(currentStep, "running");
         }
 
-        for (let i = 0; i < newIdx; i++) {
-            updateStepDot(STEP_ORDER[i], 'done');
-        }
-        updateStepDot(currentStep, 'running');
-    }
-
-    if (data.step_details) {
-        data.step_details.forEach(d => {
+        if (data.step_details) {
+          data.step_details.forEach((d) => {
             renderStepDetail(list, d);
             const item = ensureStepItem(list, d.step);
-            const dot = item.querySelector('.step-dot');
+            const dot = item.querySelector(".step-dot");
             if (d.step === currentStep) {
-                dot.className = 'step-dot running';
+              dot.className = "step-dot running";
             }
-        });
-    }
-
-    if (data.stream_text) {
-        const display = document.getElementById('poem-display');
-        if (!data.draft || !data.draft.length) {
-            display.innerHTML = '<div class="poem-line stream-text">' + escapeHtml(data.stream_text) + '</div>';
+          });
         }
-    }
-    if (data.draft && data.draft.length > 0) {
-        updatePoemDisplay(data.draft);
-    }
 
-    if (data.last_tool) {
-        const ts = document.getElementById('tool-status');
-        ts.classList.remove('hidden');
-        const toolNames = {
-            'search_words': '搜索候选词', 'refine_line': '修改某行',
-            'rewrite': '整体重写', 'submit': '提交评审', '_thinking': '思考'
-        };
-        ts.innerHTML = '<span class="tool-label">' + (toolNames[data.last_tool] || data.last_tool) + '</span>';
-        if (data.last_tool_result) {
-            ts.innerHTML += '<span class="tool-result">' + escapeHtml(String(data.last_tool_result).substring(0, 200)) + '</span>';
+        if (data.stream_text) {
+          const display = document.getElementById("poem-display");
+          if (!data.draft || !data.draft.length) {
+            display.innerHTML =
+              '<div class="poem-line stream-text">' +
+              escapeHtml(data.stream_text) +
+              "</div>";
+          }
         }
-    }
+        if (data.draft && data.draft.length > 0) {
+          updatePoemDisplay(data.draft);
+        }
 
-    if (data.current_detail_step && data.current_detail) {
-        const item = document.getElementById('progress-' + data.current_detail_step);
-        if (item) {
-            const body = item.querySelector('.progress-body');
-            body.querySelectorAll('.step-record.pending').forEach(el => el.remove());
-            const rec = document.createElement('div');
-            rec.className = 'step-record pending';
-            const pre = document.createElement('pre');
+        if (data.last_tool) {
+          const ts = document.getElementById("tool-status");
+          ts.classList.remove("hidden");
+          const toolNames = {
+            search_words: "搜索候选词",
+            refine_line: "修改某行",
+            rewrite: "整体重写",
+            submit: "提交评审",
+            _thinking: "思考",
+          };
+          ts.innerHTML =
+            '<span class="tool-label">' +
+            (toolNames[data.last_tool] || data.last_tool) +
+            "</span>";
+          if (data.last_tool_result) {
+            ts.innerHTML +=
+              '<span class="tool-result">' +
+              escapeHtml(String(data.last_tool_result).substring(0, 200)) +
+              "</span>";
+          }
+        }
+
+        if (data.current_detail_step && data.current_detail) {
+          const item = document.getElementById(
+            "progress-" + data.current_detail_step,
+          );
+          if (item) {
+            const body = item.querySelector(".progress-body");
+            body
+              .querySelectorAll(".step-record.pending")
+              .forEach((el) => el.remove());
+            const rec = document.createElement("div");
+            rec.className = "step-record pending";
+            const pre = document.createElement("pre");
             pre.textContent = data.current_detail;
             rec.appendChild(pre);
             body.appendChild(rec);
+          }
         }
-    }
-}
+      }
 
-function createStepItem(stepKey, title) {
-    const wrapper = document.createElement('div');
-    wrapper.id = 'progress-' + stepKey;
-    wrapper.className = 'progress-step';
+      function createStepItem(stepKey, title) {
+        const wrapper = document.createElement("div");
+        wrapper.id = "progress-" + stepKey;
+        wrapper.className = "progress-step";
 
-    const header = document.createElement('div');
-    header.className = 'progress-header';
-    header.innerHTML = '<span class="step-dot"></span><span class="step-title">' + title + '</span><span class="step-caret">&#9660;</span>';
+        const header = document.createElement("div");
+        header.className = "progress-header";
+        header.innerHTML =
+          '<span class="step-dot"></span><span class="step-title">' +
+          title +
+          '</span><span class="step-caret">&#9660;</span>';
 
-    const body = document.createElement('div');
-    body.className = 'progress-body';
+        const body = document.createElement("div");
+        body.className = "progress-body";
 
-    header.addEventListener('click', () => {
-        body.classList.toggle('collapsed');
-        const caret = header.querySelector('.step-caret');
-        caret.innerHTML = body.classList.contains('collapsed') ? '&#9654;' : '&#9660;';
-    });
+        header.addEventListener("click", () => {
+          body.classList.toggle("collapsed");
+          const caret = header.querySelector(".step-caret");
+          caret.innerHTML = body.classList.contains("collapsed")
+            ? "&#9654;"
+            : "&#9660;";
+        });
 
-    wrapper.appendChild(header);
-    wrapper.appendChild(body);
-    return wrapper;
-}
+        wrapper.appendChild(header);
+        wrapper.appendChild(body);
+        return wrapper;
+      }
 
-function updatePoemDisplay(poem) {
-    if (JSON.stringify(poem) === JSON.stringify(lastPoem)) return;
-    lastPoem = [...poem];
+      function updatePoemDisplay(poem) {
+        if (JSON.stringify(poem) === JSON.stringify(lastPoem)) return;
+        lastPoem = [...poem];
 
-    const display = document.getElementById('poem-display');
-    display.innerHTML = '';
-    poem.forEach((line, i) => {
-        const div = document.createElement('div');
-        div.className = 'poem-line';
-        div.textContent = line;
-        display.appendChild(div);
-    });
-}
+        const display = document.getElementById("poem-display");
+        display.innerHTML = "";
+        poem.forEach((line, i) => {
+          const div = document.createElement("div");
+          div.className = "poem-line";
+          div.textContent = line;
+          display.appendChild(div);
+        });
+      }
 
-function handleDone(data) {
-    isGenerating = false;
-    document.getElementById('btn-generate').disabled = false;
-    document.getElementById('btn-feedback').disabled = false;
+      function handleDone(data) {
+        isGenerating = false;
+        document.getElementById("btn-generate").disabled = false;
+        document.getElementById("btn-feedback").disabled = false;
 
-    const poem = data.final_poem || data.draft || [];
-    updatePoemDisplay(poem);
+        const poem = data.final_poem || data.draft || [];
+        updatePoemDisplay(poem);
 
-    document.getElementById('tool-status').classList.add('hidden');
+        document.getElementById("tool-status").classList.add("hidden");
 
-    const checkerInline = document.getElementById('checker-inline');
-    checkerInline.classList.remove('hidden');
-    if (data.checker_pass) {
-        checkerInline.innerHTML = '<div class="checker-pass">&#10004; 终审通过</div>';
-    } else {
-        checkerInline.innerHTML = '<div class="checker-fail">&#10008; 未通过</div>';
-        if (data.checker_suggestions) {
-            checkerInline.innerHTML += '<div class="checker-detail">' + escapeHtml(data.checker_suggestions) + '</div>';
+        const checkerInline = document.getElementById("checker-inline");
+        checkerInline.classList.remove("hidden");
+        if (data.checker_pass) {
+          checkerInline.innerHTML =
+            '<div class="checker-pass">&#10004; 终审通过</div>';
+        } else {
+          checkerInline.innerHTML =
+            '<div class="checker-fail">&#10008; 未通过</div>';
+          if (data.checker_suggestions) {
+            checkerInline.innerHTML +=
+              '<div class="checker-detail">' +
+              escapeHtml(data.checker_suggestions) +
+              "</div>";
+          }
         }
-    }
 
-    if (data.step_details) {
-        const list = document.getElementById('progress-list');
-        data.step_details.forEach(d => {
+        if (data.step_details) {
+          const list = document.getElementById("progress-list");
+          data.step_details.forEach((d) => {
             renderStepDetail(list, d);
-        });
-        STEP_ORDER.forEach(k => updateStepDot(k, 'done'));
-    }
-
-    document.getElementById('feedback-section').classList.remove('hidden');
-    document.getElementById('feedback-input-area').classList.add('hidden');
-    document.getElementById('user-feedback').value = '';
-
-    if (data.checker_pass) {
-        const poemText = poem.join('\n');
-        const topic = document.getElementById('topic').value;
-        const tmplName = document.getElementById('template-select').selectedOptions[0].textContent;
-    fetch('/api/history', {
-        method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, csrfHeaders()),
-        body: JSON.stringify({ topic: topic, template_name: tmplName, poem: poemText })
-    });
-    }
-}
-
-function handleError(data) {
-    alert(data.message || '发生错误');
-    document.getElementById('btn-generate').disabled = false;
-    document.getElementById('btn-feedback').disabled = false;
-    isGenerating = false;
-}
-
-function openConfig() {
-    fetch('/api/config', { headers: csrfHeaders() })
-        .then(r => r.json())
-        .then(cfg => {
-            document.getElementById('cfg-writer-url').value = cfg.writer.base_url;
-            document.getElementById('cfg-writer-key').value = cfg.writer.api_key;
-            document.getElementById('cfg-writer-model').value = cfg.writer.model;
-            document.getElementById('cfg-checker-url').value = cfg.checker.base_url;
-            document.getElementById('cfg-checker-key').value = cfg.checker.api_key;
-            document.getElementById('cfg-checker-model').value = cfg.checker.model;
-        });
-    document.getElementById('config-modal').classList.remove('hidden');
-}
-
-function closeConfig() {
-    document.getElementById('config-modal').classList.add('hidden');
-}
-
-function saveConfig() {
-    const data = {
-        writer: {
-            base_url: document.getElementById('cfg-writer-url').value,
-            api_key: document.getElementById('cfg-writer-key').value,
-            model: document.getElementById('cfg-writer-model').value,
-        },
-        checker: {
-            base_url: document.getElementById('cfg-checker-url').value,
-            api_key: document.getElementById('cfg-checker-key').value,
-            model: document.getElementById('cfg-checker-model').value,
+          });
+          STEP_ORDER.forEach((k) => updateStepDot(k, "done"));
         }
-    };
-    fetch('/api/config', {
-        method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, csrfHeaders()),
-        body: JSON.stringify(data)
-    }).then(r => r.json()).then(() => {
-        closeConfig();
-        alert('配置已保存');
-    });
-}
 
-function copyPoem() {
-    const lines = document.querySelectorAll('.poem-line');
-    const text = Array.from(lines).map(function(el) { return el.textContent; }).join('\n');
-    if (!text) return;
-    navigator.clipboard.writeText(text).then(function() {
-        const btn = document.getElementById('btn-copy');
-        btn.textContent = '\u2714';
-        setTimeout(function() { btn.textContent = '\uD83D\uDCCB'; }, 1500);
-    });
-}
+        document.getElementById("feedback-section").classList.remove("hidden");
+        document.getElementById("feedback-input-area").classList.add("hidden");
+        document.getElementById("user-feedback").value = "";
 
-function openHistory() {
-    document.getElementById('history-modal').classList.remove('hidden');
-    fetch('/api/history')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            const list = document.getElementById('history-list');
-            if (data.length === 0) {
-                list.innerHTML = '<p class="history-empty">暂无记录</p>';
-                return;
-            }
-            list.innerHTML = '';
-            data.forEach(function(item) {
-                const div = document.createElement('div');
-                div.className = 'history-item';
-                div.innerHTML = '<div class="history-meta">' +
-                    '<span class="history-topic">' + escapeHtml(item.topic) + '</span>' +
-                    '<span class="history-template">' + escapeHtml(item.template_name) + '</span>' +
-                    '<span class="history-time">' + escapeHtml(item.created_at) + '</span>' +
-                    '</div>' +
-                    '<div class="history-poem">' + escapeHtml(item.poem).replace(/\n/g, '<br>') + '</div>';
-                list.appendChild(div);
-            });
+        if (data.checker_pass) {
+          const poemText = poem.join("\n");
+          const topic = document.getElementById("topic").value;
+          const tmplName =
+            document.getElementById("template-select").selectedOptions[0]
+              .textContent;
+          fetch("/api/history", {
+            method: "POST",
+            headers: Object.assign(
+              { "Content-Type": "application/json" },
+              csrfHeaders(),
+            ),
+            body: JSON.stringify({
+              topic: topic,
+              template_name: tmplName,
+              poem: poemText,
+            }),
+          });
+        }
+      }
+
+      function handleError(data) {
+        alert(data.message || "发生错误");
+        document.getElementById("btn-generate").disabled = false;
+        document.getElementById("btn-feedback").disabled = false;
+        isGenerating = false;
+      }
+
+      function openConfig() {
+        fetch("/api/config", { headers: csrfHeaders() })
+          .then((r) => r.json())
+          .then((cfg) => {
+            document.getElementById("cfg-writer-url").value =
+              cfg.writer.base_url;
+            document.getElementById("cfg-writer-key").value =
+              cfg.writer.api_key;
+            document.getElementById("cfg-writer-model").value =
+              cfg.writer.model;
+            document.getElementById("cfg-checker-url").value =
+              cfg.checker.base_url;
+            document.getElementById("cfg-checker-key").value =
+              cfg.checker.api_key;
+            document.getElementById("cfg-checker-model").value =
+              cfg.checker.model;
+          });
+        document.getElementById("config-modal").classList.remove("hidden");
+      }
+
+      function closeConfig() {
+        document.getElementById("config-modal").classList.add("hidden");
+      }
+
+      function saveConfig() {
+        const data = {
+          writer: {
+            base_url: document.getElementById("cfg-writer-url").value,
+            api_key: document.getElementById("cfg-writer-key").value,
+            model: document.getElementById("cfg-writer-model").value,
+          },
+          checker: {
+            base_url: document.getElementById("cfg-checker-url").value,
+            api_key: document.getElementById("cfg-checker-key").value,
+            model: document.getElementById("cfg-checker-model").value,
+          },
+        };
+        fetch("/api/config", {
+          method: "POST",
+          headers: Object.assign(
+            { "Content-Type": "application/json" },
+            csrfHeaders(),
+          ),
+          body: JSON.stringify(data),
+        })
+          .then((r) => r.json())
+          .then(() => {
+            closeConfig();
+            alert("配置已保存");
+          });
+      }
+
+      function copyPoem() {
+        const lines = document.querySelectorAll(".poem-line");
+        const text = Array.from(lines)
+          .map(function (el) {
+            return el.textContent;
+          })
+          .join("\n");
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(function () {
+          const btn = document.getElementById("btn-copy");
+          btn.textContent = "\u2714";
+          setTimeout(function () {
+            btn.textContent = "\uD83D\uDCCB";
+          }, 1500);
         });
-}
+      }
 
-function closeHistory() {
-    document.getElementById('history-modal').classList.add('hidden');
-}
+      function openHistory() {
+        document.getElementById("history-modal").classList.remove("hidden");
+        fetch("/api/history")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            const list = document.getElementById("history-list");
+            if (data.length === 0) {
+              list.innerHTML = '<p class="history-empty">暂无记录</p>';
+              return;
+            }
+            list.innerHTML = "";
+            data.forEach(function (item) {
+              const div = document.createElement("div");
+              div.className = "history-item";
+              div.innerHTML =
+                '<div class="history-meta">' +
+                '<span class="history-topic">' +
+                escapeHtml(item.topic) +
+                "</span>" +
+                '<span class="history-template">' +
+                escapeHtml(item.template_name) +
+                "</span>" +
+                '<span class="history-time">' +
+                escapeHtml(item.created_at) +
+                "</span>" +
+                "</div>" +
+                '<div class="history-poem">' +
+                escapeHtml(item.poem).replace(/\n/g, "<br>") +
+                "</div>";
+              list.appendChild(div);
+            });
+          });
+      }
 
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
+      function closeHistory() {
+        document.getElementById("history-modal").classList.add("hidden");
+      }
 
-let cmEditor = null;
+      function escapeHtml(str) {
+        const div = document.createElement("div");
+        div.textContent = str;
+        return div.innerHTML;
+      }
 
-function openTemplateModal() {
-    document.getElementById('template-modal').classList.remove('hidden');
-    rebuildSyllableTable();
-    if (!cmEditor) {
-        cmEditor = CodeMirror(document.getElementById('tmpl-code'), {
-            value: '',
-            mode: 'python',
-            theme: 'default',
+      let cmEditor = null;
+
+      function openTemplateModal() {
+        document.getElementById("template-modal").classList.remove("hidden");
+        rebuildSyllableTable();
+        if (!cmEditor) {
+          cmEditor = CodeMirror(document.getElementById("tmpl-code"), {
+            value: "",
+            mode: "python",
+            theme: "default",
             lineNumbers: true,
             indentUnit: 4,
             tabSize: 4,
             lineWrapping: true,
-            placeholder: '三平尾: errors.extend(_check_sanpingwei(syls))\n三仄尾: errors.extend(_check_sanzewei(syls))\n押韵:   errors.extend(_check_rhyme(syllables, [1,3]))\n\n可用: _check_sanpingwei, _check_sanzewei, _check_guping, _check_rhyme, _check_alternation'
-        });
-    } else {
-        cmEditor.setValue('');
-    }
-    setTimeout(function() { cmEditor.refresh(); }, 50);
-}
+            placeholder:
+              "三平尾: errors.extend(_check_sanpingwei(syls))\n三仄尾: errors.extend(_check_sanzewei(syls))\n押韵:   errors.extend(_check_rhyme(syllables, [1,3]))\n\n可用: _check_sanpingwei, _check_sanzewei, _check_guping, _check_rhyme, _check_alternation",
+          });
+        } else {
+          cmEditor.setValue("");
+        }
+        setTimeout(function () {
+          cmEditor.refresh();
+        }, 50);
+      }
 
-function closeTemplateModal() {
-    document.getElementById('template-modal').classList.add('hidden');
-}
+      function closeTemplateModal() {
+        document.getElementById("template-modal").classList.add("hidden");
+      }
 
-function rebuildSyllableTable() {
-    const lines = parseInt(document.getElementById('tmpl-lines').value) || 4;
-    const raw = document.getElementById('tmpl-syl-per-line').value.trim();
-    const sylCounts = raw ? raw.split(',').map(function(s) { return parseInt(s.trim()) || 7; }) : [];
-    while (sylCounts.length < lines) sylCounts.push(sylCounts.length > 0 ? sylCounts[sylCounts.length - 1] : 7);
-    document.getElementById('tmpl-syl-per-line').value = sylCounts.slice(0, lines).join(',');
+      function rebuildSyllableTable() {
+        const lines =
+          parseInt(document.getElementById("tmpl-lines").value) || 4;
+        const raw = document.getElementById("tmpl-syl-per-line").value.trim();
+        const sylCounts = raw
+          ? raw.split(",").map(function (s) {
+              return parseInt(s.trim()) || 7;
+            })
+          : [];
+        while (sylCounts.length < lines)
+          sylCounts.push(
+            sylCounts.length > 0 ? sylCounts[sylCounts.length - 1] : 7,
+          );
+        document.getElementById("tmpl-syl-per-line").value = sylCounts
+          .slice(0, lines)
+          .join(",");
 
-    const lang = document.getElementById('tmpl-language').value;
-    const table = document.getElementById('tmpl-syllable-table');
-    table.innerHTML = '';
+        const lang = document.getElementById("tmpl-language").value;
+        const table = document.getElementById("tmpl-syllable-table");
+        table.innerHTML = "";
 
-    for (let i = 0; i < lines; i++) {
-        const row = document.createElement('div');
-        row.className = 'syl-row';
-        const label = document.createElement('span');
-        label.className = 'syl-row-label';
-        label.textContent = '第' + (i + 1) + '行';
-        row.appendChild(label);
-        const cnt = sylCounts[i] || 7;
-        for (let j = 0; j < cnt; j++) {
-            const sel = document.createElement('select');
-            sel.className = 'syl-cell';
+        for (let i = 0; i < lines; i++) {
+          const row = document.createElement("div");
+          row.className = "syl-row";
+          const label = document.createElement("span");
+          label.className = "syl-row-label";
+          label.textContent = "第" + (i + 1) + "行";
+          row.appendChild(label);
+          const cnt = sylCounts[i] || 7;
+          for (let j = 0; j < cnt; j++) {
+            const sel = document.createElement("select");
+            sel.className = "syl-cell";
             sel.dataset.line = i;
             sel.dataset.pos = j;
-            if (lang === 'zh') {
-                sel.innerHTML = '<option value="">自由</option><option value="平">平</option><option value="仄">仄</option>';
+            if (lang === "zh") {
+              sel.innerHTML =
+                '<option value="">自由</option><option value="平">平</option><option value="仄">仄</option>';
             } else {
-                sel.innerHTML = '<option value="">自由</option><option value="light">light</option><option value="heavy">heavy</option>';
+              sel.innerHTML =
+                '<option value="">自由</option><option value="light">light</option><option value="heavy">heavy</option>';
             }
             row.appendChild(sel);
+          }
+          table.appendChild(row);
         }
-        table.appendChild(row);
-    }
-}
+      }
 
-function createTemplate() {
-    const name = document.getElementById('tmpl-name').value.trim();
-    if (!name) { alert('请输入模板名称'); return; }
-    const language = document.getElementById('tmpl-language').value;
-    const lines = parseInt(document.getElementById('tmpl-lines').value) || 4;
-    const raw = document.getElementById('tmpl-syl-per-line').value.trim();
-    const sylCounts = raw ? raw.split(',').map(function(s) { return parseInt(s.trim()) || 7; }) : [];
-    while (sylCounts.length < lines) sylCounts.push(7);
-    const code = cmEditor ? cmEditor.getValue() : '';
+      function createTemplate() {
+        const name = document.getElementById("tmpl-name").value.trim();
+        if (!name) {
+          alert("请输入模板名称");
+          return;
+        }
+        const language = document.getElementById("tmpl-language").value;
+        const lines =
+          parseInt(document.getElementById("tmpl-lines").value) || 4;
+        const raw = document.getElementById("tmpl-syl-per-line").value.trim();
+        const sylCounts = raw
+          ? raw.split(",").map(function (s) {
+              return parseInt(s.trim()) || 7;
+            })
+          : [];
+        while (sylCounts.length < lines) sylCounts.push(7);
+        const code = cmEditor ? cmEditor.getValue() : "";
 
-    const syllables_per_line = sylCounts.slice(0, lines);
-    const constraints = [];
-    for (let i = 0; i < lines; i++) {
-        const lineConstraints = [];
-        const cnt = syllables_per_line[i];
-        const cells = document.querySelectorAll('.syl-cell[data-line="' + i + '"]');
-        let j = 0;
-        cells.forEach(function(sel) {
+        const syllables_per_line = sylCounts.slice(0, lines);
+        const constraints = [];
+        for (let i = 0; i < lines; i++) {
+          const lineConstraints = [];
+          const cnt = syllables_per_line[i];
+          const cells = document.querySelectorAll(
+            '.syl-cell[data-line="' + i + '"]',
+          );
+          let j = 0;
+          cells.forEach(function (sel) {
             if (j >= cnt) return;
             const val = sel.value;
-            if (language === 'zh') {
-                lineConstraints.push({onset:'',nucleus:'',coda:'',attributes:{tone:val,stress:'',length:''}});
+            if (language === "zh") {
+              lineConstraints.push({
+                onset: "",
+                nucleus: "",
+                coda: "",
+                attributes: { tone: val, stress: "", length: "" },
+              });
             } else {
-                lineConstraints.push({onset:'',nucleus:'',coda:'',attributes:{tone:'',stress:val,length:''}});
+              lineConstraints.push({
+                onset: "",
+                nucleus: "",
+                coda: "",
+                attributes: { tone: "", stress: val, length: "" },
+              });
             }
             j++;
-        });
-        constraints.push(lineConstraints);
-    }
+          });
+          constraints.push(lineConstraints);
+        }
 
-    fetch('/api/templates/custom', {
-        method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, csrfHeaders()),
-        body: JSON.stringify({
+        fetch("/api/templates/custom", {
+          method: "POST",
+          headers: Object.assign(
+            { "Content-Type": "application/json" },
+            csrfHeaders(),
+          ),
+          body: JSON.stringify({
             name: name,
             language: language,
             lines: lines,
             syllables_per_line: syllables_per_line,
             constraints: constraints,
-            code: code
+            code: code,
+          }),
         })
-    }).then(function(r) { return r.json(); }).then(function(resp) {
-        alert(resp.message);
-        if (resp.status === 'ok') {
-            closeTemplateModal();
-            loadTemplates();
-        }
-    });
-}
-</script>
-</body>
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (resp) {
+            alert(resp.message);
+            if (resp.status === "ok") {
+              closeTemplateModal();
+              loadTemplates();
+            }
+          });
+      }
+    </script>
+  </body>
 </html>

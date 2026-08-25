@@ -84,7 +84,9 @@ class CheckerAI:
                             "role": "tool",
                             "tool_call_id": tc["id"],
                             "content": json.dumps(
-                                {"error": "请调用 submit 工具给出评审结论（pass 和 suggestions）。"},
+                                {
+                                    "error": "请调用 submit 工具给出评审结论（pass 和 suggestions）。"
+                                },
                                 ensure_ascii=False,
                             ),
                         }

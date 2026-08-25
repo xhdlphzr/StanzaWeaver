@@ -34,11 +34,14 @@ def _auto_import():
         init_db()
         print("[StanzaWeaver] 检查词库...")
         from src.knowledge.importer import import_all
+
         import_all()
     except Exception as e:
         print(f"[StanzaWeaver] 词库导入失败: {e}")
     finally:
         _vocab_importing = False
+
+
 threading.Thread(target=_auto_import, daemon=True).start()
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -127,7 +130,9 @@ def api_save_config():
         if key in data:
             value = data[key]
             if not isinstance(value, dict):
-                return jsonify({"status": "error", "message": f"{key} 配置格式错误"}), 400
+                return jsonify(
+                    {"status": "error", "message": f"{key} 配置格式错误"}
+                ), 400
             config.__setattr__(key, value)
     config.save()
     return jsonify({"status": "ok"})
@@ -262,13 +267,13 @@ def api_create_custom_template():
     if language not in ("zh", "en"):
         return jsonify({"status": "error", "message": "不支持的语言"}), 400
     try:
-        syllables_per_line = [
-            max(1, int(s)) for s in syllables_per_line
-        ][:lines]
+        syllables_per_line = [max(1, int(s)) for s in syllables_per_line][:lines]
     except (TypeError, ValueError):
         return jsonify({"status": "error", "message": "每行音节数格式错误"}), 400
     if len(syllables_per_line) != lines:
-        return jsonify({"status": "error", "message": "音节数列表长度必须等于行数"}), 400
+        return jsonify(
+            {"status": "error", "message": "音节数列表长度必须等于行数"}
+        ), 400
 
     safe_name = re.sub(r"\W+", "_", name).strip("_")
     if not safe_name:

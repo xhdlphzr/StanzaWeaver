@@ -7,9 +7,49 @@ from .base import SyllableAnalyzer
 from ..models.syllable import Syllable
 
 _VOWELS = set("aeiouyàâäéèêëîïôöùûüÿ")
-_FR_DIGRAPHS = {"ou", "au", "eau", "ai", "ei", "eu", "oi", "ui", "ay", "ey", "œu", "œ", "an", "en", "in", "on", "un", "am", "em", "im", "om", "um", "ain", "ein", "oin"}
+_FR_DIGRAPHS = {
+    "ou",
+    "au",
+    "eau",
+    "ai",
+    "ei",
+    "eu",
+    "oi",
+    "ui",
+    "ay",
+    "ey",
+    "œu",
+    "œ",
+    "an",
+    "en",
+    "in",
+    "on",
+    "un",
+    "am",
+    "em",
+    "im",
+    "om",
+    "um",
+    "ain",
+    "ein",
+    "oin",
+}
 _SILENT_E_RE = re.compile(r"e(s|nt)?$", re.I)
-_ELISION_WORDS = {"l'", "d'", "s'", "n'", "c'", "j'", "m'", "t'", "qu'", "jusqu'", "lorsqu'", "puisqu'", "quoiqu'"}
+_ELISION_WORDS = {
+    "l'",
+    "d'",
+    "s'",
+    "n'",
+    "c'",
+    "j'",
+    "m'",
+    "t'",
+    "qu'",
+    "jusqu'",
+    "lorsqu'",
+    "puisqu'",
+    "quoiqu'",
+}
 _APOSTROPHE_RE = re.compile(r"^[a-zA-Zàâäéèêëîïôöùûüÿ]*['’]")
 
 
@@ -23,12 +63,20 @@ class FrenchAnalyzer(SyllableAnalyzer):
         if w in _ELISION_WORDS:
             w = _APOSTROPHE_RE.sub("", w)
             if not w:
-                return [Syllable(nucleus="?", attributes={"tone": "", "stress": "", "length": ""})]
+                return [
+                    Syllable(
+                        nucleus="?", attributes={"tone": "", "stress": "", "length": ""}
+                    )
+                ]
         else:
             w = _APOSTROPHE_RE.sub("", w)
         w = _SILENT_E_RE.sub("", w)
         if not w:
-            return [Syllable(nucleus="?", attributes={"tone": "", "stress": "", "length": ""})]
+            return [
+                Syllable(
+                    nucleus="?", attributes={"tone": "", "stress": "", "length": ""}
+                )
+            ]
         syls = []
         i = 0
         n = len(w)
@@ -37,8 +85,8 @@ class FrenchAnalyzer(SyllableAnalyzer):
             if w[i] in _VOWELS:
                 nucleus = None
                 for length in [3, 2]:
-                    if i + length <= n and w[i:i + length] in _FR_DIGRAPHS:
-                        nucleus = w[i:i + length]
+                    if i + length <= n and w[i : i + length] in _FR_DIGRAPHS:
+                        nucleus = w[i : i + length]
                         i += length
                         break
                 if nucleus is None:
@@ -61,7 +109,11 @@ class FrenchAnalyzer(SyllableAnalyzer):
                 onset += w[i]
                 i += 1
         if not syls:
-            syls.append(Syllable(nucleus="?", attributes={"tone": "", "stress": "", "length": ""}))
+            syls.append(
+                Syllable(
+                    nucleus="?", attributes={"tone": "", "stress": "", "length": ""}
+                )
+            )
         return syls
 
     def rhyme_key(self, word: str) -> str:

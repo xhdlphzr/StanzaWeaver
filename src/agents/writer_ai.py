@@ -243,8 +243,15 @@ class WriterAI:
 
             executed_rounds += 1
             if on_stream:
-                _fire_stream(on_stream, f"[第{round_num}轮] 思考完成" +
-                             (f" → 调用工具: {response['tool_calls'][0]['name']}" if response.get('tool_calls') else ""))
+                _fire_stream(
+                    on_stream,
+                    f"[第{round_num}轮] 思考完成"
+                    + (
+                        f" → 调用工具: {response['tool_calls'][0]['name']}"
+                        if response.get("tool_calls")
+                        else ""
+                    ),
+                )
 
             results_by_id: dict[str, dict] = {}
             for tool_call in response["tool_calls"]:
@@ -299,7 +306,11 @@ class WriterAI:
                     detail_parts.append(detail)
                 elif name == "rewrite":
                     result = self._handle_rewrite(
-                        description, current_poem, template, template_obj, args,
+                        description,
+                        current_poem,
+                        template,
+                        template_obj,
+                        args,
                         on_stream=on_stream,
                     )
                     if "poem" in result:
@@ -310,9 +321,7 @@ class WriterAI:
                         )
                         if not full_result.passed:
                             result["validation_errors"] = full_result.errors
-                    detail = (
-                        f"[第{round_num}轮] rewrite({args.get('instruction', '')})"
-                    )
+                    detail = f"[第{round_num}轮] rewrite({args.get('instruction', '')})"
                     if "poem" in result:
                         detail += ": 重写完成"
                         if "validation_errors" in result:

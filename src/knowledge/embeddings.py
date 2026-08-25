@@ -11,6 +11,7 @@ def _get_model():
     global _MODEL
     if _MODEL is None:
         from sentence_transformers import SentenceTransformer
+
         _MODEL = SentenceTransformer(_MODEL_NAME)
     return _MODEL
 

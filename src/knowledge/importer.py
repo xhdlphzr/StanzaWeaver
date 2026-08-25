@@ -25,19 +25,28 @@ def _dataset_key(name: str) -> str:
 
 def _check_dataset(lang: str, expected: str) -> bool:
     import sqlite3
+
     conn = sqlite3.connect(str(get_db_path()))
     conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
     conn.commit()
-    cur = conn.execute("SELECT value FROM meta WHERE key = ?", (_dataset_key(lang),)).fetchone()
-    count = conn.execute("SELECT COUNT(*) FROM words WHERE language = ?", (lang,)).fetchone()[0]
+    cur = conn.execute(
+        "SELECT value FROM meta WHERE key = ?", (_dataset_key(lang),)
+    ).fetchone()
+    count = conn.execute(
+        "SELECT COUNT(*) FROM words WHERE language = ?", (lang,)
+    ).fetchone()[0]
     conn.close()
     return cur and cur[0] == expected and count > 0
 
 
 def _set_dataset(lang: str, name: str):
     import sqlite3
+
     conn = sqlite3.connect(str(get_db_path()))
-    conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (_dataset_key(lang), name))
+    conn.execute(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+        (_dataset_key(lang), name),
+    )
     conn.commit()
     conn.close()
 
@@ -47,12 +56,14 @@ def _import_chinese():
         print("  [zh] 已有数据，跳过")
         return
     import gzip
+
     batch: list[Word] = []
     total = 0
     try:
         req = urllib.request.Request(
             "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz",
-            headers={"User-Agent": "Mozilla/5.0"})
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
         with urllib.request.urlopen(req, timeout=60) as resp:
             raw = gzip.decompress(resp.read())
             text = raw.decode("utf-8", errors="replace")
@@ -74,7 +85,9 @@ def _import_chinese():
             continue
         syls = _parse_pinyin(pinyin_match.group(1).split())
         meaning = meaning_match.group(1).replace("/", "; ")[:120]
-        batch.append(Word(text=simplified, language="zh", syllables=syls, meaning=meaning))
+        batch.append(
+            Word(text=simplified, language="zh", syllables=syls, meaning=meaning)
+        )
         total += 1
         if len(batch) >= 500:
             insert_words(batch)
@@ -100,26 +113,39 @@ def _parse_pinyin(raw_list: list[str]) -> list[Syllable]:
         for init in sorted(CHINESE_INITIALS, key=len, reverse=True):
             if base.startswith(init) and base != init:
                 onset = init
-                final_part = base[len(init):]
+                final_part = base[len(init) :]
                 break
         if final_part and final_part[0] in {"y", "w"} and not onset:
             final_part = final_part[1:]
         nucleus, coda = FINAL_TO_PARTS.get(final_part, (final_part, ""))
         if not nucleus and final_part:
             nucleus = final_part
-        results.append(Syllable(onset=onset, nucleus=nucleus, coda=coda,
-                                 attributes={"tone": tone_map.get(tone_num, ""), "stress": "", "length": ""}))
+        results.append(
+            Syllable(
+                onset=onset,
+                nucleus=nucleus,
+                coda=coda,
+                attributes={
+                    "tone": tone_map.get(tone_num, ""),
+                    "stress": "",
+                    "length": "",
+                },
+            )
+        )
     return results
 
 
 def _sqlite_delete(lang: str):
     import sqlite3
+
     conn = sqlite3.connect(str(get_db_path()))
     conn.execute("DELETE FROM words WHERE language = ?", (lang,))
     conn.commit()
     conn.close()
 
+
 # ── English: CMUdict ──
+
 
 def _import_english():
     if _check_dataset("en", "CMUdict"):
@@ -127,14 +153,35 @@ def _import_english():
         return
     try:
         import nltk
+
         nltk.data.find("corpora/cmudict.zip")
     except LookupError:
         nltk.download("cmudict", quiet=True)
     from nltk.corpus import cmudict
+
     batch: list[Word] = []
     total = 0
-    _VOWELS = {"AA", "AE", "AH", "AO", "AW", "AX", "AXR", "AY", "EH", "ER", "EY",
-               "IH", "IX", "IY", "OW", "OY", "UH", "UW", "UX"}
+    _VOWELS = {
+        "AA",
+        "AE",
+        "AH",
+        "AO",
+        "AW",
+        "AX",
+        "AXR",
+        "AY",
+        "EH",
+        "ER",
+        "EY",
+        "IH",
+        "IX",
+        "IY",
+        "OW",
+        "OY",
+        "UH",
+        "UW",
+        "UX",
+    }
     _SMAP = {"0": "", "1": "heavy", "2": "heavy"}
     for word, pron_list in cmudict.dict().items():
         if not word.isalpha():
@@ -146,24 +193,43 @@ def _import_english():
                 continue
             seen.add(pron_key)
             syls = []
-            ons = []; nuc = ""; stre = ""; cod = []
+            ons = []
+            nuc = ""
+            stre = ""
+            cod = []
             for p in phones:
                 cl = re.sub(r"\d+", "", p)
                 sm = re.search(r"\d", p)
                 st = sm.group() if sm else ""
                 if cl in _VOWELS:
                     if nuc:
-                        syls.append(Syllable(onset="".join(ons), nucleus=nuc, coda="".join(cod),
-                                             attributes={"tone": "", "stress": stre, "length": ""}))
-                        ons = []; cod = []
-                    nuc = cl; stre = _SMAP.get(st, "")
+                        syls.append(
+                            Syllable(
+                                onset="".join(ons),
+                                nucleus=nuc,
+                                coda="".join(cod),
+                                attributes={"tone": "", "stress": stre, "length": ""},
+                            )
+                        )
+                        ons = []
+                        cod = []
+                    nuc = cl
+                    stre = _SMAP.get(st, "")
                 else:
                     (cod if nuc else ons).append(cl)
             if nuc:
-                syls.append(Syllable(onset="".join(ons), nucleus=nuc, coda="".join(cod),
-                                     attributes={"tone": "", "stress": stre, "length": ""}))
+                syls.append(
+                    Syllable(
+                        onset="".join(ons),
+                        nucleus=nuc,
+                        coda="".join(cod),
+                        attributes={"tone": "", "stress": stre, "length": ""},
+                    )
+                )
             if syls:
-                batch.append(Word(text=word.upper(), language="en", syllables=syls, meaning=""))
+                batch.append(
+                    Word(text=word.upper(), language="en", syllables=syls, meaning="")
+                )
                 total += 1
                 if len(batch) >= 500:
                     insert_words(batch)
@@ -177,18 +243,23 @@ def _import_english():
 
 # ── French: Lexique ──
 
+
 def _import_french():
     if _check_dataset("fr", "Lexique382"):
         print("  [fr] 已有数据，跳过")
         return
-    text = _download_text("http://www.lexique.org/databases/Lexique382/Lexique382.tsv", timeout=15)
+    text = _download_text(
+        "http://www.lexique.org/databases/Lexique382/Lexique382.tsv", timeout=15
+    )
     total = 0
     if text:
         lines = text.splitlines()
         if len(lines) > 1:
             hdr = lines[0].split("\t")
             wc = next((i for i, h in enumerate(hdr) if h.lower() == "ortho"), 0)
-            sc = next((i for i, h in enumerate(hdr) if h.lower() in ("nbsyl", "nbsyll")), -1)
+            sc = next(
+                (i for i, h in enumerate(hdr) if h.lower() in ("nbsyl", "nbsyll")), -1
+            )
             pc = next((i for i, h in enumerate(hdr) if h.lower() == "phon"), -1)
             seen = set()
             batch: list[Word] = []
@@ -202,10 +273,17 @@ def _import_french():
                 seen.add(w)
                 n = 1
                 if sc >= 0 and sc < len(cols):
-                    try: n = int(cols[sc])
-                    except ValueError: n = 1
+                    try:
+                        n = int(cols[sc])
+                    except ValueError:
+                        n = 1
                 phon = cols[pc] if pc >= 0 and pc < len(cols) else ""
-                syls = [Syllable(nucleus="?", attributes={"tone": "", "stress": "", "length": ""}) for _ in range(n)]
+                syls = [
+                    Syllable(
+                        nucleus="?", attributes={"tone": "", "stress": "", "length": ""}
+                    )
+                    for _ in range(n)
+                ]
                 batch.append(Word(text=w, language="fr", syllables=syls, meaning=phon))
                 total += 1
                 if len(batch) >= 500:
@@ -229,6 +307,7 @@ def _import_italian():
         return
     from ..prosody.italian import ItalianAnalyzer
     import bz2
+
     analyzer = ItalianAnalyzer()
     seen = set()
     batch: list[Word] = []
@@ -244,8 +323,8 @@ def _import_italian():
         print(f"  [it] GLAW-IT error: {e}")
         text = None
     if text:
-        titles = list(re.finditer(r'<title>([^<]+)</title>', text))
-        glosses = list(re.finditer(r'<txt>([^<]+)</txt>', text))
+        titles = list(re.finditer(r"<title>([^<]+)</title>", text))
+        glosses = list(re.finditer(r"<txt>([^<]+)</txt>", text))
         gloss_idx = 0
         for tm in titles:
             w = tm.group(1).strip().lower()
@@ -259,7 +338,12 @@ def _import_italian():
                 meaning = glosses[gloss_idx].group(1).strip()[:120]
                 gloss_idx += 1
             c = analyzer._count_syllables_in_word(w)
-            syls = [Syllable(nucleus="?", attributes={"tone": "", "stress": "", "length": ""}) for _ in range(max(c, 1))]
+            syls = [
+                Syllable(
+                    nucleus="?", attributes={"tone": "", "stress": "", "length": ""}
+                )
+                for _ in range(max(c, 1))
+            ]
             batch.append(Word(text=w, language="it", syllables=syls, meaning=meaning))
             total += 1
             if len(batch) >= 500:
@@ -270,7 +354,12 @@ def _import_italian():
             if w and w not in seen:
                 seen.add(w)
                 c = analyzer._count_syllables_in_word(w)
-                syls = [Syllable(nucleus="?", attributes={"tone": "", "stress": "", "length": ""}) for _ in range(max(c, 1))]
+                syls = [
+                    Syllable(
+                        nucleus="?", attributes={"tone": "", "stress": "", "length": ""}
+                    )
+                    for _ in range(max(c, 1))
+                ]
                 batch.append(Word(text=w, language="it", syllables=syls, meaning=""))
                 total += 1
                 if len(batch) >= 500:
@@ -293,6 +382,7 @@ def _import_latin():
         print("  [la] 已有数据，跳过")
         return
     from ..prosody.latin import LatinAnalyzer
+
     analyzer = LatinAnalyzer()
     seen = set()
     batch: list[Word] = []
@@ -316,8 +406,15 @@ def _import_latin():
             seen.add(clean)
             syllables = analyzer.analyze_word(clean)
             if not syllables:
-                syllables = [Syllable(nucleus="?", attributes={"tone": "", "stress": "", "length": ""}) for _ in range(len(clean))]
-            batch.append(Word(text=clean, language="la", syllables=syllables, meaning=meaning))
+                syllables = [
+                    Syllable(
+                        nucleus="?", attributes={"tone": "", "stress": "", "length": ""}
+                    )
+                    for _ in range(len(clean))
+                ]
+            batch.append(
+                Word(text=clean, language="la", syllables=syllables, meaning=meaning)
+            )
             total += 1
             if len(batch) >= 500:
                 insert_words(batch)
