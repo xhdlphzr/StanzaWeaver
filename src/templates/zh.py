@@ -134,7 +134,9 @@ def _check_jinti_rhyme(
         if line_idx < len(syllables_list) and syllables_list[line_idx]:
             last = syllables_list[line_idx][-1]
             if last.attributes.get("tone", "") != "平":
-                errors.append(f"第{line_idx + 1}行韵脚应为平声字，实际为'{last.attributes.get('tone') or '未知'}'")
+                errors.append(
+                    f"第{line_idx + 1}行韵脚应为平声字，实际为'{last.attributes.get('tone') or '未知'}'"
+                )
             keys.append((line_idx, _rhyme_key(last)))
     first = syllables_list[0][-1] if syllables_list and syllables_list[0] else None
     if first is not None and first.attributes.get("tone") == "平":
@@ -367,9 +369,7 @@ class XiangjianhuanTemplate(PoetryTemplate):
                 f"下阕平韵应转回上阕平声韵部: 上阕'{upper}'，下阕'{lower_ping}'"
             )
         if upper and lower_ze and lower_ze == upper:
-            errors.append(
-                f"下阕仄韵应与平韵不同部（换韵）: 均为'{lower_ze}'"
-            )
+            errors.append(f"下阕仄韵应与平韵不同部（换韵）: 均为'{lower_ze}'")
         return errors
 
 

@@ -66,12 +66,19 @@ def _validate_hex(syls) -> list[str]:
         first_len = foot[0].attributes.get("length", "")
         if foot_idx < 4:
             if first_len != "long":
-                errors.append(f"第{foot_idx + 1}音步应以长音节开头，实际为{first_len or '未知'}")
+                errors.append(
+                    f"第{foot_idx + 1}音步应以长音节开头，实际为{first_len or '未知'}"
+                )
             if len(foot) == 3:
-                if foot[1].attributes.get("length") != "short" or foot[2].attributes.get("length") != "short":
+                if (
+                    foot[1].attributes.get("length") != "short"
+                    or foot[2].attributes.get("length") != "short"
+                ):
                     errors.append(f"第{foot_idx + 1}音步扬抑抑格应为长短短，实际不满足")
             elif len(foot) == 2 and foot[1].attributes.get("length") != "long":
-                errors.append(f"第{foot_idx + 1}音步扬扬格应两个长音节，实际第二个为{foot[1].attributes.get('length') or '未知'}")
+                errors.append(
+                    f"第{foot_idx + 1}音步扬扬格应两个长音节，实际第二个为{foot[1].attributes.get('length') or '未知'}"
+                )
         elif foot_idx == 4:
             if len(foot) != 3:
                 errors.append(f"第5音步必须为扬抑抑格（3音节），实际{len(foot)}个")
@@ -168,9 +175,21 @@ class HendecasyllabusTemplate(PoetryTemplate):
 
     def get_syllable_constraints(self):
         # 第1音步: 扬扬格(LL)或扬抑格(L∪) -> 首音节必长
-        return [[
-            _L, {}, _L, _S, _S, _L, _S, _L, _S, _L, _S,
-        ]]
+        return [
+            [
+                _L,
+                {},
+                _L,
+                _S,
+                _S,
+                _L,
+                _S,
+                _L,
+                _S,
+                _L,
+                _S,
+            ]
+        ]
 
     def validate_full(self, poem, syllables):
         errors = []
@@ -180,7 +199,10 @@ class HendecasyllabusTemplate(PoetryTemplate):
         if len(syls) < 11:
             errors.append(f"音节数不足: 需要11个，实际{len(syls)}个")
         patterns = [
-            (2, "long"), (5, "long"), (7, "long"), (9, "long"),
+            (2, "long"),
+            (5, "long"),
+            (7, "long"),
+            (9, "long"),
         ]
         for pos, expected in patterns:
             if pos < len(syls):

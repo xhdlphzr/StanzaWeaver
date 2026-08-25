@@ -91,9 +91,12 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
         _check_stress_count(poem, syllables, 4, errors)
 
         rhyme_groups = [
-            ("A", [0, 2], 0), ("B", [1, 3], 0),
-            ("C", [4, 6], 1), ("D", [5, 7], 1),
-            ("E", [8, 10], 2), ("F", [9, 11], 2),
+            ("A", [0, 2], 0),
+            ("B", [1, 3], 0),
+            ("C", [4, 6], 1),
+            ("D", [5, 7], 1),
+            ("E", [8, 10], 2),
+            ("F", [9, 11], 2),
             ("G", [12, 13], 3),
         ]
         quatrain_rhymes: dict[int, dict[str, str | None]] = {}
@@ -113,7 +116,9 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
             distinct = {v for v in values.values() if v is not None}
             if len(distinct) < 2 and len(values) >= 2:
                 a_rhyme = list(values.values())[0]
-                errors.append(f"第{q_idx + 1}段对韵: A/B 韵脚应不同，当前均为'{a_rhyme}'")
+                errors.append(
+                    f"第{q_idx + 1}段对韵: A/B 韵脚应不同，当前均为'{a_rhyme}'"
+                )
 
         return errors
 

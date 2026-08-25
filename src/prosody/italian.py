@@ -7,7 +7,22 @@ from .base import SyllableAnalyzer
 from ..models.syllable import Syllable
 
 _VOWELS = set("aeiouàèéìòóùAEIOUÀÈÉÌÒÓÙ")
-_DIPHTHONGS = {"ia", "ie", "io", "iu", "ua", "ue", "uo", "ui", "ai", "ei", "oi", "au", "eu", "ou"}
+_DIPHTHONGS = {
+    "ia",
+    "ie",
+    "io",
+    "iu",
+    "ua",
+    "ue",
+    "uo",
+    "ui",
+    "ai",
+    "ei",
+    "oi",
+    "au",
+    "eu",
+    "ou",
+}
 _ACCENTED_VOWELS = set("àèéìòóù")
 # 省音撇号（elision）：l'amor → amor；strip 前缀计数
 _APOSTROPHE_RE = re.compile(r"^[a-zA-ZàèéìòóùÀÈÉÌÒÓÙ]*['’]")
@@ -27,7 +42,7 @@ class ItalianAnalyzer(SyllableAnalyzer):
         while i < n:
             if word[i] in _VOWELS:
                 count += 1
-                if i + 1 < n and word[i:i + 2] in _DIPHTHONGS:
+                if i + 1 < n and word[i : i + 2] in _DIPHTHONGS:
                     i += 1
             i += 1
         return count if count > 0 else 1
@@ -45,8 +60,8 @@ class ItalianAnalyzer(SyllableAnalyzer):
         n = len(w)
         while i < n:
             if w[i] in _VOWELS:
-                if i + 1 < n and w[i:i + 2] in _DIPHTHONGS:
-                    nucleus = w[i:i + 2]
+                if i + 1 < n and w[i : i + 2] in _DIPHTHONGS:
+                    nucleus = w[i : i + 2]
                     i += 2
                 else:
                     nucleus = w[i]
@@ -65,7 +80,11 @@ class ItalianAnalyzer(SyllableAnalyzer):
             else:
                 i += 1
         if not syls:
-            return [Syllable(nucleus="?", attributes={"tone": "", "stress": "", "length": ""})]
+            return [
+                Syllable(
+                    nucleus="?", attributes={"tone": "", "stress": "", "length": ""}
+                )
+            ]
 
         final_char = w[-1]
         if final_char in _ACCENTED_VOWELS or final_char not in _VOWELS:

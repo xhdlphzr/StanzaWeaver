@@ -107,8 +107,7 @@ class EnglishAnalyzer(SyllableAnalyzer):
         - 两个及以上的辅音簇：首辅音收前音节，其余归后一音节（ex-tra, Mon-day）。
         """
         vpos = [
-            i for i, p in enumerate(phones)
-            if _NUMBERS_RE.sub("", p) in _VOWEL_PHONEMES
+            i for i, p in enumerate(phones) if _NUMBERS_RE.sub("", p) in _VOWEL_PHONEMES
         ]
         if not vpos:
             return []

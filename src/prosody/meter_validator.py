@@ -46,15 +46,16 @@ class MeterValidator:
         for i in range(len(poem)):
             if language == "en":
                 # 英语多音词：保留全部发音的组合切分，任一变体满足格律即通过
-                all_syllables.append(get_analyzer(language).analyze_line_variants(poem[i]))
+                all_syllables.append(
+                    get_analyzer(language).analyze_line_variants(poem[i])
+                )
             else:
                 all_syllables.append([analyze_line(poem[i], language)])
 
         for i in range(min(len(poem), len(syllables_expected))):
             expected_count = syllables_expected[i]
             if not any(
-                _count_matches(len(v), expected_count)
-                for v in all_syllables[i]
+                _count_matches(len(v), expected_count) for v in all_syllables[i]
             ):
                 actual_count = len(all_syllables[i][0])
                 result.add_error(
@@ -151,8 +152,7 @@ class MeterValidator:
             if language == "en":
                 variants = get_analyzer(language).analyze_line_variants(line_text)
                 if any(
-                    self._line_matches_variant(v, line_constraints)
-                    for v in variants
+                    self._line_matches_variant(v, line_constraints) for v in variants
                 ):
                     return result
                 syllables = variants[0]

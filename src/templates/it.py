@@ -116,7 +116,9 @@ class CanzoneTemplate(PoetryTemplate):
                 if r:
                     distinct.add(r)
         if len(distinct) > 4:
-            errors.append(f"全诗韵脚数量应为4个以内，当前为{len(distinct)}个: {sorted(distinct)}")
+            errors.append(
+                f"全诗韵脚数量应为4个以内，当前为{len(distinct)}个: {sorted(distinct)}"
+            )
 
         # 段内同一韵脚不得连续出现超过两次
         prev = None
@@ -126,7 +128,9 @@ class CanzoneTemplate(PoetryTemplate):
             if r and r == prev:
                 streak += 1
                 if streak >= 2:
-                    errors.append(f"第{idx + 1}行与第{idx}行、第{idx - 1}行连续同一韵脚，超过两次")
+                    errors.append(
+                        f"第{idx + 1}行与第{idx}行、第{idx - 1}行连续同一韵脚，超过两次"
+                    )
                     streak = 0
             else:
                 streak = 0
