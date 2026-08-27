@@ -14,7 +14,10 @@ def execute_search_words(template: dict, arguments: dict) -> dict:
     tone = arguments.get("tone", "")
     stress = arguments.get("stress", "")
     length = arguments.get("length", "")
-    limit = arguments.get("limit", 20)
+    try:
+        limit = max(1, min(int(arguments.get("limit", 20)), 50))
+    except (TypeError, ValueError):
+        limit = 20
 
     results = db_search(
         language=language,

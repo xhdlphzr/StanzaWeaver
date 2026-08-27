@@ -400,6 +400,11 @@ class WriterAI:
         lines = template.get("lines", 4)
         syllables_per_line = template.get("syllables_per_line", [])
 
+        if template_obj is not None and hasattr(template_obj, "describe"):
+            meter_desc = template_obj.describe()
+        else:
+            meter_desc = f"行数: {lines}\n每行音节数: {syllables_per_line}"
+
         sys_prompt = (
             f"""请根据指令重写全诗。
 
@@ -407,8 +412,7 @@ class WriterAI:
 {description}
 
 【格律要求】
-行数: {lines}
-每行音节数: {syllables_per_line}
+{meter_desc}
 
 【重写指令】
 {instruction}
