@@ -319,7 +319,7 @@ def api_create_custom_template():
         f"    _check_rhyme, _check_alternation, _check_lv_alternation,\n"
         f")\n\n\n"
         f"class {class_name}(PoetryTemplate):\n"
-        f'    name = "{name}"\n'
+        f"    name = {json.dumps(name, ensure_ascii=False)}\n"
         f'    language = "{language}"\n'
         f"    lines = {lines}\n"
         f"    syllables_per_line = {syllables_per_line}\n\n"
@@ -408,13 +408,23 @@ def api_get_history():
 def api_save_history():
     import sqlite3
 
+    if not _require_csrf():
+        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"status": "error", "message": "请求格式错误"}), 400
+
     _init_history_db()
-    data = request.get_json()
     hdb = Path.home() / ".stanza_weaver" / "history.db"
     conn = sqlite3.connect(str(hdb))
     conn.execute(
         "INSERT INTO history (topic, template_name, poem) VALUES (?, ?, ?)",
-        (data.get("topic", ""), data.get("template_name", ""), data.get("poem", "")),
+        (
+            str(data.get("topic", "")),
+            str(data.get("template_name", "")),
+            str(data.get("poem", "")),
+        ),
     )
     conn.commit()
     conn.close()

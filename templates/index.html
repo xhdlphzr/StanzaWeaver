@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -27,7 +27,7 @@
       <header>
         <div class="header-logo">
           <h1>StanzaWeaver</h1>
-          <p class="slogan">Let&rsquo;s weave stanzas with StanzaWeaver!</p>
+          <p class="slogan">以智识，巧织诗</p>
         </div>
         <button id="btn-config" class="btn-icon" title="LLM配置">
           &#9881;
@@ -347,8 +347,10 @@
 
       function sendFeedback() {
         const feedback = document.getElementById("user-feedback").value.trim();
-        if (!feedback) return;
+        if (!feedback || isGenerating) return;
 
+        isGenerating = true;
+        document.getElementById("btn-generate").disabled = true;
         document.getElementById("btn-feedback").disabled = true;
         document.getElementById("checker-inline").classList.add("hidden");
         document.getElementById("tool-status").classList.add("hidden");
@@ -579,7 +581,12 @@
           data.step_details.forEach((d) => {
             renderStepDetail(list, d);
           });
-          STEP_ORDER.forEach((k) => updateStepDot(k, "done"));
+          if (data.checker_pass) {
+            STEP_ORDER.forEach((k) => updateStepDot(k, "done"));
+          } else {
+            STEP_ORDER.forEach((k) => updateStepDot(k, "done"));
+            updateStepDot("step4_check", "failed");
+          }
         }
 
         document.getElementById("feedback-section").classList.remove("hidden");
