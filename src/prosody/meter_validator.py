@@ -1,13 +1,36 @@
-# Copyright (c) 2026 xhdlphzr
-# SPDX-License-Identifier: MIT
+"""格律总校验器（MeterValidator）。
+
+对整首诗执行三层校验：
+1. 行数匹配；
+2. 每行音节数（英语按多音变体任选其一满足即可）；
+3. 逐位音节约束（平仄/重音/长短），英语同样支持任一变体；
+4. 模板自定义完整规则（validate_full：押韵、三平尾、孤平等）。
+"""
 
 from dataclasses import dataclass, field
+from typing import Any
 
-from .syllable_counter import analyze_line, count_syllables, get_analyzer
+from ..models.syllable import Syllable
 from ..templates import format_count
+from .syllable_counter import analyze_line, count_syllables, get_analyzer
+
+SyllableCount = int | tuple[int, int]
+Constraint = dict[str, Any]
+ConstraintLine = list[Constraint]
+TemplateDict = dict[str, Any]
+VariantList = list[list[Syllable]]
 
 
-def _count_matches(actual: int, expected) -> bool:
+def _count_matches(actual: int, expected: SyllableCount) -> bool:
+    """判断实际音节数是否落在期望（定值或区间）。
+
+    Args:
+        actual: 实际音节数。
+        expected: int 定值或 (min, max) 区间。
+
+    Returns:
+        匹配返回 True。
+    """
     if isinstance(expected, (tuple, list)) and len(expected) == 2:
         return expected[0] <= actual <= expected[1]
     return actual == expected
@@ -15,25 +38,54 @@ def _count_matches(actual: int, expected) -> bool:
 
 @dataclass
 class ValidationResult:
+    """一次格律校验的结果。
+
+    Attributes:
+        passed: 是否全部通过。
+        errors: 错误信息列表（人类可读，供 LLM 修正提示与前端展示）。
+    """
+
     passed: bool = True
     errors: list[str] = field(default_factory=list)
 
-    def add_error(self, msg: str):
+    def add_error(self, msg: str) -> None:
+        """追加一条错误并使结果不通过。
+
+        Args:
+            msg: 错误描述。
+        """
         self.passed = False
         self.errors.append(msg)
 
 
 class MeterValidator:
+    """多语言格律总校验器（符号层，零 AI 开销）。"""
+
     def validate(
         self,
         poem: list[str],
-        template: dict,
+        template: TemplateDict,
         template_obj: object = None,
     ) -> ValidationResult:
-        language = template.get("language", "zh")
-        lines_expected = template.get("lines", len(poem))
-        syllables_expected = template.get("syllables_per_line", [])
-        constraints = template.get("syllable_constraints", [])
+        """校验整首诗。
+
+        Args:
+            poem: 诗行列表。
+            template: 模板字典（to_dict() 结果）。
+            template_obj: 模板对象（含 validate_full 时执行完整规则检查）。
+
+        Returns:
+            校验结果（含全部错误）。
+        """
+        language = str(template.get("language", "zh"))
+        lines_expected = int(template.get("lines", len(poem)))
+        syllables_expected: list[SyllableCount] = list(
+            template.get("syllables_per_line", [])
+        )
+        constraints_raw = template.get("syllable_constraints", [])
+        constraints: list[ConstraintLine] = (
+            list(constraints_raw) if constraints_raw else []
+        )
 
         result = ValidationResult()
 
@@ -42,12 +94,12 @@ class MeterValidator:
                 f"行数不匹配: 期望 {lines_expected} 行, 实际 {len(poem)} 行"
             )
 
-        all_syllables: list[list[list]] = []
+        all_syllables: list[VariantList] = []
         for i in range(len(poem)):
             if language == "en":
                 # 英语多音词：保留全部发音的组合切分，任一变体满足格律即通过
                 all_syllables.append(
-                    get_analyzer(language).analyze_line_variants(poem[i])
+                    get_analyzer(language).analyze_line_variants(poem[i])  # type: ignore[attr-defined]
                 )
             else:
                 all_syllables.append([analyze_line(poem[i], language)])
@@ -91,7 +143,18 @@ class MeterValidator:
         return result
 
     @staticmethod
-    def _line_matches_variant(variant: list, line_constraints: list) -> bool:
+    def _line_matches_variant(
+        variant: list[Syllable], line_constraints: ConstraintLine
+    ) -> bool:
+        """判断一行音节是否满足整行逐位约束。
+
+        Args:
+            variant: 一行的一个音节切分变体。
+            line_constraints: 该行的逐位约束。
+
+        Returns:
+            全部约束满足返回 True。
+        """
         min_syl = min(len(variant), len(line_constraints))
         for j in range(min_syl):
             if not variant[j].match_constraint(line_constraints[j]):
@@ -101,11 +164,22 @@ class MeterValidator:
     def validate_count_only(
         self,
         poem: list[str],
-        template: dict,
+        template: TemplateDict,
     ) -> ValidationResult:
-        language = template.get("language", "zh")
-        lines_expected = template.get("lines", len(poem))
-        syllables_expected = template.get("syllables_per_line", [])
+        """仅校验行数与每行音节数（初稿阶段的快速检查）。
+
+        Args:
+            poem: 诗行列表。
+            template: 模板字典。
+
+        Returns:
+            校验结果。
+        """
+        language = str(template.get("language", "zh"))
+        lines_expected = int(template.get("lines", len(poem)))
+        syllables_expected: list[SyllableCount] = list(
+            template.get("syllables_per_line", [])
+        )
 
         result = ValidationResult()
 
@@ -131,11 +205,26 @@ class MeterValidator:
         self,
         line_text: str,
         line_index: int,
-        template: dict,
+        template: TemplateDict,
     ) -> ValidationResult:
-        language = template.get("language", "zh")
-        syllables_expected = template.get("syllables_per_line", [])
-        constraints = template.get("syllable_constraints", [])
+        """校验单行（refine_line 工具的前置检查）。
+
+        Args:
+            line_text: 新行文本。
+            line_index: 行号（0-based）。
+            template: 模板字典。
+
+        Returns:
+            校验结果。
+        """
+        language = str(template.get("language", "zh"))
+        syllables_expected: list[SyllableCount] = list(
+            template.get("syllables_per_line", [])
+        )
+        constraints_raw = template.get("syllable_constraints", [])
+        constraints: list[ConstraintLine] = (
+            list(constraints_raw) if constraints_raw else []
+        )
 
         result = ValidationResult()
 
@@ -150,7 +239,7 @@ class MeterValidator:
         if constraints and line_index < len(constraints):
             line_constraints = constraints[line_index]
             if language == "en":
-                variants = get_analyzer(language).analyze_line_variants(line_text)
+                variants = get_analyzer(language).analyze_line_variants(line_text)  # type: ignore[attr-defined]
                 if any(
                     self._line_matches_variant(v, line_constraints) for v in variants
                 ):
@@ -170,7 +259,15 @@ class MeterValidator:
         return result
 
     @staticmethod
-    def _describe_constraint(c: dict) -> str:
+    def _describe_constraint(c: Constraint) -> str:
+        """约束的人类可读描述。
+
+        Args:
+            c: 约束字典。
+
+        Returns:
+            如 "声母=zh,tone=平"；无约束返回 "无约束"。
+        """
         parts = []
         if c.get("onset"):
             parts.append(f"声母={c['onset']}")
@@ -184,7 +281,15 @@ class MeterValidator:
         return ",".join(parts) if parts else "无约束"
 
     @staticmethod
-    def _describe_syllable(s) -> str:
+    def _describe_syllable(s: Syllable) -> str:
+        """音节的人类可读描述。
+
+        Args:
+            s: 音节。
+
+        Returns:
+            如 "声母=zh,tone=仄"；全空返回 "空"。
+        """
         parts = []
         if s.onset:
             parts.append(f"声母={s.onset}")

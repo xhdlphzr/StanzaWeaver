@@ -1,7 +1,12 @@
-# Copyright (c) 2026 xhdlphzr
-# SPDX-License-Identifier: MIT
+"""Agent 工具定义（OpenAI Function Calling JSON Schema）。
 
-SEARCH_WORDS_TOOL = {
+WRITER_TOOLS：编写 AI 可用的四个工具（search_words / refine_line /
+rewrite / submit）；CHECKER_TOOLS：检查 AI 的终审工具。
+"""
+
+from typing import Any
+
+SEARCH_WORDS_TOOL: dict[str, Any] = {
     "type": "function",
     "function": {
         "name": "search_words",
@@ -33,7 +38,7 @@ SEARCH_WORDS_TOOL = {
     },
 }
 
-REFINE_LINE_TOOL = {
+REFINE_LINE_TOOL: dict[str, Any] = {
     "type": "function",
     "function": {
         "name": "refine_line",
@@ -49,7 +54,7 @@ REFINE_LINE_TOOL = {
     },
 }
 
-REWRITE_TOOL = {
+REWRITE_TOOL: dict[str, Any] = {
     "type": "function",
     "function": {
         "name": "rewrite",
@@ -67,7 +72,7 @@ REWRITE_TOOL = {
     },
 }
 
-SUBMIT_TOOL = {
+SUBMIT_TOOL: dict[str, Any] = {
     "type": "function",
     "function": {
         "name": "submit",
@@ -76,7 +81,7 @@ SUBMIT_TOOL = {
     },
 }
 
-CHECKER_SUBMIT_TOOL = {
+CHECKER_SUBMIT_TOOL: dict[str, Any] = {
     "type": "function",
     "function": {
         "name": "submit",
@@ -95,5 +100,10 @@ CHECKER_SUBMIT_TOOL = {
     },
 }
 
-WRITER_TOOLS = [SEARCH_WORDS_TOOL, REFINE_LINE_TOOL, REWRITE_TOOL, SUBMIT_TOOL]
-CHECKER_TOOLS = [CHECKER_SUBMIT_TOOL]
+WRITER_TOOLS: list[dict[str, Any]] = [
+    SEARCH_WORDS_TOOL,
+    REFINE_LINE_TOOL,
+    REWRITE_TOOL,
+    SUBMIT_TOOL,
+]
+CHECKER_TOOLS: list[dict[str, Any]] = [CHECKER_SUBMIT_TOOL]

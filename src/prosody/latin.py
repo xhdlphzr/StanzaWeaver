@@ -1,10 +1,15 @@
-# Copyright (c) 2026 xhdlphzr
-# SPDX-License-Identifier: MIT
+"""拉丁语音节分析器。
 
-from .base import SyllableAnalyzer
+- 支持长音符号（āēīōūȳ）与短音符号（ăĕĭŏŭ）标注。
+- 音长判定：词典/符号标注优先；无标注时双元音（ae/oe/au/eu/ei/ui）为长音，
+  元音后跟两个及以上辅音（含跨词）为长音，其余为短音。
+- qu/gu/su 后接元音时 u 为辅音性（quō、lingua、suāvis），不构成音节。
+"""
+
 from ..models.syllable import Syllable
+from .base import SyllableAnalyzer
 
-_LONG_MARKERS = {
+_LONG_MARKERS: dict[str, str] = {
     "ā": "a",
     "ē": "e",
     "ī": "i",
@@ -18,7 +23,7 @@ _LONG_MARKERS = {
     "Ū": "u",
     "Ȳ": "y",
 }
-_SHORT_MARKERS = {
+_SHORT_MARKERS: dict[str, str] = {
     "ă": "a",
     "ĕ": "e",
     "ĭ": "i",
@@ -31,18 +36,41 @@ _SHORT_MARKERS = {
     "Ŏ": "o",
     "Ŭ": "u",
 }
-_VOWELS = set("aeiouyāēīōūȳăĕĭŏŭAEIOUY")
-_DIPHTHONGS = {"ae", "oe", "au", "eu", "ei", "ui", "AE", "OE", "AU", "EU", "EI", "UI"}
+_VOWELS: set[str] = set("aeiouyāēīōūȳăĕĭŏŭAEIOUY")
+_DIPHTHONGS: set[str] = {
+    "ae",
+    "oe",
+    "au",
+    "eu",
+    "ei",
+    "ui",
+    "AE",
+    "OE",
+    "AU",
+    "EU",
+    "EI",
+    "UI",
+}
 
 
 class LatinAnalyzer(SyllableAnalyzer):
+    """拉丁语音节分析器：音节切分 + 音长判定（符号/双元音/辅音位置）。"""
+
     language = "la"
 
     def analyze_word(self, word: str) -> list[Syllable]:
+        """分析单词的音节与音长。
+
+        Args:
+            word: 拉丁语单词（可含长短音符号）。
+
+        Returns:
+            音节列表（长度标在 attributes["length"]）。
+        """
         word = word.strip(".,;:!?\"'()[]{}")
         if not word:
             return []
-        syllables = []
+        syllables: list[Syllable] = []
         i = 0
         n = len(word)
         onset = ""
@@ -134,4 +162,12 @@ class LatinAnalyzer(SyllableAnalyzer):
         )
 
     def count_syllables(self, text: str) -> int:
+        """逐词统计音节总数。
+
+        Args:
+            text: 拉丁语文本。
+
+        Returns:
+            音节总数。
+        """
         return sum(len(self.analyze_word(w)) for w in text.split() if w.strip())

@@ -1,20 +1,26 @@
-# Copyright (c) 2026 xhdlphzr
-# SPDX-License-Identifier: MIT
+"""StanzaWeaver 应用入口（Flask + SocketIO + pywebview）。
+
+- HTTP API：模板列表、LLM 配置、历史记录、自定义模板、导入状态；
+- SocketIO：generate / feedback 事件驱动四步流水线，progress/done/error 推送；
+- 安全：仅限本机访问（Host 校验）+ CSRF 令牌保护写接口；
+- 首次运行自动导入词库（后台线程）。
+"""
 
 import json
 import secrets
 import threading
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify
+from typing import Any
+
+from flask import Flask, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
 
-# Import and register all templates
-from src.templates.zh import register_chinese_templates
-from src.templates.en import register_english_templates
-from src.templates.it import register_italian_templates
-from src.templates.fr import register_french_templates
-from src.templates.la import register_latin_templates
 from src.templates import list_dicts
+from src.templates.en import register_english_templates
+from src.templates.fr import register_french_templates
+from src.templates.it import register_italian_templates
+from src.templates.la import register_latin_templates
+from src.templates.zh import register_chinese_templates
 
 register_chinese_templates()
 register_english_templates()
@@ -22,11 +28,11 @@ register_italian_templates()
 register_french_templates()
 register_latin_templates()
 
-# Auto-import vocabulary on first run
 _vocab_importing = True
 
 
-def _auto_import():
+def _auto_import() -> None:
+    """后台线程：首次运行自动导入词库。"""
     global _vocab_importing
     from src.knowledge.vocabulary import init_db
 
@@ -36,7 +42,7 @@ def _auto_import():
         from src.knowledge.importer import import_all
 
         import_all()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - 词库导入兜底：失败仅记录，不影响启动
         print(f"[StanzaWeaver] 词库导入失败: {e}")
     finally:
         _vocab_importing = False
@@ -47,11 +53,12 @@ threading.Thread(target=_auto_import, daemon=True).start()
 app = Flask(__name__, template_folder="templates", static_folder="static")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
-_active_states: dict[str, dict] = {}
+_active_states: dict[str, dict[str, Any]] = {}
 _CSRF_TOKEN = secrets.token_hex(16)
 
 
-def _register_custom_templates():
+def _register_custom_templates() -> None:
+    """注册 src/templates/custom_*.py 中的自定义模板（重启自动恢复）。"""
     import importlib
 
     tpl_dir = Path(__file__).parent / "src" / "templates"
@@ -63,7 +70,7 @@ def _register_custom_templates():
             for attr in dir(module):
                 if attr.startswith("register_custom_"):
                     getattr(module, attr)()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - 自定义模板可含任意用户代码，注册失败仅记录
             print(f"[StanzaWeaver] 自定义模板注册失败 {f.name}: {e}")
 
 
@@ -71,38 +78,53 @@ _register_custom_templates()
 
 
 @app.before_request
-def _guard_local_access():
+def _guard_local_access() -> Any:
+    """仅允许本机访问（Host 校验）。"""
     host = request.host or ""
     if not host.startswith(("127.0.0.1", "localhost")):
         return jsonify({"status": "error", "message": "拒绝非本机访问"}), 403
+    return None
 
 
-def _require_csrf():
+def _require_csrf() -> bool:
+    """校验 CSRF 令牌。
+
+    Returns:
+        令牌匹配返回 True。
+    """
     return request.headers.get("X-CSRF-Token", "") == _CSRF_TOKEN
 
 
-def load_templates() -> list[dict]:
+def load_templates() -> list[dict[str, Any]]:
+    """加载全部模板字典。
+
+    Returns:
+        模板字典列表。
+    """
     return list_dicts()
 
 
 @app.route("/api/import-status")
-def api_import_status():
-    global _vocab_importing
+def api_import_status() -> Any:
+    """查询词库导入状态。"""
     return jsonify({"importing": _vocab_importing})
 
 
 @app.route("/")
-def index():
+def index() -> str:
+    """主页面（注入 CSRF 令牌）。"""
     return render_template("index.html", csrf_token=_CSRF_TOKEN)
 
 
 @app.route("/api/templates")
-def api_templates():
+def api_templates() -> Any:
+    """模板列表接口。"""
     return jsonify(load_templates())
 
 
 @app.route("/api/config", methods=["GET"])
-def api_get_config():
+def api_get_config() -> Any:
+    """读取 LLM 配置。"""
     if not _require_csrf():
         return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
     from src.config import get_config
@@ -117,7 +139,8 @@ def api_get_config():
 
 
 @app.route("/api/config", methods=["POST"])
-def api_save_config():
+def api_save_config() -> Any:
+    """保存 LLM 配置。"""
     if not _require_csrf():
         return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
     from src.config import get_config
@@ -139,17 +162,38 @@ def api_save_config():
 
 
 @socketio.on("connect")
-def handle_connect():
-    pass
+def handle_connect() -> None:
+    """Socket 连接建立。"""
+
+
+def _emit_done(session_id: str, result: Any) -> None:
+    """向会话推送 done 事件。
+
+    Args:
+        session_id: SocketIO 会话 ID。
+        result: 流水线结果状态。
+    """
+    socketio.emit(
+        "done",
+        {
+            "draft": result.draft,
+            "final_poem": result.final_poem,
+            "checker_pass": result.checker_pass,
+            "checker_suggestions": result.checker_suggestions,
+            "step_details": result.step_details,
+        },
+        to=session_id,
+    )
 
 
 @socketio.on("generate")
-def handle_generate(data):
+def handle_generate(data: dict[str, Any]) -> None:
+    """开始生成：后台线程跑四步流水线。"""
     from src.pipeline.pipeline import PoetryPipeline
 
-    topic = data.get("topic", "")
-    template_key = data.get("template_key", "")
-    session_id = request.sid
+    topic = str(data.get("topic", ""))
+    template_key = str(data.get("template_key", ""))
+    session_id = request.sid  # type: ignore[attr-defined]  # flask_socketio 注入
 
     if not topic or not template_key:
         emit("error", {"message": "主题和模板不能为空"})
@@ -157,43 +201,34 @@ def handle_generate(data):
 
     pipeline = PoetryPipeline()
 
-    def on_progress(state_dict: dict):
+    def on_progress(state_dict: dict[str, Any]) -> None:
         socketio.emit("progress", state_dict, to=session_id)
 
-    def run():
+    def run() -> None:
         try:
             result = pipeline.run(
                 topic=topic,
                 template_key=template_key,
                 on_progress=on_progress,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - 生成线程兜底：任何失败转为前端错误事件
             socketio.emit("error", {"message": f"生成失败: {e}"}, to=session_id)
             return
         _active_states[session_id] = {
             "pipeline_state": result,
         }
-        socketio.emit(
-            "done",
-            {
-                "draft": result.draft,
-                "final_poem": result.final_poem,
-                "checker_pass": result.checker_pass,
-                "checker_suggestions": result.checker_suggestions,
-                "step_details": result.step_details,
-            },
-            to=session_id,
-        )
+        _emit_done(session_id, result)
 
     threading.Thread(target=run, daemon=True).start()
 
 
 @socketio.on("feedback")
-def handle_feedback(data):
+def handle_feedback(data: dict[str, Any]) -> None:
+    """用户反馈续跑：打回 Step 3 按反馈重新炼句。"""
     from src.pipeline.pipeline import PoetryPipeline
 
-    feedback = data.get("feedback", "")
-    session_id = request.sid
+    feedback = str(data.get("feedback", ""))
+    session_id = request.sid  # type: ignore[attr-defined]  # flask_socketio 注入
 
     session_data = _active_states.get(session_id, {})
     pipeline_state = session_data.get("pipeline_state")
@@ -203,44 +238,36 @@ def handle_feedback(data):
 
     pipeline = PoetryPipeline()
 
-    def on_progress(state_dict: dict):
+    def on_progress(state_dict: dict[str, Any]) -> None:
         socketio.emit("progress", state_dict, to=session_id)
 
-    def run():
+    def run() -> None:
         try:
             result = pipeline.continue_with_feedback(
                 state=pipeline_state,
                 user_feedback=feedback,
                 on_progress=on_progress,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - 反馈线程兜底：任何失败转为前端错误事件
             socketio.emit("error", {"message": f"反馈处理失败: {e}"}, to=session_id)
             return
         _active_states[session_id] = {
             "pipeline_state": result,
         }
-        socketio.emit(
-            "done",
-            {
-                "draft": result.draft,
-                "final_poem": result.final_poem,
-                "checker_pass": result.checker_pass,
-                "checker_suggestions": result.checker_suggestions,
-                "step_details": result.step_details,
-            },
-            to=session_id,
-        )
+        _emit_done(session_id, result)
 
     threading.Thread(target=run, daemon=True).start()
 
 
 @socketio.on("disconnect")
-def handle_disconnect():
-    _active_states.pop(request.sid, None)
+def handle_disconnect() -> None:
+    """连接断开：清理会话状态。"""
+    _active_states.pop(request.sid, None)  # type: ignore[attr-defined]  # flask_socketio 注入
 
 
 @app.route("/api/templates/custom", methods=["POST"])
-def api_create_custom_template():
+def api_create_custom_template() -> Any:
+    """创建自定义格律模板（落盘为 src/templates/custom_*.py 并热注册）。"""
     import importlib
     import re
     from pathlib import Path
@@ -290,9 +317,9 @@ def api_create_custom_template():
     file_key = f"custom_{safe_name}"
     file_path = Path(__file__).parent / "src" / "templates" / f"{file_key}.py"
 
-    constraints_code = []
+    constraints_code: list[str] = []
     for line_c in constraints:
-        cells = []
+        cells: list[str] = []
         for c in line_c:
             tone = c.get("attributes", {}).get("tone", "")
             stress = c.get("attributes", {}).get("stress", "")
@@ -347,7 +374,7 @@ def api_create_custom_template():
         reg_func = getattr(module, f"register_custom_{safe_name}", None)
         if reg_func:
             reg_func()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - 用户代码模板注册兜底：任何导入/执行错误回报 500
         return jsonify({"status": "error", "message": f"注册失败: {e}"}), 500
 
     socketio.emit("templates_updated", {"count": len(load_templates())})
@@ -360,7 +387,8 @@ def api_create_custom_template():
     )
 
 
-def _init_history_db():
+def _init_history_db() -> None:
+    """初始化历史记录表（幂等）。"""
     import sqlite3
 
     hdb = Path.home() / ".stanza_weaver" / "history.db"
@@ -380,7 +408,8 @@ def _init_history_db():
 
 
 @app.route("/api/history", methods=["GET"])
-def api_get_history():
+def api_get_history() -> Any:
+    """读取历史记录（最近 50 条）。"""
     import sqlite3
 
     _init_history_db()
@@ -405,7 +434,8 @@ def api_get_history():
 
 
 @app.route("/api/history", methods=["POST"])
-def api_save_history():
+def api_save_history() -> Any:
+    """保存历史记录（定稿后由前端调用）。"""
     import sqlite3
 
     if not _require_csrf():
@@ -431,11 +461,13 @@ def api_save_history():
     return jsonify({"status": "ok"})
 
 
-def start_server():
+def start_server() -> None:
+    """启动 SocketIO 服务（127.0.0.1:5000）。"""
     socketio.run(app, host="127.0.0.1", port=5000, allow_unsafe_werkzeug=True)
 
 
-def main():
+def main() -> None:
+    """入口：优先 pywebview 桌面窗口，否则纯 HTTP 服务。"""
     try:
         import webview
     except ImportError:
