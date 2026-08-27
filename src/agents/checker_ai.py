@@ -1,15 +1,33 @@
-# Copyright (c) 2026 xhdlphzr
-# SPDX-License-Identifier: MIT
+"""检查 AI：句意终审。
 
-from .base import LLMClient
-from ..tools import CHECKER_TOOLS
+对诗歌做语义评审（句意通顺、语义契合；中文 8 行以上附加对仗检查），
+通过 submit 工具返回 pass/suggestions。
+"""
 
 import json
+from typing import Any
+
+from ..tools import CHECKER_TOOLS
+from .base import LLMClient, Message
+
+CheckResult = dict[str, Any]
 
 
-def _build_checker_system(description: str, poem: list[str], template: dict) -> str:
-    language = template.get("language", "zh")
-    lines = template.get("lines", len(poem))
+def _build_checker_system(
+    description: str, poem: list[str], template: dict[str, Any]
+) -> str:
+    """构造检查 AI 的系统提示。
+
+    Args:
+        description: 主题描述。
+        poem: 诗行列表。
+        template: 模板字典。
+
+    Returns:
+        系统提示文本。
+    """
+    language = str(template.get("language", "zh"))
+    lines = int(template.get("lines", len(poem)))
 
     parallelism_note = ""
     dim_count = 2
@@ -40,21 +58,38 @@ def _build_checker_system(description: str, poem: list[str], template: dict) -> 
 
 
 class CheckerAI:
-    def __init__(self, config: dict):
+    """句意终审代理（独立 LLM 端点/模型）。"""
+
+    def __init__(self, config: dict[str, Any]):
+        """初始化检查 AI。
+
+        Args:
+            config: {"base_url", "api_key", "model"}。
+        """
         self.client = LLMClient(
-            base_url=config["base_url"],
-            api_key=config["api_key"],
-            model=config["model"],
+            base_url=str(config["base_url"]),
+            api_key=str(config["api_key"]),
+            model=str(config["model"]),
         )
 
     def check(
         self,
         description: str,
         poem: list[str],
-        template: dict,
-    ) -> dict:
+        template: dict[str, Any],
+    ) -> CheckResult:
+        """执行句意终审（最多重试 3 轮直到拿到 submit 结论）。
+
+        Args:
+            description: 主题描述。
+            poem: 诗行列表。
+            template: 模板字典。
+
+        Returns:
+            {"pass": bool, "suggestions": str}。
+        """
         system_prompt = _build_checker_system(description, poem, template)
-        messages = [
+        messages: list[Message] = [
             {"role": "system", "content": system_prompt},
             {
                 "role": "user",
@@ -67,15 +102,15 @@ class CheckerAI:
                 response = self.client.chat(messages, tools=CHECKER_TOOLS)
 
                 if response["tool_calls"]:
-                    submit_args = None
+                    submit_args: dict[str, Any] | None = None
                     for tc in response["tool_calls"]:
                         if tc["name"] == "submit":
                             submit_args = tc["arguments"]
                             break
                     if submit_args is not None:
                         return {
-                            "pass": submit_args.get("pass", False),
-                            "suggestions": submit_args.get("suggestions", ""),
+                            "pass": bool(submit_args.get("pass", False)),
+                            "suggestions": str(submit_args.get("suggestions", "")),
                         }
 
                     messages.append(LLMClient.assistant_to_message(response))
@@ -101,7 +136,7 @@ class CheckerAI:
                         "content": "请务必调用 submit 工具给出评审结论（pass和suggestions）。",
                     }
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - 终审兜底：任何调用失败转为"未通过+建议"
             return {"pass": False, "suggestions": f"检查AI调用失败: {e}"}
 
         return {"pass": False, "suggestions": "检查AI在多次尝试后未能给出结论"}

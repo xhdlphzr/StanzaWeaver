@@ -1,14 +1,32 @@
-# Copyright (c) 2026 xhdlphzr
-# SPDX-License-Identifier: MIT
+"""拉丁语格律模板：六步格、哀歌双行体、十一音节诗。
 
-from . import PoetryTemplate, register
+- 六步格：第 1-4 音步扬抑抑/扬扬自由替换，第 5 音步必须扬抑抑格，
+  第 6 音步 2 音节（扬扬或扬抑）。
+- 哀歌双行体：第 1 行六步格，第 2 行五步格（后 6 音节必须两个完整扬抑抑格）。
+- 十一音节诗：第 1 音步首音节必长，第 5/6 音节之间必须是词边界。
+"""
+
+from typing import Any, ClassVar
+
+from ..models.syllable import Syllable
 from ..prosody.latin import LatinAnalyzer
+from . import ConstraintTable, PoetryTemplate, register
 
 _LATIN = LatinAnalyzer()
 
 
-def _make_syl(**kwargs) -> dict:
+def _make_syl(**kwargs: Any) -> dict[str, Any]:
+    """构造逐位约束字典。
+
+    Args:
+        **kwargs: 可含 onset/nucleus/coda 及 attributes。
+
+    Returns:
+        约束字典。
+    """
     attrs = kwargs.pop("attributes", {})
+    if not isinstance(attrs, dict):
+        attrs = {}
     return {
         "onset": kwargs.get("onset", ""),
         "nucleus": kwargs.get("nucleus", ""),
@@ -21,20 +39,29 @@ def _make_syl(**kwargs) -> dict:
     }
 
 
-_L = _make_syl(attributes={"length": "long"})
-_S = _make_syl(attributes={"length": "short"})
+_L: dict[str, Any] = _make_syl(attributes={"length": "long"})
+_S: dict[str, Any] = _make_syl(attributes={"length": "short"})
 
 
-def _validate_hex(syls) -> list[str]:
-    """六步格完整校验：第1-4音步为扬抑抑格(长短短)或扬扬格(长长)自由替换，
-    第5音步必须为扬抑抑格（长短短），第6音步为扬扬格或扬抑格（2音节，首音节长）。"""
-    errors = []
+def _validate_hex(syls: list[Syllable]) -> list[str]:
+    """六步格完整校验。
+
+    第 1-4 音步为扬抑抑格(长短短)或扬扬格(长长)自由替换；
+    第 5 音步必须为扬抑抑格（长短短）；第 6 音步为扬扬格或扬抑格（2 音节）。
+
+    Args:
+        syls: 一行音节。
+
+    Returns:
+        错误列表。
+    """
+    errors: list[str] = []
     n = len(syls)
     if n < 13:
         errors.append(f"音节数不足: 至少13个，实际{n}个")
         return errors
     i = 0
-    feet = []
+    feet: list[tuple[int, int, int]] = []
     for foot_idx in range(4):
         if i >= n:
             break
@@ -87,7 +114,7 @@ def _validate_hex(syls) -> list[str]:
                 or foot[1].attributes.get("length") != "short"
                 or foot[2].attributes.get("length") != "short"
             ):
-                errors.append(f"第5音步必须为扬抑抑格（长短短），实际不满足")
+                errors.append("第5音步必须为扬抑抑格（长短短），实际不满足")
         else:
             if len(foot) != 2:
                 errors.append(f"第6音步应为2音节（扬扬格或扬抑格），实际{len(foot)}个")
@@ -97,32 +124,39 @@ def _validate_hex(syls) -> list[str]:
 
 
 class HexameterTemplate(PoetryTemplate):
+    """六步格：单行，可连续堆叠，逐行校验。"""
+
     name = "六步格"
     language = "la"
     lines = 1
-    syllables_per_line = [(13, 17)]
+    syllables_per_line: ClassVar[list[tuple[int, int]]] = [(13, 17)]
     rule_description = (
         "格律规则：共6音步；第1-4音步可为扬抑抑格(长短短)或扬扬格(长长)自由替换；"
         "第5音步必须为扬抑抑格(长短短)；第6音步为扬扬格或扬抑格，末音节可长可短；"
         "音长判定：词典标注优先，无标注时双元音及元音后跟两个及以上辅音(含跨词)为长音。"
     )
 
-    def get_syllable_constraints(self):
-        # 音步可替换导致边界移动，不做固定位置约束，由 validate_full 逐音步校验
+    def get_syllable_constraints(self) -> ConstraintTable | None:
+        """无固定位置约束（音步可替换，由 validate_full 贪心扫描）。"""
         return None
 
-    def validate_full(self, poem, syllables):
-        errors = []
+    def validate_full(
+        self, poem: list[str], syllables: list[list[Syllable]]
+    ) -> list[str]:
+        """逐音步校验六步格结构。"""
+        errors: list[str] = []
         if syllables and syllables[0]:
             errors.extend(_validate_hex(syllables[0]))
         return errors
 
 
 class DistichonTemplate(PoetryTemplate):
+    """哀歌双行体：第 1 行六步格，第 2 行五步格（末 6 音节两完整扬抑抑格）。"""
+
     name = "哀歌双行体"
     language = "la"
     lines = 2
-    syllables_per_line = [(13, 17), (11, 13)]
+    syllables_per_line: ClassVar[list[tuple[int, int]]] = [(13, 17), (11, 13)]
     rule_description = (
         "格律规则：第1行完全遵循六步格规则；"
         "第2行五步格：前2.5音步可为扬抑抑格或扬扬格（自由），中间必有停顿，"
@@ -130,12 +164,15 @@ class DistichonTemplate(PoetryTemplate):
         "两行末字必须押韵（AA）。"
     )
 
-    def get_syllable_constraints(self):
-        # 同六步格：音步可替换导致边界移动，固定位置约束与扬扬格替换互斥
+    def get_syllable_constraints(self) -> ConstraintTable | None:
+        """无固定位置约束（同六步格）。"""
         return None
 
-    def validate_full(self, poem, syllables):
-        errors = []
+    def validate_full(
+        self, poem: list[str], syllables: list[list[Syllable]]
+    ) -> list[str]:
+        """完整检查：第 1 行六步格、第 2 行末 6 音节扬抑抑×2、AA 押韵。"""
+        errors: list[str] = []
         if not syllables or len(syllables) < 2:
             return errors
         if syllables[0]:
@@ -152,20 +189,21 @@ class DistichonTemplate(PoetryTemplate):
                     )
         elif len(pent_syls) >= 2:
             errors.append("第2行音节数不足: 至少11个")
-        if len(poem) >= 2:
-            if syllables[0] and syllables[1]:
-                r0 = syllables[0][-1].nucleus + syllables[0][-1].coda
-                r1 = syllables[1][-1].nucleus + syllables[1][-1].coda
-                if r0 and r1 and r0 != r1:
-                    errors.append(f"押韵不匹配: 第1行韵脚为'{r0}'，第2行韵脚为'{r1}'")
+        if len(poem) >= 2 and syllables[0] and syllables[1]:
+            r0 = syllables[0][-1].nucleus + syllables[0][-1].coda
+            r1 = syllables[1][-1].nucleus + syllables[1][-1].coda
+            if r0 and r1 and r0 != r1:
+                errors.append(f"押韵不匹配: 第1行韵脚为'{r0}'，第2行韵脚为'{r1}'")
         return errors
 
 
 class HendecasyllabusTemplate(PoetryTemplate):
+    """十一音节诗：5 音步，第 5/6 音节间须为词边界。"""
+
     name = "十一音节诗"
     language = "la"
     lines = 1
-    syllables_per_line = [11]
+    syllables_per_line: ClassVar[list[int]] = [11]
     rule_description = (
         "格律规则：共5音步11音节；第1音步为扬扬格或扬抑格（首音节必长）；"
         "第2音步固定扬抑抑格(长短短)；第3-5音步均为扬抑格(长短)；"
@@ -173,8 +211,8 @@ class HendecasyllabusTemplate(PoetryTemplate):
         "第3、6、8、10音节（全行）必须为长音。"
     )
 
-    def get_syllable_constraints(self):
-        # 第1音步: 扬扬格(LL)或扬抑格(L∪) -> 首音节必长
+    def get_syllable_constraints(self) -> ConstraintTable:
+        """固定音步模式约束（第1音步首音节必长）。"""
         return [
             [
                 _L,
@@ -191,8 +229,11 @@ class HendecasyllabusTemplate(PoetryTemplate):
             ]
         ]
 
-    def validate_full(self, poem, syllables):
-        errors = []
+    def validate_full(
+        self, poem: list[str], syllables: list[list[Syllable]]
+    ) -> list[str]:
+        """完整检查：固定长音位 + 第 5/6 音节间词边界。"""
+        errors: list[str] = []
         if not syllables or not syllables[0]:
             return errors
         syls = syllables[0]
@@ -210,7 +251,6 @@ class HendecasyllabusTemplate(PoetryTemplate):
                 if actual and actual != expected:
                     errors.append(f"第{pos + 1}音节应为长音节，实际为{actual}")
 
-        # 硬性边界: 第5与第6音节（1-based）之间必须是词边界
         if poem:
             line = poem[0]
             cum = 0
@@ -231,7 +271,8 @@ class HendecasyllabusTemplate(PoetryTemplate):
         return errors
 
 
-def register_latin_templates():
+def register_latin_templates() -> None:
+    """注册全部拉丁语模板。"""
     register("la_hexameter", HexameterTemplate())
     register("la_distichon", DistichonTemplate())
     register("la_hendecasyllabus", HendecasyllabusTemplate())

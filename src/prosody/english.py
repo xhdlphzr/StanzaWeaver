@@ -1,12 +1,20 @@
-# Copyright (c) 2026 xhdlphzr
-# SPDX-License-Identifier: MIT
+"""英语音节分析器（基于 CMUdict）。
+
+- CMUdict 音素串 → 音节切分，采用英语常规划音规则分配跨音节辅音。
+- 主重音(1)与次重音(2)均视为重读（诗歌格律中次重音同样承担重音位置）。
+- 多音词保留全部发音（read/present/record 等按词性、意义有不同读音），
+  校验时任一发音变体满足格律即通过。
+- rhyme_tail 生成严格重音押韵 key：最后一个重读元音起到词尾的音素串
+  （含重音层级），用于商籁体/双行体等的押韵校验。
+"""
 
 import re
 import threading
-from typing import Dict, Optional
 
-from .base import SyllableAnalyzer
+import nltk  # type: ignore[import-untyped]
+
 from ..models.syllable import Syllable
+from .base import SyllableAnalyzer
 
 _NUMBERS_RE = re.compile(r"\d+")
 
@@ -33,14 +41,18 @@ _VOWEL_PHONEMES = {
 }
 
 # 主重音(1)与次重音(2)均为重读（诗歌格律中次重音同样承担重音位置）
-_STRESS_MAP = {"0": "", "1": "heavy", "2": "heavy"}
+_STRESS_MAP: dict[str, str] = {"0": "", "1": "heavy", "2": "heavy"}
 
-_ARPABET_TO_PHONEMES: Dict[str, list[list[str]]] = {}
+_ARPABET_TO_PHONEMES: dict[str, list[list[str]]] = {}
 _cmudict_loaded = False
 _cmudict_lock = threading.Lock()
 
 
-def _load_cmudict():
+def _load_cmudict() -> None:
+    """惰性加载 CMUdict 到内存（线程安全，仅加载一次）。
+
+    保留每个词的全部发音变体。
+    """
     global _cmudict_loaded
     if _cmudict_loaded:
         return
@@ -48,41 +60,67 @@ def _load_cmudict():
         if _cmudict_loaded:
             return
         try:
-            import nltk
-
             nltk.data.find("corpora/cmudict.zip")
         except LookupError:
             nltk.download("cmudict", quiet=True)
-        from nltk.corpus import cmudict
+        from nltk.corpus import cmudict  # type: ignore[import-untyped]
 
         for word, pronunciations in cmudict.dict().items():
-            # 保留全部发音（多音词，如 read/present/record 按词性、意义有不同读音）
-            _ARPABET_TO_PHONEMES[word] = pronunciations
+            _ARPABET_TO_PHONEMES[str(word)] = pronunciations
         _cmudict_loaded = True
 
 
 class EnglishAnalyzer(SyllableAnalyzer):
+    """英语音节分析器：音节切分 + 重音标注 + 多音变体 + 押韵尾串。"""
+
     language = "en"
 
     def _get_pronunciations(self, word: str) -> list[list[str]]:
+        """查询词的全部音素发音。
+
+        Args:
+            word: 英文单词。
+
+        Returns:
+            音素列表的列表（每个元素是一个发音）；未知词返回空列表。
+        """
         _load_cmudict()
         return _ARPABET_TO_PHONEMES.get(word.lower(), [])
 
     def analyze_variants(self, word: str) -> list[list[Syllable]]:
-        """返回该词全部发音的音节切分结果（多音词每个读音一种切分）。"""
+        """返回该词全部发音的音节切分结果。
+
+        Args:
+            word: 英文单词。
+
+        Returns:
+            每种发音对应一个音节列表；未知词退回启发式切分。
+        """
         prons = self._get_pronunciations(word)
         if not prons:
             return [self._fallback_analyze(word)]
         return [self._parse_phones(p) for p in prons]
 
     def analyze_word(self, word: str) -> list[Syllable]:
+        """分析单词（取第一个发音，即 CMUdict 中最常见读音）。
+
+        Args:
+            word: 英文单词。
+
+        Returns:
+            音节列表。
+        """
         return self.analyze_variants(word)[0]
 
     def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-        """整行的候选音节切分：逐词取全部发音变体组合（上限 64 种，避免爆炸）。
+        """整行的候选音节切分：逐词取全部发音变体组合（上限 64 种）。
 
-        多音词（read/present/record 等）按词性、意义有不同读音，任一组合
-        满足格律即视为合格。"""
+        Args:
+            line: 一行诗（可为多词）。
+
+        Returns:
+            候选切分列表（至少含一个元素）。
+        """
         words = [w for w in re.split(r"[^a-zA-Z0-9'-]+", line.lower()) if w]
         combos: list[list[Syllable]] = [[]]
         for w in words:
@@ -105,6 +143,12 @@ class EnglishAnalyzer(SyllableAnalyzer):
         - 两个元音之间的单个辅音：前一元音为主重音、后一元音非主重音时
           收前音节（hap-py, bet-ter, bi-ol-o-gy）；否则归后一音节（a-bout, re-spond）。
         - 两个及以上的辅音簇：首辅音收前音节，其余归后一音节（ex-tra, Mon-day）。
+
+        Args:
+            phones: CMUdict 音素列表（含重音数字，如 ["B", "AE1", "T"]）。
+
+        Returns:
+            音节列表。
         """
         vpos = [
             i for i, p in enumerate(phones) if _NUMBERS_RE.sub("", p) in _VOWEL_PHONEMES
@@ -113,7 +157,6 @@ class EnglishAnalyzer(SyllableAnalyzer):
             return []
 
         n = len(phones)
-        # 各元音前的辅音运行（第0音节起点为0，其余为上一元音后）
         onset_runs: list[list[str]] = []
         for k, vi in enumerate(vpos):
             start = 0 if k == 0 else vpos[k - 1] + 1
@@ -137,7 +180,7 @@ class EnglishAnalyzer(SyllableAnalyzer):
                 onset_runs[k + 1] = run[1:]
         codas[-1] = final_coda
 
-        syllables = []
+        syllables: list[Syllable] = []
         for k, vi in enumerate(vpos):
             sm = _NUMBERS_RE.search(phones[vi])
             stress = _STRESS_MAP.get(sm.group() if sm else "", "")
@@ -151,11 +194,14 @@ class EnglishAnalyzer(SyllableAnalyzer):
             )
         return syllables
 
-    def rhyme_tail(self, word: str) -> Optional[str]:
+    def rhyme_tail(self, word: str) -> str | None:
         """最后一个重读元音（主/次重音）起到词尾的音素串（含重音标记）。
 
-        用于严格重音押韵：韵脚必须落在重读音节上，且该音节起的全部音素
-        （含重音层级）必须完全相同。无重读音节时返回 None（不能作韵脚）。
+        Args:
+            word: 英文单词。
+
+        Returns:
+            押韵尾串（如 "AY1 T"）；无重读音节时返回 None（不能作韵脚）。
         """
         prons = self._get_pronunciations(word)
         if not prons:
@@ -172,6 +218,14 @@ class EnglishAnalyzer(SyllableAnalyzer):
         return None
 
     def _fallback_analyze(self, word: str) -> list[Syllable]:
+        """未知词启发式切分：按元音字母组数估音节数。
+
+        Args:
+            word: 不在 CMUdict 中的词。
+
+        Returns:
+            每个元音组一个占位音节（nucleus="?"，无重音）。
+        """
         vowel_groups = re.findall(r"[aeiouy]+", word.lower())
         count = len(vowel_groups)
         if count == 0:
@@ -185,6 +239,14 @@ class EnglishAnalyzer(SyllableAnalyzer):
         ]
 
     def count_syllables(self, text: str) -> int:
+        """逐词统计音节总数。
+
+        Args:
+            text: 英文文本。
+
+        Returns:
+            音节总数。
+        """
         total = 0
         for word in text.split():
             total += len(self.analyze_word(word))

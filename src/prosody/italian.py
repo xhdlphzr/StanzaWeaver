@@ -1,13 +1,20 @@
-# Copyright (c) 2026 xhdlphzr
-# SPDX-License-Identifier: MIT
+"""意大利语音节分析器。
+
+- 按正字法切分音节（二合元音并读），并按启发式标注词重音：
+  词尾重读元音（città, perché, virtù）或辅音收尾（amor）→ 末音节重读；
+  其余 → 倒数第二音节重读（意大利语最常见重音位置）。
+  注：少数倒数第三音节重读的词（sdrucciole）无法由正字法判定，属已知局限。
+- syllabify_line 处理行级 sinalefe（前词末元音与后词首元音并读为一个音节）
+  与省音撇号（l'amor → amor），用于十一音节句计数。
+"""
 
 import re
 
-from .base import SyllableAnalyzer
 from ..models.syllable import Syllable
+from .base import SyllableAnalyzer
 
-_VOWELS = set("aeiouàèéìòóùAEIOUÀÈÉÌÒÓÙ")
-_DIPHTHONGS = {
+_VOWELS: set[str] = set("aeiouàèéìòóùAEIOUÀÈÉÌÒÓÙ")
+_DIPHTHONGS: set[str] = {
     "ia",
     "ie",
     "io",
@@ -23,16 +30,25 @@ _DIPHTHONGS = {
     "eu",
     "ou",
 }
-_ACCENTED_VOWELS = set("àèéìòóù")
-# 省音撇号（elision）：l'amor → amor；strip 前缀计数
+_ACCENTED_VOWELS: set[str] = set("àèéìòóù")
 _APOSTROPHE_RE = re.compile(r"^[a-zA-ZàèéìòóùÀÈÉÌÒÓÙ]*['’]")
 _WORD_SPLIT_RE = re.compile(r"[^a-zA-ZàèéìòóùÀÈÉÌÒÓÙ0-9'’\-]+")
 
 
 class ItalianAnalyzer(SyllableAnalyzer):
+    """意大利语音节分析器：音节切分 + 重音启发式 + 行级 sinalefe。"""
+
     language = "it"
 
     def _count_syllables_in_word(self, word: str) -> int:
+        """单词语节数（含二合元音合并）。
+
+        Args:
+            word: 意大利语单词。
+
+        Returns:
+            音节数（至少 1）。
+        """
         word = _APOSTROPHE_RE.sub("", word.lower().strip(".,;:!?\"'()[]{}"))
         if not word:
             return 0
@@ -48,14 +64,18 @@ class ItalianAnalyzer(SyllableAnalyzer):
         return count if count > 0 else 1
 
     def _syllabify_word(self, word: str) -> list[Syllable]:
-        """按词切分音节并标注重音（启发式）：
-        - 词尾为重读元音（città, perché, virtù）或词尾为辅音（amor, piacer）→ 末音节重读；
-        - 其余（词尾为普通元音）→ 倒数第二音节重读（意大利语最常见重音位置）。
-        注：少数倒数第三音节重读的词（sdrucciole）无法由正字法判定，属已知局限。"""
+        """按词切分音节并标注重音（启发式）。
+
+        Args:
+            word: 意大利语单词。
+
+        Returns:
+            音节列表（重音标在 attributes["stress"]）。
+        """
         w = _APOSTROPHE_RE.sub("", word.lower())
         if not w:
             return []
-        syls = []
+        syls: list[Syllable] = []
         i = 0
         n = len(w)
         while i < n:
@@ -96,7 +116,14 @@ class ItalianAnalyzer(SyllableAnalyzer):
         return syls
 
     def syllabify_line(self, text: str) -> list[Syllable]:
-        """整行切分：逐词切分后应用 sinalefe（前词末元音与后词首元音并读为一个音节）。"""
+        """整行切分：逐词切分后应用 sinalefe 合并跨词元音。
+
+        Args:
+            text: 一行意大利语诗。
+
+        Returns:
+            整行音节列表（已合并 sinalefe 与省音）。
+        """
         words = [w for w in _WORD_SPLIT_RE.split(text.lower()) if w]
         all_syls: list[Syllable] = []
         for wi, w in enumerate(words):
@@ -123,7 +150,23 @@ class ItalianAnalyzer(SyllableAnalyzer):
         return all_syls
 
     def analyze_word(self, word: str) -> list[Syllable]:
+        """分析单词的音节与重音。
+
+        Args:
+            word: 意大利语单词。
+
+        Returns:
+            音节列表。
+        """
         return self._syllabify_word(word)
 
     def count_syllables(self, text: str) -> int:
+        """统计文本音节数（含 sinalefe 合并）。
+
+        Args:
+            text: 意大利语文本。
+
+        Returns:
+            音节总数。
+        """
         return len(self.syllabify_line(text))

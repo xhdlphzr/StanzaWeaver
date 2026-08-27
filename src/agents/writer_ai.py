@@ -1,31 +1,61 @@
-# Copyright (c) 2026 xhdlphzr
-# SPDX-License-Identifier: MIT
+"""编写 AI：描述生成、初稿生成、ReAct 炼句循环。
+
+炼句循环无轮数上限：AI 反复调用 search_words/refine_line/rewrite
+修改诗句（每次修改后自动跑全部格律校验），直到调用 submit 提交。
+连续多轮无进展时注入引导提示（不中断循环）。
+"""
 
 import json
+from collections.abc import Callable
+from typing import Any
 
-from .base import LLMClient
-from ..tools import WRITER_TOOLS
-from ..tools.search_words import execute_search_words
-from ..tools.refine_line import execute_refine_line
 from ..prosody.meter_validator import MeterValidator
 from ..templates import format_count
+from ..tools import WRITER_TOOLS
+from ..tools.refine_line import execute_refine_line
+from ..tools.search_words import execute_search_words
+from .base import LLMClient, Message
+
+ChunkCallback = Callable[[str], None] | None
+StepCallback = Callable[[dict[str, Any]], None] | None
+RefineResult = tuple[list[str], bool, list[dict[str, Any]], str, int]
 
 
-def _fire_stream(cb, text: str):
+def _fire_stream(cb: ChunkCallback, text: str) -> None:
+    """安全触发流式回调（吞掉回调内部异常）。
+
+    前端流回调失败不应中断生成流程。
+
+    Args:
+        cb: 回调函数。
+        text: 回调文本。
+    """
     if cb:
         try:
             cb(text)
-        except Exception:
+        except Exception:  # noqa: S110, BLE001 - 有意吞掉回调异常，仅保证生成不中断
             pass
 
 
 def _build_writer_system(
     description: str,
     poem: list[str],
-    template: dict,
-    template_obj=None,
+    template: dict[str, Any],
+    template_obj: object = None,
     feedback: str = "",
 ) -> str:
+    """构造编写 AI 的系统提示（含完整格律描述与当前诗稿）。
+
+    Args:
+        description: 主题描述。
+        poem: 当前诗稿。
+        template: 模板字典。
+        template_obj: 模板对象（提供 describe() 时用完整格律描述）。
+        feedback: 用户/检查 AI 反馈。
+
+    Returns:
+        系统提示文本。
+    """
     lines_spec = template.get("syllables_per_line", [])
     language = template.get("language", "zh")
 
@@ -88,18 +118,34 @@ def _build_writer_system(
 
 
 class WriterAI:
-    def __init__(self, config: dict):
+    """编写 AI：四步流水线的神经层（描述/初稿/炼句）。"""
+
+    def __init__(self, config: dict[str, Any]):
+        """初始化编写 AI。
+
+        Args:
+            config: {"base_url", "api_key", "model"}。
+        """
         self.client = LLMClient(
-            base_url=config["base_url"],
-            api_key=config["api_key"],
-            model=config["model"],
+            base_url=str(config["base_url"]),
+            api_key=str(config["api_key"]),
+            model=str(config["model"]),
         )
         self.validator = MeterValidator()
 
     def generate_description(
-        self, topic: str, on_stream: object = None
+        self, topic: str, on_stream: ChunkCallback = None
     ) -> tuple[str, str]:
-        messages = [
+        """生成主题的现代文描述（Step 1）。
+
+        Args:
+            topic: 用户主题。
+            on_stream: 流式回调。
+
+        Returns:
+            (描述文本, 日志文本)。
+        """
+        messages: list[Message] = [
             {
                 "role": "system",
                 "content": "你是一位诗歌创作助手。根据用户给出的主题，写一段100字以内的现代文描述，包含意象、情感、内容概要。直接输出描述文本，不要加任何前缀。",
@@ -110,20 +156,32 @@ class WriterAI:
             response = self.client.chat_stream(messages, on_chunk=on_stream)
         else:
             response = self.client.chat(messages)
-        desc = response["content"].strip()
+        desc = str(response["content"]).strip()
         detail = f"{desc}"
         return desc, detail
 
     def generate_draft(
         self,
         description: str,
-        template: dict,
-        template_obj=None,
+        template: dict[str, Any],
+        template_obj: object = None,
         max_attempts: int = 5,
-        on_stream: object = None,
+        on_stream: ChunkCallback = None,
     ) -> tuple[list[str], str]:
-        language = template.get("language", "zh")
-        lines = template.get("lines", 4)
+        """生成初稿（Step 2，仅校验行数与音节数，最多尝试 max_attempts 次）。
+
+        Args:
+            description: 主题描述。
+            template: 模板字典。
+            template_obj: 模板对象。
+            max_attempts: 最大尝试次数。
+            on_stream: 流式回调。
+
+        Returns:
+            (诗稿, 日志文本)。
+        """
+        language = str(template.get("language", "zh"))
+        lines = int(template.get("lines", 4))
         syllables_per_line = template.get("syllables_per_line", [5] * lines)
 
         constraints_desc = ""
@@ -147,18 +205,19 @@ class WriterAI:
 请直接输出诗歌，每行一句，不要加序号、标题或其他任何文字。
 只输出纯诗文本，每行用换行分隔。"""
 
-        messages = [
+        messages: list[Message] = [
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": "请按以上格律要求生成诗稿。"},
         ]
 
-        detail_parts = []
+        detail_parts: list[str] = []
+        poem: list[str] = []
         for attempt in range(max_attempts):
             if on_stream and attempt == 0:
                 response = self.client.chat_stream(messages, on_chunk=on_stream)
             else:
                 response = self.client.chat(messages)
-            text = response["content"].strip()
+            text = str(response["content"]).strip()
             detail_parts.append(f"尝试 {attempt + 1}:\n{text}")
             poem = [line.strip() for line in text.split("\n") if line.strip()]
 
@@ -181,7 +240,7 @@ class WriterAI:
             messages.append(
                 {
                     "role": "user",
-                    "content": f"格律校验未通过:\n"
+                    "content": "格律校验未通过:\n"
                     + "\n".join(result.errors)
                     + "\n请修正后重新输出。",
                 }
@@ -193,19 +252,34 @@ class WriterAI:
         self,
         description: str,
         poem: list[str],
-        template: dict,
-        template_obj=None,
+        template: dict[str, Any],
+        template_obj: object = None,
         feedback: str = "",
-        on_step: object = None,
-        on_stream: object = None,
+        on_step: StepCallback = None,
+        on_stream: ChunkCallback = None,
         start_round: int = 0,
-    ) -> tuple[list[str], bool, list[dict], str, int]:
+    ) -> RefineResult:
+        """ReAct 炼句循环（Step 3，无轮数上限，直到 submit 成功）。
+
+        Args:
+            description: 主题描述。
+            poem: 当前诗稿。
+            template: 模板字典。
+            template_obj: 模板对象。
+            feedback: 用户/检查 AI 反馈。
+            on_step: 每次工具执行后的回调。
+            on_stream: 流式回调。
+            start_round: 起始轮号（打回续轮用）。
+
+        Returns:
+            (诗稿, 是否提交, 工具历史, 日志, 执行轮数)。
+        """
         current_poem = list(poem)
         system_prompt = _build_writer_system(
             description, current_poem, template, template_obj, feedback
         )
 
-        messages = [
+        messages: list[Message] = [
             {"role": "system", "content": system_prompt},
             {
                 "role": "user",
@@ -214,8 +288,8 @@ class WriterAI:
         ]
 
         submitted = False
-        history = []
-        detail_parts = []
+        history: list[dict[str, Any]] = []
+        detail_parts: list[str] = []
         modifications = 0
         executed_rounds = 0
         round_idx = 0
@@ -253,9 +327,9 @@ class WriterAI:
                     ),
                 )
 
-            results_by_id: dict[str, dict] = {}
+            results_by_id: dict[str, dict[str, Any]] = {}
             for tool_call in response["tool_calls"]:
-                name = tool_call["name"]
+                name = str(tool_call["name"])
                 args = tool_call["arguments"]
 
                 if name == "submit":
@@ -279,7 +353,7 @@ class WriterAI:
                     detail_parts.append(f"[第{round_num}轮] submit: 提交定稿")
                     break
 
-                result = None
+                result: dict[str, Any] | None = None
                 if name == "search_words":
                     result = execute_search_words(template, args)
                     word_count_result = len(result.get("words", []))
@@ -328,22 +402,25 @@ class WriterAI:
                             detail += f" (格律问题: {result['validation_errors']})"
                     detail_parts.append(detail)
 
-                results_by_id[tool_call["id"]] = result
-                history.append({"tool": name, "arguments": args, "result": result})
+                if result is not None:
+                    results_by_id[tool_call["id"]] = result
+                    history.append({"tool": name, "arguments": args, "result": result})
 
-                if "poem" in (result or {}):
-                    detail_parts.append("当前诗稿:\n" + "\n".join(current_poem))
+                    if "poem" in result:
+                        detail_parts.append("当前诗稿:\n" + "\n".join(current_poem))
 
-                if on_step:
-                    on_step(
-                        {
-                            "poem": list(current_poem),
-                            "last_tool": name,
-                            "last_result": result,
-                            "detail": "\n".join(detail_parts) if detail_parts else "",
-                            "stream_text": "",
-                        }
-                    )
+                    if on_step:
+                        on_step(
+                            {
+                                "poem": list(current_poem),
+                                "last_tool": name,
+                                "last_result": result,
+                                "detail": "\n".join(detail_parts)
+                                if detail_parts
+                                else "",
+                                "stream_text": "",
+                            }
+                        )
 
             if submitted:
                 break
@@ -391,13 +468,28 @@ class WriterAI:
         self,
         description: str,
         poem: list[str],
-        template: dict,
-        template_obj=None,
-        args: dict = None,
-        on_stream: object = None,
-    ) -> dict:
-        instruction = args.get("instruction", "")
-        lines = template.get("lines", 4)
+        template: dict[str, Any],
+        template_obj: object = None,
+        args: dict[str, Any] | None = None,
+        on_stream: ChunkCallback = None,
+    ) -> dict[str, Any]:
+        """执行整体重写（最多 3 次尝试，通过格律校验即返回）。
+
+        Args:
+            description: 主题描述。
+            poem: 当前诗稿。
+            template: 模板字典。
+            template_obj: 模板对象。
+            args: 工具参数（instruction）。
+            on_stream: 流式回调。
+
+        Returns:
+            {"poem": 新诗稿} 或 {"poem": ..., "note": 提示}。
+        """
+        if args is None:
+            args = {}
+        instruction = str(args.get("instruction", ""))
+        lines = int(template.get("lines", 4))
         syllables_per_line = template.get("syllables_per_line", [])
 
         if template_obj is not None and hasattr(template_obj, "describe"):
@@ -425,7 +517,7 @@ class WriterAI:
 请直接输出重写后的全诗，每行一句，不要加序号或其他文字。"""
         )
 
-        messages = [
+        messages: list[Message] = [
             {"role": "system", "content": sys_prompt},
             {"role": "user", "content": "请按指令重写全诗。"},
         ]
@@ -440,7 +532,7 @@ class WriterAI:
                 )
             else:
                 response = self.client.chat(messages)
-            text = response["content"].strip()
+            text = str(response["content"]).strip()
             new_poem = [line.strip() for line in text.split("\n") if line.strip()]
 
             if len(new_poem) != lines:
