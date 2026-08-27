@@ -6,11 +6,15 @@
 
 import re
 import urllib.request
+from logging import Logger
 
+from ..logging_setup import get_logger
 from ..models.syllable import Syllable
 from ..models.word import Word
 from ..prosody.chinese import CHINESE_INITIALS, FINAL_TO_PARTS
 from .vocabulary import get_db_path, init_db, insert_words
+
+logger: Logger = get_logger(__name__)
 
 
 def _download_text(url: str, timeout: int = 10) -> str | None:
@@ -92,7 +96,7 @@ def _set_dataset(lang: str, name: str) -> None:
 def _import_chinese() -> None:
     """导入 CC-CEDICT（中文词条，多音字每个读音独立成条）。"""
     if _check_dataset("zh", "CC-CEDICT"):
-        print("  [zh] 已有数据，跳过")
+        logger.info("[zh] 已有数据，跳过")
         return
     import gzip
 
@@ -108,7 +112,7 @@ def _import_chinese() -> None:
             text = raw.decode("utf-8", errors="replace")
     except OSError as e:
         # 网络/解压失败（URLError/HTTPError/BadGzipFile 均为 OSError 子类）
-        print(f"  [zh] CC-CEDICT error: {e}")
+        logger.warning("[zh] CC-CEDICT error: %s", e)
         return
     for line in text.splitlines():
         line = line.strip()
@@ -136,7 +140,7 @@ def _import_chinese() -> None:
         insert_words(batch)
     if total > 0:
         _set_dataset("zh", "CC-CEDICT")
-    print(f"  [zh@CC-CEDICT] {total}")
+    logger.info("[zh@CC-CEDICT] %d", total)
 
 
 def _parse_pinyin(raw_list: list[str]) -> list[Syllable]:
@@ -203,7 +207,7 @@ def _sqlite_delete(lang: str) -> None:
 def _import_english() -> None:
     """导入 CMUdict（英文，全部发音变体独立成条，次重音记 heavy）。"""
     if _check_dataset("en", "CMUdict"):
-        print("  [en] 已有数据，跳过")
+        logger.info("[en] 已有数据，跳过")
         return
     try:
         import nltk  # type: ignore[import-untyped]
@@ -297,7 +301,7 @@ def _import_english() -> None:
         insert_words(batch)
     if total > 0:
         _set_dataset("en", "CMUdict")
-    print(f"  [en@CMUdict] {total}")
+    logger.info("[en@CMUdict] %d", total)
 
 
 # ── French: Lexique ──
@@ -306,7 +310,7 @@ def _import_english() -> None:
 def _import_french() -> None:
     """导入 Lexique382（法语词形，音节数来自 nbsyl 列）。"""
     if _check_dataset("fr", "Lexique382"):
-        print("  [fr] 已有数据，跳过")
+        logger.info("[fr] 已有数据，跳过")
         return
     text = _download_text(
         "http://www.lexique.org/databases/Lexique382/Lexique382.tsv", timeout=15
@@ -353,7 +357,7 @@ def _import_french() -> None:
                 insert_words(batch)
     if total > 0:
         _set_dataset("fr", "Lexique382")
-    print(f"  [fr@Lexique] {total}")
+    logger.info("[fr@Lexique] %d", total)
 
 
 # ── Italian: GLAW-IT ──
@@ -364,7 +368,7 @@ _GLAWIT_URL = "http://redac.univ-tlse2.fr/lexicons/glawit/glawit_2017-06-09.xml.
 def _import_italian() -> None:
     """导入 GLAW-IT（意大利语词形与释义）。"""
     if _check_dataset("it", "GLAW-IT"):
-        print("  [it] 已有数据，跳过")
+        logger.info("[it] 已有数据，跳过")
         return
     import bz2
 
@@ -383,7 +387,7 @@ def _import_italian() -> None:
             text = raw.decode("utf-8", errors="replace")
     except OSError as e:
         # 网络/解压失败（URLError/HTTPError/OSError 子类）
-        print(f"  [it] GLAW-IT error: {e}")
+        logger.warning("[it] GLAW-IT error: %s", e)
         text = None
     if text:
         titles = list(re.finditer(r"<title>([^<]+)</title>", text))
@@ -432,7 +436,7 @@ def _import_italian() -> None:
         insert_words(batch)
     if total > 0:
         _set_dataset("it", "GLAW-IT")
-    print(f"  [it@GLAW-IT] {total}")
+    logger.info("[it@GLAW-IT] %d", total)
 
 
 # ── Latin: Lewis & Short ──
@@ -443,7 +447,7 @@ _LS_URL = "https://raw.githubusercontent.com/telemachus/plaintext-lewis-short/ma
 def _import_latin() -> None:
     """导入 Lewis & Short（拉丁语词条，音长按正字法启发式判定）。"""
     if _check_dataset("la", "Lewis-Short"):
-        print("  [la] 已有数据，跳过")
+        logger.info("[la] 已有数据，跳过")
         return
     from ..prosody.latin import LatinAnalyzer
 
@@ -487,16 +491,16 @@ def _import_latin() -> None:
         insert_words(batch)
     if total > 0:
         _set_dataset("la", "Lewis-Short")
-    print(f"  [la@L&S] {total}")
+    logger.info("[la@L&S] %d", total)
 
 
 def import_all() -> None:
     """导入全部语言词库（幂等，已导入的数据集自动跳过）。"""
     init_db()
-    print("[StanzaWeaver] 导入词库...")
+    logger.info("[StanzaWeaver] 导入词库...")
     _import_chinese()
     _import_english()
     _import_french()
     _import_italian()
     _import_latin()
-    print("[StanzaWeaver] 就绪")
+    logger.info("[StanzaWeaver] 就绪")

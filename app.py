@@ -15,12 +15,17 @@ from typing import Any
 from flask import Flask, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
 
+from src.logging_setup import get_logger, setup_logging
 from src.templates import list_dicts
 from src.templates.en import register_english_templates
 from src.templates.fr import register_french_templates
 from src.templates.it import register_italian_templates
 from src.templates.la import register_latin_templates
 from src.templates.zh import register_chinese_templates
+
+logger = get_logger(__name__)
+
+setup_logging()
 
 register_chinese_templates()
 register_english_templates()
@@ -38,12 +43,12 @@ def _auto_import() -> None:
 
     try:
         init_db()
-        print("[StanzaWeaver] 检查词库...")
+        logger.info("[StanzaWeaver] 检查词库...")
         from src.knowledge.importer import import_all
 
         import_all()
     except Exception as e:  # noqa: BLE001 - 词库导入兜底：失败仅记录，不影响启动
-        print(f"[StanzaWeaver] 词库导入失败: {e}")
+        logger.error("[StanzaWeaver] 词库导入失败: %s", e)
     finally:
         _vocab_importing = False
 
@@ -71,7 +76,7 @@ def _register_custom_templates() -> None:
                 if attr.startswith("register_custom_"):
                     getattr(module, attr)()
         except Exception as e:  # noqa: BLE001 - 自定义模板可含任意用户代码，注册失败仅记录
-            print(f"[StanzaWeaver] 自定义模板注册失败 {f.name}: {e}")
+            logger.error("[StanzaWeaver] 自定义模板注册失败 %s: %s", f.name, e)
 
 
 _register_custom_templates()
@@ -158,6 +163,8 @@ def api_save_config() -> Any:
                 ), 400
             config.__setattr__(key, value)
     config.save()
+    logger.info("LLM 配置已保存 (writer.base_url=%s, checker.base_url=%s)",
+                config.writer["base_url"], config.checker["base_url"])
     return jsonify({"status": "ok"})
 
 
@@ -199,6 +206,7 @@ def handle_generate(data: dict[str, Any]) -> None:
         emit("error", {"message": "主题和模板不能为空"})
         return
 
+    logger.info("generate 开始 session=%s template=%s topic=%r", session_id, template_key, topic)
     pipeline = PoetryPipeline()
 
     def on_progress(state_dict: dict[str, Any]) -> None:
@@ -212,11 +220,14 @@ def handle_generate(data: dict[str, Any]) -> None:
                 on_progress=on_progress,
             )
         except Exception as e:  # noqa: BLE001 - 生成线程兜底：任何失败转为前端错误事件
+            logger.error("generate 失败 session=%s: %s", session_id, e)
             socketio.emit("error", {"message": f"生成失败: {e}"}, to=session_id)
             return
         _active_states[session_id] = {
             "pipeline_state": result,
         }
+        logger.info("generate 完成 session=%s checker_pass=%s rounds=%s",
+                    session_id, result.checker_pass, result.refine_rounds)
         _emit_done(session_id, result)
 
     threading.Thread(target=run, daemon=True).start()
@@ -249,11 +260,14 @@ def handle_feedback(data: dict[str, Any]) -> None:
                 on_progress=on_progress,
             )
         except Exception as e:  # noqa: BLE001 - 反馈线程兜底：任何失败转为前端错误事件
+            logger.error("feedback 失败 session=%s: %s", session_id, e)
             socketio.emit("error", {"message": f"反馈处理失败: {e}"}, to=session_id)
             return
         _active_states[session_id] = {
             "pipeline_state": result,
         }
+        logger.info("feedback 完成 session=%s checker_pass=%s rounds=%s",
+                    session_id, result.checker_pass, result.refine_rounds)
         _emit_done(session_id, result)
 
     threading.Thread(target=run, daemon=True).start()
@@ -378,6 +392,7 @@ def api_create_custom_template() -> Any:
         return jsonify({"status": "error", "message": f"注册失败: {e}"}), 500
 
     socketio.emit("templates_updated", {"count": len(load_templates())})
+    logger.info("自定义模板已创建: %s (%s, %d 行)", name, language, lines)
     return jsonify(
         {
             "status": "ok",
@@ -458,11 +473,13 @@ def api_save_history() -> Any:
     )
     conn.commit()
     conn.close()
+    logger.info("历史记录已保存: %s (%s)", data.get("template_name", ""), data.get("topic", ""))
     return jsonify({"status": "ok"})
 
 
 def start_server() -> None:
     """启动 SocketIO 服务（127.0.0.1:5000）。"""
+    logger.info("[StanzaWeaver] 服务启动 http://127.0.0.1:5000")
     socketio.run(app, host="127.0.0.1", port=5000, allow_unsafe_werkzeug=True)
 
 
