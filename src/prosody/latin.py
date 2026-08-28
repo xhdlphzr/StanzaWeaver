@@ -134,7 +134,11 @@ class LatinAnalyzer(SyllableAnalyzer):
                 eff = 0
                 for c in consonants:
                     eff += 2 if c == "x" else 1
-                if len(consonants) == 2 and consonants[0] in _STOPS and consonants[1] in "lr":
+                if (
+                    len(consonants) == 2
+                    and consonants[0] in _STOPS
+                    and consonants[1] in "lr"
+                ):
                     eff = 1
                 if not is_long and eff >= 2:
                     is_long = True
@@ -183,11 +187,7 @@ class LatinAnalyzer(SyllableAnalyzer):
         """
         import re
 
-        words = [
-            w
-            for w in re.split(r"[^A-Za-zāēīōūȳăĕĭŏŭ'-]+", text)
-            if w
-        ]
+        words = [w for w in re.split(r"[^A-Za-zāēīōūȳăĕĭŏŭ'-]+", text) if w]
         result: list[Syllable] = []
         m = len(words)
         for wi, w in enumerate(words):
