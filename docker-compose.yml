@@ -1,0 +1,40 @@
+# StanzaWeaver Docker Compose
+#
+# 默认：端口映射方式（STANZAWEAVER_HOST=0.0.0.0）。
+# 备选：Linux 下可用 --network host（此时服务绑定 127.0.0.1，
+#       与"仅本机访问"安全设计完全契合，去掉 ports 段即可）。
+#
+# 启动:   docker compose up -d --build
+# 访问:   http://localhost:5000
+# 日志:   docker compose logs -f stanzaweaver
+# 停止:   docker compose down
+
+services:
+  stanzaweaver:
+    build: .
+    image: stanzaweaver:latest
+    container_name: stanzaweaver
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      STANZAWEAVER_HOST: "0.0.0.0"
+      STANZAWEAVER_PORT: "5000"
+      # STANZAWEAVER_LOG_DIR 指向 volume 内，日志持久化
+      STANZAWEAVER_LOG_DIR: "/home/stanzaweaver/.stanza_weaver/logs"
+    volumes:
+      # 持久化：配置 / 词库 / 历史 / 日志
+      - stanzaweaver-data:/home/stanzaweaver/.stanza_weaver
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/import-status', timeout=5)"
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+
+volumes:
+  stanzaweaver-data:

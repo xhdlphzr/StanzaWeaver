@@ -1,0 +1,28 @@
+# 版本控制
+.git/
+.gitignore
+
+# Python
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.mypy_cache/
+.pytest_cache/
+**/.mypy_cache/
+
+# 本地数据（运行时生成，挂载 volume 持久化）
+*.db
+*.db-journal
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+
+# Docker 构建产物本身无需进入镜像
+Dockerfile
+docker-compose.yml
+.dockerignore

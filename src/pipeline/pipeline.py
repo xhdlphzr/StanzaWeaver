@@ -273,9 +273,7 @@ class PoetryPipeline:
 
             last_report_time: list[float] = [0.0]
 
-            def on_stream(
-                text: str, _t: list[float] = last_report_time
-            ) -> None:
+            def on_stream(text: str, _t: list[float] = last_report_time) -> None:
                 # _t 以默认参数绑定当前迭代的节流容器，避免闭包误捕循环变量
                 now = time.monotonic()
                 if now - _t[0] >= 0.25 or not text:
