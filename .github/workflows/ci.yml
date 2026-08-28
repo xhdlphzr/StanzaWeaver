@@ -1,0 +1,208 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
+# StanzaWeaver CI/CD
+#
+# CI  (持续集成): 每次 push / PR 在三个平台运行
+#   - ruff format ./           代码格式化
+#   - ruff check --fix --unsafe-fixes ./   静态检查与自动修复
+#   - mypy --strict ./         类型检查（零容忍）
+#   - pytest                   单元测试 + 集成测试（桩 LLM，无网络）
+#
+# CD  (持续交付): CI 全部通过后，仅对主分支打包，产物上传为 artifact
+#   - Windows : pyinstaller StanzaWeaver.spec --clean        -> StanzaWeaver.exe
+#   - macOS   : pyinstaller StanzaWeaver.spec --clean        -> StanzaWeaver.app
+#   - Linux   : pyinstaller + appimage-builder               -> StanzaWeaver.AppImage
+#
+# 注: 本地 venv 与 Dockerfile 均使用 Python 3.14，故 CI 统一锁定 3.14。
+
+name: CI/CD
+
+# 同一分支/PR 的新提交会取消仍在运行的旧流水线，节省资源
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # ------------------------------------------------------------------
+  # CI: 三个平台并行执行 lint / 类型检查 / 测试
+  # ------------------------------------------------------------------
+  test:
+    name: CI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: ruff format
+        run: ruff format ./
+
+      - name: ruff check
+        run: ruff check --fix --unsafe-fixes ./
+
+      - name: mypy (strict)
+        run: mypy --strict ./
+
+      - name: pytest
+        run: pytest
+
+  # ------------------------------------------------------------------
+  # CD: 仅主分支，测试通过后跨平台打包（matrix.os）
+  # ------------------------------------------------------------------
+  build:
+    name: Build (${{ matrix.os }})
+    needs: test
+    # 仅主分支触发打包（PR 不发布产物）
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      # ---------- Windows / macOS: PyInstaller 直接出包 ----------
+      - name: Build with PyInstaller (Windows/macOS)
+        if: matrix.os != 'ubuntu-latest'
+        run: pyinstaller StanzaWeaver.spec --clean
+
+      # ---------- Linux: PyInstaller 产出二进制后封装为 AppImage ----------
+      - name: Build AppImage (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patchelf file libfuse2 desktop-file-utils appstream
+          pip install appimage-builder pillow
+
+          # 1) 用 PyInstaller 生成 --onedir 目录型产物（而非单文件）
+          #    appimage-builder 无法直接分析 PyInstaller 的“自解压单文件二进制”，
+          #    必须提供含真实共享库/_internal 的目录，才能正确解析依赖并打包。
+          pyinstaller StanzaWeaver.spec --onedir --clean
+
+          # 2) 图标: 将仓库内的 Franx.ico 转为 AppImage 所需的 PNG
+          #    （ICO 可能含多分辨率，取面积最大的一帧；落盘为标准 PNG）
+          python - <<'PY'
+          from PIL import Image
+          icon = Image.open('Franx.ico')
+          frames = getattr(icon, 'n_frames', 1)
+          best = icon
+          if frames > 1:
+              best = max(
+                  (icon.copy() for _ in range(frames)),
+                  key=lambda im: im.width * im.height,
+              )
+          best = best.convert('RGBA')
+          best.save('StanzaWeaver.png')
+          print('icon exported, size =', best.size)
+          PY
+
+          # 3) 组装 AppDir（AppImage 标准目录布局）
+          APPDIR=StanzaWeaver.AppDir
+          mkdir -p "$APPDIR/usr/bin" \
+                   "$APPDIR/usr/share/icons/hicolor/256x256/apps" \
+                   "$APPDIR/usr/share/applications"
+          # 将 onedir 产物整体搬入 usr/bin（可执行文件与 _internal 同目录，
+          # PyInstaller 启动器才能相对自身找到运行时）
+          cp -r dist/StanzaWeaver/. "$APPDIR/usr/bin/"
+          chmod +x "$APPDIR/usr/bin/StanzaWeaver"
+          # AppRun 入口（AppImage 运行时以此作为可执行入口）
+          ln -s usr/bin/StanzaWeaver "$APPDIR/AppRun"
+          # 图标放到 AppDir 根（配方按名引用）与标准 hicolor 主题目录
+          cp StanzaWeaver.png "$APPDIR/StanzaWeaver.png"
+          cp StanzaWeaver.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/StanzaWeaver.png"
+          # 桌面入口文件（AppImage 与菜单集成均需）
+          cat > "$APPDIR/StanzaWeaver.desktop" <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=StanzaWeaver
+          Exec=StanzaWeaver
+          Icon=StanzaWeaver
+          Terminal=false
+          Categories=Utility;Education;
+          Comment=以智识，巧织诗
+          EOF
+          cp "$APPDIR/StanzaWeaver.desktop" "$APPDIR/usr/share/applications/StanzaWeaver.desktop"
+
+          # 4) appimage-builder 配方（与 Dockerfile 一致的 3.14 运行时）
+          cat > AppImageBuilder.yml <<'EOF'
+          version: 1
+          AppDir:
+            path: ./StanzaWeaver.AppDir
+            app_info:
+              id: com.stanzaweaver.StanzaWeaver
+              name: StanzaWeaver
+              icon: StanzaWeaver
+              version: "1.0.0"
+              exec: usr/bin/StanzaWeaver
+              exec_args: $@
+            apt:
+              arch: amd64
+              allow_unauthenticated: true
+              include: []
+          EOF
+
+          # 5) 打包为 AppImage 并统一命名
+          appimage-builder --recipe AppImageBuilder.yml --skip-tests
+          mv StanzaWeaver-*.AppImage StanzaWeaver-Linux.AppImage
+
+      # ---------- 上传产物（分别命名以便后续发布） ----------
+      - name: Upload Windows artifact
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: StanzaWeaver-Windows.exe
+          path: dist/StanzaWeaver.exe
+          if-no-files-found: error
+
+      - name: Upload macOS artifact
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: StanzaWeaver-macOS.app
+          path: dist/StanzaWeaver.app
+          if-no-files-found: error
+
+      - name: Upload Linux artifact
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: StanzaWeaver-Linux.AppImage
+          path: StanzaWeaver-Linux.AppImage
+          if-no-files-found: error
