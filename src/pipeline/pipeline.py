@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """四步生成流水线与打回循环。
 
 Step 1 描述生成 → Step 2 初稿（仅验音节）→ Step 3 炼句循环

@@ -1,3 +1,6 @@
+Copyright (c) 2026 xhdlphzr
+SPDX-License-Identifier: MIT
+
 # StanzaWeaver
 
 神经符号智能诗歌生成桌面软件

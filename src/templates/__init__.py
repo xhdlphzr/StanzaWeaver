@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """格律模板基类与注册表。
 
 模板（PoetryTemplate）定义一种诗体的全部格律规则：

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """格律总校验器（MeterValidator）。
 
 对整首诗执行三层校验：

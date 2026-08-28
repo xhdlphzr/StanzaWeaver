@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """数据模型：音节（Syllable）。
 
 格律分析的最小单元——声母(onset)、韵腹(nucleus)、韵尾(coda)以及

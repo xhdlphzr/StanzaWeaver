@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """拉丁语格律模板：六步格、哀歌双行体、十一音节诗。
 
 - 六步格：第 1-4 音步扬抑抑/扬扬自由替换，第 5 音步必须扬抑抑格，

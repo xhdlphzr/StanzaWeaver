@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """refine_line 工具执行：整行替换（前置单行格律校验）。"""
 
 from typing import Any

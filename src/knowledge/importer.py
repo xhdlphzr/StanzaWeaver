@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """词库数据集导入（CC-CEDICT / CMUdict / Lexique / GLAW-IT / Lewis & Short）。
 
 首次运行自动执行：下载数据集 → 解析为 Word 列表 → 写入 SQLite。

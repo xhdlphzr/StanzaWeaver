@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 #!/usr/bin/env bash
 #
 # run.sh - 运行 StanzaWeaver Docker 容器（Web 服务）

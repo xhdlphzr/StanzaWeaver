@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """词库访问层（SQLite）。
 
 - 词条表 words：文本、语言、释义、音节 JSON、音节数；

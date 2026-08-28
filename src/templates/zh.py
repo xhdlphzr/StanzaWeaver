@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """中文格律模板：五言绝句、七言绝句、五言律诗、七言律诗、相见欢。
 
 实现近体诗/词牌的符号层规则：

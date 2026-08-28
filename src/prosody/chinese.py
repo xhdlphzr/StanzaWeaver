@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """中文音节分析器（基于 pypinyin）。
 
 - 韵母拆解表 FINAL_TO_PARTS：将拼音韵母拆为韵腹 + 韵尾。

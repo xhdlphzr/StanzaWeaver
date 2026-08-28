@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """意大利语格律模板：三行体（Terza Rima）、八行体（Ottava Rima）、歌谣。
 
 十一音节句（endecasillabo）的定义特征：每行第 10 个音节必须重读。

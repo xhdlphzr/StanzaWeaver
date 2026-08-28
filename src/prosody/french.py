@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """法语音节分析器。
 
 - 按正字法切分音节：二合/三合元音（ou/eau/ain 等）、鼻化元音、静音 e。

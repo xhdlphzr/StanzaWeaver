@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """应用日志系统（logging + RotatingFileHandler）。
 
 - 文件输出：~/.stanza_weaver/logs/stanza.log，RotatingFileHandler 轮转——
