@@ -7,6 +7,7 @@
 """
 
 import json
+import os
 import secrets
 import threading
 from pathlib import Path
@@ -163,8 +164,11 @@ def api_save_config() -> Any:
                 ), 400
             config.__setattr__(key, value)
     config.save()
-    logger.info("LLM 配置已保存 (writer.base_url=%s, checker.base_url=%s)",
-                config.writer["base_url"], config.checker["base_url"])
+    logger.info(
+        "LLM 配置已保存 (writer.base_url=%s, checker.base_url=%s)",
+        config.writer["base_url"],
+        config.checker["base_url"],
+    )
     return jsonify({"status": "ok"})
 
 
@@ -206,7 +210,9 @@ def handle_generate(data: dict[str, Any]) -> None:
         emit("error", {"message": "主题和模板不能为空"})
         return
 
-    logger.info("generate 开始 session=%s template=%s topic=%r", session_id, template_key, topic)
+    logger.info(
+        "generate 开始 session=%s template=%s topic=%r", session_id, template_key, topic
+    )
     pipeline = PoetryPipeline()
 
     def on_progress(state_dict: dict[str, Any]) -> None:
@@ -226,8 +232,12 @@ def handle_generate(data: dict[str, Any]) -> None:
         _active_states[session_id] = {
             "pipeline_state": result,
         }
-        logger.info("generate 完成 session=%s checker_pass=%s rounds=%s",
-                    session_id, result.checker_pass, result.refine_rounds)
+        logger.info(
+            "generate 完成 session=%s checker_pass=%s rounds=%s",
+            session_id,
+            result.checker_pass,
+            result.refine_rounds,
+        )
         _emit_done(session_id, result)
 
     threading.Thread(target=run, daemon=True).start()
@@ -266,8 +276,12 @@ def handle_feedback(data: dict[str, Any]) -> None:
         _active_states[session_id] = {
             "pipeline_state": result,
         }
-        logger.info("feedback 完成 session=%s checker_pass=%s rounds=%s",
-                    session_id, result.checker_pass, result.refine_rounds)
+        logger.info(
+            "feedback 完成 session=%s checker_pass=%s rounds=%s",
+            session_id,
+            result.checker_pass,
+            result.refine_rounds,
+        )
         _emit_done(session_id, result)
 
     threading.Thread(target=run, daemon=True).start()
@@ -473,18 +487,39 @@ def api_save_history() -> Any:
     )
     conn.commit()
     conn.close()
-    logger.info("历史记录已保存: %s (%s)", data.get("template_name", ""), data.get("topic", ""))
+    logger.info(
+        "历史记录已保存: %s (%s)", data.get("template_name", ""), data.get("topic", "")
+    )
     return jsonify({"status": "ok"})
 
 
 def start_server() -> None:
-    """启动 SocketIO 服务（127.0.0.1:5000）。"""
-    logger.info("[StanzaWeaver] 服务启动 http://127.0.0.1:5000")
-    socketio.run(app, host="127.0.0.1", port=5000, allow_unsafe_werkzeug=True)
+    """启动 SocketIO 服务。
+
+    监听地址/端口可用环境变量 STANZAWEAVER_HOST / STANZAWEAVER_PORT 覆盖
+    （Docker 部署时设 STANZAWEAVER_HOST=0.0.0.0 配合端口映射）。
+
+    Returns:
+        None（阻塞运行直到退出）。
+    """
+    host = os.environ.get("STANZAWEAVER_HOST", "127.0.0.1")
+    try:
+        port = int(os.environ.get("STANZAWEAVER_PORT", "5000"))
+    except ValueError:
+        port = 5000
+    logger.info("[StanzaWeaver] 服务启动 http://%s:%s", host, port)
+    socketio.run(app, host=host, port=port, allow_unsafe_werkzeug=True)
 
 
 def main() -> None:
-    """入口：优先 pywebview 桌面窗口，否则纯 HTTP 服务。"""
+    """入口：优先 pywebview 桌面窗口，否则纯 HTTP 服务。
+
+    桌面窗口初始化失败（如无显示环境/缺 GUI 库）时自动回退到 HTTP 服务，
+    保证 Docker 等无头环境可用。
+
+    Returns:
+        None。
+    """
     try:
         import webview
     except ImportError:
@@ -493,14 +528,18 @@ def main() -> None:
 
     t = threading.Thread(target=start_server, daemon=True)
     t.start()
-    webview.create_window(
-        "StanzaWeaver",
-        "http://127.0.0.1:5000",
-        width=900,
-        height=700,
-        min_size=(700, 500),
-    )
-    webview.start()
+    try:
+        webview.create_window(
+            "StanzaWeaver",
+            "http://127.0.0.1:5000",
+            width=900,
+            height=700,
+            min_size=(700, 500),
+        )
+        webview.start()
+    except Exception as e:  # noqa: BLE001 - GUI 初始化失败兜底：回退 HTTP 服务
+        logger.warning("GUI 初始化失败，回退到 HTTP 服务模式: %s", e)
+        t.join()
 
 
 if __name__ == "__main__":

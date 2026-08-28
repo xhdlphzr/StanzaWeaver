@@ -85,8 +85,12 @@ def setup_logging(
     root.addHandler(console_handler)
 
     app_logger = logging.getLogger("stanzaweaver")
-    app_logger.debug("日志系统已初始化: %s (max_bytes=%s, backup_count=%s)",
-                     log_file, max_bytes, backup_count)
+    app_logger.debug(
+        "日志系统已初始化: %s (max_bytes=%s, backup_count=%s)",
+        log_file,
+        max_bytes,
+        backup_count,
+    )
     return app_logger
 
 

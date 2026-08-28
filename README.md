@@ -43,6 +43,52 @@ python -c "from src.knowledge.importer import import_all; import_all()"
 python app.py
 ```
 
+## Docker 部署
+
+以 Web 服务方式运行（无需本地 Python 环境）：
+
+```bash
+# 构建
+docker build -t stanzaweaver .
+# 无法直连 Docker Hub 时用国内镜像加速器前缀：
+#   docker build --build-arg BASE_IMAGE=docker.m.daocloud.io/library/python:3.14-slim -t stanzaweaver .
+
+# 运行（推荐 Compose）
+docker compose up -d --build
+
+# 或直接运行
+docker run -d --name stanzaweaver \
+    -p 5000:5000 \
+    -e STANZAWEAVER_HOST=0.0.0.0 \
+    -v stanzaweaver-data:/home/stanzaweaver/.stanza_weaver \
+    stanzaweaver
+
+# 访问
+#   http://localhost:5000
+
+# 查看日志 / 停止
+docker compose logs -f stanzaweaver
+docker compose down
+```
+
+也可用 `scripts/` 下的一键脚本（Windows 与 Linux/macOS 通用，均支持 `-h` 查看参数）：
+
+| 平台 | 构建 | 运行 |
+|---|---|---|
+| PowerShell | `.\scripts\build.ps1 [-t tag] [-b base-image] [-n]` | `.\scripts\run.ps1 [-p port] [-d] [-l] [--no-volume]` |
+| cmd | `scripts\build.bat [-t tag] [-b base-image] [-n]` | `scripts\run.bat [-p port] [-d] [-l] [--no-volume]` |
+| bash | `./scripts/build.sh [-t tag] [-b base-image] [-n]` | `./scripts/run.sh [-p port] [-d] [-l] [--no-volume]` |
+
+示例：`.\scripts\build.ps1 -b docker.m.daocloud.io/library/python:3.14-slim` 构建，`.\scripts\run.ps1 -d -l` 后台运行并跟随日志。
+
+说明：
+
+- **依赖**：直接用项目完整 `requirements.txt`（含桌面 GUI 与嵌入重排组件，功能与本地一致）；Linux 镜像会同时包含这些依赖，镜像较大、首次构建较慢，但构建一次后可复用。
+- **数据持久化**：配置、词库、历史记录、日志通过 volume `stanzaweaver-data` 持久化到容器内 `~/.stanza_weaver`。
+- **安全设计**：应用仅接受 `localhost`/`127.0.0.1` 的 Host 头（`app.py` 的 `_guard_local_access`），Docker 部署需通过 `http://localhost:5000` 访问；Linux 下也可改用 `network_mode: host`（见 `docker-compose.yml` 注释）。
+- **自定义模板**：通过 UI 创建的自定义模板写入容器内 `/app/src/templates/`，容器重建后需重新创建（源码未挂载）。
+- **日志**：容器内日志文件位于 `~/.stanza_weaver/logs/stanza.log`（随 volume 持久化），`STANZAWEAVER_LOG_DIR` 可重定向；`docker compose logs` 可看标准输出。
+
 ## 项目结构
 
 ```
