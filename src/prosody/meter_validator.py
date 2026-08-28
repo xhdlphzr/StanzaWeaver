@@ -12,6 +12,7 @@ from typing import Any
 
 from ..models.syllable import Syllable
 from ..templates import format_count
+from .english import EnglishAnalyzer
 from .syllable_counter import analyze_line, count_syllables, get_analyzer
 
 SyllableCount = int | tuple[int, int]
@@ -192,9 +193,17 @@ class MeterValidator:
         for i in range(min_lines):
             line = poem[i]
             expected_count = syllables_expected[i]
-            actual_count = count_syllables(line, language)
 
-            if not _count_matches(actual_count, expected_count):
+            if language == "en":
+                # 英语存在多音词，取任一发音变体满足即可（与完整校验一致）
+                variants = EnglishAnalyzer().analyze_line_variants(line)
+                ok = any(_count_matches(len(v), expected_count) for v in variants)
+                actual_count = len(variants[0]) if variants else 0
+            else:
+                actual_count = count_syllables(line, language)
+                ok = _count_matches(actual_count, expected_count)
+
+            if not ok:
                 result.add_error(
                     f"第{i + 1}行音节数不匹配: 期望 {format_count(expected_count)}, 实际 {actual_count}"
                 )

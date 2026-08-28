@@ -1,17 +1,17 @@
 @echo off
 rem ============================================================
-rem  build.bat - Build StanzaWeaver Docker image
+rem  build.bat - 构建 StanzaWeaver 的 Docker 镜像
 rem
-rem  Usage:
-rem    scripts\build.bat                        default tag=stanzaweaver:latest
+rem  用法:
+rem    scripts\build.bat                        默认 tag=stanzaweaver:latest
 rem    scripts\build.bat -b docker.m.daocloud.io/library/python:3.14-slim
 rem    scripts\build.bat -t stanzaweaver:1.0.0 -n
 rem
-rem  Options:
-rem    -t, --tag <tag>         image tag (default stanzaweaver:latest)
-rem    -b, --base-image <img>  base image (default python:3.14-slim)
-rem    -n, --no-cache          full rebuild without BuildKit cache
-rem    -h, --help              show this help
+rem  选项:
+rem    -t, --tag <tag>         镜像标签（默认 stanzaweaver:latest）
+rem    -b, --base-image <img>  基础镜像（默认 python:3.14-slim）
+rem    -n, --no-cache          不使用 BuildKit 缓存，完整重建
+rem    -h, --help              显示本帮助
 rem ============================================================
 @setlocal enabledelayedexpansion
 
@@ -35,7 +35,7 @@ goto :usage
 :parsed
 cd /d "%~dp0\.."
 if not exist Dockerfile (
-    echo [build] ERROR: Dockerfile not found in project root
+    echo [build] 错误: 项目根目录未找到 Dockerfile
     exit /b 1
 )
 
@@ -48,7 +48,7 @@ set "BUILD_ARGS=%BUILD_ARGS% ."
 
 docker build %BUILD_ARGS%
 if errorlevel 1 (
-    echo [build] ERROR: docker build failed
+        echo [build] 错误: docker build 失败
     exit /b 1
 )
 
@@ -57,11 +57,11 @@ exit /b 0
 
 :usage
 echo.
-echo Usage:
+echo 用法:
 echo   build.bat [-t tag] [-b base-image] [-n] [-h]
 echo.
-echo   -t, --tag ^<tag^>         image tag (default stanzaweaver:latest)
-echo   -b, --base-image ^<img^>  base image (default python:3.14-slim)
-echo   -n, --no-cache          full rebuild without BuildKit cache
-echo   -h, --help              show this help
+echo   -t, --tag ^<tag^>         镜像标签（默认 stanzaweaver:latest）
+echo   -b, --base-image ^<img^>  基础镜像（默认 python:3.14-slim）
+echo   -n, --no-cache          不使用 BuildKit 缓存，完整重建
+echo   -h, --help             显示本帮助
 exit /b 0

@@ -86,7 +86,10 @@ def _check_sanzewei(syllables: list[Syllable]) -> list[str]:
 
 
 def _check_guping(syllables: list[Syllable]) -> list[str]:
-    """检查孤平（句中孤立平声，前后皆仄）。
+    """检查孤平（平脚句中除韵脚外仅余一个平声）。
+
+    孤平只发生在平声收尾的句子：除末字（韵脚）外，句中若只有一个平声，
+    即为孤平。此定义精确对应近体诗「仄仄平平仄仄平」改为「仄仄仄平仄仄平」的犯规。
 
     Args:
         syllables: 一行音节。
@@ -96,16 +99,15 @@ def _check_guping(syllables: list[Syllable]) -> list[str]:
     """
     errors: list[str] = []
     n = len(syllables)
-    if n < 3:
+    if n < 2:
         return errors
-    for i in range(1, n - 1):
-        prev = syllables[i - 1].attributes.get("tone", "")
-        curr = syllables[i].attributes.get("tone", "")
-        nxt = syllables[i + 1].attributes.get("tone", "")
-        if prev == "仄" and curr == "平" and nxt == "仄":
-            if i == n - 2:
-                continue
-            errors.append(f"孤平: 第{i + 1}字为孤立的平声（前后皆为仄声）")
+    last = syllables[-1].attributes.get("tone", "")
+    if last != "平":
+        return errors
+    body = [s.attributes.get("tone", "") for s in syllables[:-1]]
+    if body.count("平") == 1:
+        idx = body.index("平")
+        errors.append(f"孤平: 第{idx + 1}字为句中唯一平声（除韵脚外仅一平）")
     return errors
 
 
@@ -132,20 +134,29 @@ def _check_alternation(syllables: list[Syllable], even_pattern: list[str]) -> li
     return errors
 
 
-# 拼音省写映射: iou→iu, uei→ui, uen→un, üen→vn，押韵取省写前的韵腹+韵尾
-_RHYME_MEDIAL_MAP: dict[str, str] = {
-    "iu": "ou",
-    "ui": "ei",
-    "un": "en",
-    "vn": "en",
-    "ün": "en",
+# 十三辙归并：eng/ing/ong/iong/ueng 同属中东辙，en/in/un/ün 同属人辰辙等
+_ZHE: dict[str, str] = {
+    "a": "a", "ia": "a", "ua": "a",
+    "o": "o", "e": "o", "uo": "o",
+    "ie": "e", "üe": "e",
+    "i": "i", "ü": "i", "er": "i", "v": "i",
+    "u": "u",
+    "ai": "ai", "uai": "ai",
+    "ei": "ei", "ui": "ei",
+    "ao": "ao", "iao": "ao",
+    "ou": "ou", "iu": "ou",
+    "an": "an", "ian": "an", "uan": "an", "üan": "an", "van": "an",
+    "en": "en", "in": "en", "un": "en", "vn": "en", "ün": "en",
+    "ang": "ang", "iang": "ang", "uang": "ang",
+    "eng": "eng", "ing": "eng", "ong": "eng", "iong": "eng", "ueng": "eng",
 }
 
 
 def _rhyme_key(syl: Syllable) -> str:
-    """生成韵脚 key：忽略介音（韵头），只取韵腹+韵尾。
+    """生成韵脚 key：按十三辙归并韵腹+韵尾。
 
-    如 ang/uang/iang 视为同韵；iu/ui/un/vn 按省写还原。
+    例如中东辙把 eng/ing/ong/iong/ueng 归为一类，人辰辙把 en/in/un/ün 归为一类，
+    避免相近韵母被误判为不押韵或过度拆散；ü 与 u 仍按衣期/姑苏分属不同辙。
 
     Args:
         syl: 韵脚音节。
@@ -153,14 +164,16 @@ def _rhyme_key(syl: Syllable) -> str:
     Returns:
         韵脚串。
     """
-    nucleus = syl.nucleus
-    if len(nucleus) > 1 and nucleus[0] in ("i", "u", "ü", "v"):
-        if nucleus in _RHYME_MEDIAL_MAP:
-            return _RHYME_MEDIAL_MAP[nucleus] + syl.coda
-        nucleus = nucleus[1:]
-    if nucleus in _RHYME_MEDIAL_MAP:
-        return _RHYME_MEDIAL_MAP[nucleus] + syl.coda
-    return nucleus + syl.coda
+    nucleus = syl.nucleus or ""
+    coda = syl.coda or ""
+    raw = nucleus + coda
+    if raw in _ZHE:
+        return _ZHE[raw]
+    if len(raw) > 1 and raw[0] in ("i", "u", "ü", "v"):
+        stripped = raw[1:]
+        if stripped in _ZHE:
+            return _ZHE[stripped]
+    return raw or "?"
 
 
 def _check_rhyme(

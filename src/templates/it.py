@@ -139,18 +139,18 @@ class CanzoneTemplate(PoetryTemplate):
     lines = 13
     syllables_per_line: ClassVar[list[int]] = [
         11,
-        11,
         7,
-        7,
-        11,
         11,
         7,
         11,
         7,
         11,
+        7,
         11,
         7,
         11,
+        7,
+        7,
     ]
     rule_description = (
         "格律规则：奇数行（1、3、5、7、9、11）为11音节，"

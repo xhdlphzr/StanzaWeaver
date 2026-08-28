@@ -51,6 +51,8 @@ _DIPHTHONGS: set[str] = {
     "EI",
     "UI",
 }
+# 拉丁语塞音（muta）：与流音(l/r)相邻构成 muta cum liquida，仅算一个辅音位
+_STOPS: set[str] = set("bcdfgkpqt")
 
 
 class LatinAnalyzer(SyllableAnalyzer):
@@ -120,12 +122,18 @@ class LatinAnalyzer(SyllableAnalyzer):
                     nucleus = vowel_base.lower()
 
                 j = i + 1
-                cons_count = 0
+                consonants: list[str] = []
                 while j < n and word[j] not in _VOWELS:
                     if word[j] not in " .-":
-                        cons_count += 1
+                        consonants.append(word[j].lower())
                     j += 1
-                if not is_long and cons_count >= 2:
+                # x 计为两个辅音(ks)；muta cum liquida（塞音+流音）仅算一个辅音位
+                eff = 0
+                for c in consonants:
+                    eff += 2 if c == "x" else 1
+                if len(consonants) == 2 and consonants[0] in _STOPS and consonants[1] in "lr":
+                    eff = 1
+                if not is_long and eff >= 2:
                     is_long = True
                 length_val = "long" if is_long else "short"
             else:
@@ -160,6 +168,64 @@ class LatinAnalyzer(SyllableAnalyzer):
                 )
             ]
         )
+
+    def analyze_line(self, text: str) -> list[Syllable]:
+        """整行分析（含跨词音长：前词末元音后接后词首 ≥2 辅音则为长音）。
+
+        Args:
+            text: 一行拉丁语文本。
+
+        Returns:
+            音节列表。
+        """
+        import re
+
+        words = [
+            w
+            for w in re.split(r"[^A-Za-zāēīōūȳăĕĭŏŭ'-]+", text)
+            if w
+        ]
+        result: list[Syllable] = []
+        m = len(words)
+        for wi, w in enumerate(words):
+            syls = self.analyze_word(w)
+            if wi + 1 < m and syls:
+                lead = self._leading_consonant_count(words[wi + 1])
+                if lead >= 2:
+                    syls[-1].attributes["length"] = "long"
+            result.extend(syls)
+        return result
+
+    @staticmethod
+    def _leading_consonant_count(w: str) -> int:
+        """统计词首辅音序列的「有效辅音位」数（含 x 计2、qu/gu/su 的 u 为辅音性、
+
+        muta cum liquida 仅算1）。
+
+        Args:
+            w: 拉丁语单词。
+
+        Returns:
+            有效辅音位数；无前导辅音返回 0。
+        """
+        w = w.strip(".,;:!?\"'()[]{}").lower()
+        n = len(w)
+        i = 0
+        cons: list[str] = []
+        while i < n and w[i] not in _VOWELS:
+            ch = w[i]
+            if ch in "qgs" and i + 1 < n and w[i + 1] == "u":
+                cons.append(ch + "u")
+                i += 2
+                continue
+            cons.append(ch)
+            i += 1
+        eff = 0
+        for c in cons:
+            eff += 2 if c == "x" else 1
+        if len(cons) == 2 and cons[0][0] in _STOPS and cons[1][0] in "lr":
+            eff = 1
+        return eff
 
     def count_syllables(self, text: str) -> int:
         """逐词统计音节总数。

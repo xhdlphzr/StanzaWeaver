@@ -14,6 +14,15 @@ from ..models.word import Word
 from ..prosody.chinese import CHINESE_INITIALS, FINAL_TO_PARTS
 from .vocabulary import get_db_path, init_db, insert_words
 
+# y/w 零声母拼写还原为 pypinyin 风格的韵母（与 prosody/chinese.py 实时分析保持一致）
+_YW_MAP: dict[str, str] = {
+    "yu": "ü", "yue": "üe", "yun": "ün", "yuan": "üan",
+    "yi": "i", "ya": "ia", "yan": "ian", "yang": "iang", "yao": "iao",
+    "ye": "ie", "yong": "iong", "you": "iu", "ying": "ing",
+    "wu": "u", "wa": "ua", "wo": "uo", "wai": "uai", "wei": "ui",
+    "wan": "uan", "wen": "uen", "wang": "uang", "weng": "ueng",
+}
+
 logger: Logger = get_logger(__name__)
 
 
@@ -123,19 +132,37 @@ def _import_chinese() -> None:
             continue
         simplified = parts[1]
         rest = parts[2] if len(parts) > 2 else ""
-        pinyin_match = re.search(r"\[(.+?)\]", rest)
+        # 提取所有拼音括号（主读音 + 异读 + 轻声等），而非仅第一个
+        pinyin_groups = re.findall(r"\[([^\[\]/]+?)\]", rest)
         meaning_match = re.search(r"/(.+?)/", rest)
-        if not pinyin_match or not meaning_match:
+        if not pinyin_groups:
             continue
-        syls = _parse_pinyin(pinyin_match.group(1).split())
-        meaning = meaning_match.group(1).replace("/", "; ")[:120]
-        batch.append(
-            Word(text=simplified, language="zh", syllables=syls, meaning=meaning)
-        )
-        total += 1
-        if len(batch) >= 500:
-            insert_words(batch)
-            batch.clear()
+        valid_prons: list[list[str]] = []
+        for g in pinyin_groups:
+            toks = g.split()
+            if toks and all(
+                re.fullmatch(r"[a-züv]+[1-5]?", t, re.IGNORECASE) for t in toks
+            ):
+                valid_prons.append(toks)
+        if not valid_prons:
+            continue
+        meaning = meaning_match.group(1).replace("/", "; ")[:120] if meaning_match else ""
+        seen_pron: set[tuple[str, ...]] = set()
+        for toks in valid_prons:
+            key = tuple(toks)
+            if key in seen_pron:
+                continue
+            seen_pron.add(key)
+            syls = _parse_pinyin(toks)
+            if not syls:
+                continue
+            batch.append(
+                Word(text=simplified, language="zh", syllables=syls, meaning=meaning)
+            )
+            total += 1
+            if len(batch) >= 500:
+                insert_words(batch)
+                batch.clear()
     if batch:
         insert_words(batch)
     if total > 0:
@@ -167,8 +194,8 @@ def _parse_pinyin(raw_list: list[str]) -> list[Syllable]:
                 onset = init
                 final_part = base[len(init) :]
                 break
-        if final_part and final_part[0] in {"y", "w"} and not onset:
-            final_part = final_part[1:]
+        if not onset and (final_part.startswith(("y", "w"))):
+            final_part = _YW_MAP.get(final_part, final_part[1:])
         nucleus, coda = FINAL_TO_PARTS.get(final_part, (final_part, ""))
         if not nucleus and final_part:
             nucleus = final_part
@@ -240,7 +267,7 @@ def _import_english() -> None:
         "UW",
         "UX",
     }
-    _SMAP: dict[str, str] = {"0": "", "1": "heavy", "2": "heavy"}
+    _SMAP: dict[str, str] = {"0": "light", "1": "heavy", "2": "heavy"}
     for word, pron_list in cmudict.dict().items():
         if not str(word).isalpha():
             continue
@@ -308,7 +335,10 @@ def _import_english() -> None:
 
 
 def _import_french() -> None:
-    """导入 Lexique382（法语词形，音节数来自 nbsyl 列）。"""
+    """导入 Lexique382（法语词形，真实音节结构由 FrenchAnalyzer 推导）。"""
+    from ..prosody.french import FrenchAnalyzer
+
+    _fr_analyzer = FrenchAnalyzer()
     if _check_dataset("fr", "Lexique382"):
         logger.info("[fr] 已有数据，跳过")
         return
@@ -342,12 +372,15 @@ def _import_french() -> None:
                     except ValueError:
                         n = 1
                 phon = cols[pc] if pc >= 0 and pc < len(cols) else ""
-                syls = [
-                    Syllable(
-                        nucleus="?", attributes={"tone": "", "stress": "", "length": ""}
-                    )
-                    for _ in range(max(n, 1))
-                ]
+                syls = _fr_analyzer._syllabify_word(w)
+                if not syls:
+                    syls = [
+                        Syllable(
+                            nucleus="?",
+                            attributes={"tone": "", "stress": "", "length": ""},
+                        )
+                        for _ in range(max(n, 1))
+                    ]
                 batch.append(Word(text=w, language="fr", syllables=syls, meaning=phon))
                 total += 1
                 if len(batch) >= 500:
@@ -404,13 +437,15 @@ def _import_italian() -> None:
             if gloss_idx < len(glosses):
                 meaning = glosses[gloss_idx].group(1).strip()[:120]
                 gloss_idx += 1
-            c = analyzer._count_syllables_in_word(w)
-            syls = [
-                Syllable(
-                    nucleus="?", attributes={"tone": "", "stress": "", "length": ""}
-                )
-                for _ in range(max(c, 1))
-            ]
+            syls = analyzer._syllabify_word(w)
+            if not syls:
+                syls = [
+                    Syllable(
+                        nucleus="?",
+                        attributes={"tone": "", "stress": "", "length": ""},
+                    )
+                    for _ in range(max(analyzer._count_syllables_in_word(w), 1))
+                ]
             batch.append(Word(text=w, language="it", syllables=syls, meaning=meaning))
             total += 1
             if len(batch) >= 500:
@@ -420,13 +455,15 @@ def _import_italian() -> None:
             w = m.group(1).strip().lower()
             if w and w not in seen:
                 seen.add(w)
-                c = analyzer._count_syllables_in_word(w)
-                syls = [
-                    Syllable(
-                        nucleus="?", attributes={"tone": "", "stress": "", "length": ""}
-                    )
-                    for _ in range(max(c, 1))
-                ]
+                syls = analyzer._syllabify_word(w)
+                if not syls:
+                    syls = [
+                        Syllable(
+                            nucleus="?",
+                            attributes={"tone": "", "stress": "", "length": ""},
+                        )
+                        for _ in range(max(analyzer._count_syllables_in_word(w), 1))
+                    ]
                 batch.append(Word(text=w, language="it", syllables=syls, meaning=""))
                 total += 1
                 if len(batch) >= 500:
