@@ -107,30 +107,26 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y patchelf file libfuse2 desktop-file-utils appstream
-          pip install appimage-builder
+          sudo apt-get install -y patchelf file libfuse2 desktop-file-utils
 
           # 1) 用 spec 生成单文件二进制（onefile）
           #    注: 给定 .spec 时 PyInstaller 不允许再传 --onedir/--onefile，
-          #    故此处直接用 spec；随后把单文件二进制放入 AppDir 由 appimage-builder 封装。
+          #    故此处直接用 spec；随后把单文件二进制放入 AppDir 由 appimagetool 封装。
           pyinstaller StanzaWeaver.spec --clean
 
-          # 2) 图标: Linux 直接使用仓库内的 PNG（Franx.png），无需再由 .ico 转换
-          cp Franx.png StanzaWeaver.png
-
-          # 3) 组装 AppDir（AppImage 标准目录布局）
+          # 2) 组装 AppDir（AppImage 标准目录布局，供官方 appimagetool 使用）
           APPDIR=StanzaWeaver.AppDir
           mkdir -p "$APPDIR/usr/bin" \
                    "$APPDIR/usr/share/icons/hicolor/256x256/apps" \
                    "$APPDIR/usr/share/applications"
-          # 将单文件二进制放入 AppDir 的 usr/bin（appimage-builder 将其作为 AppRun 封装）
+          # 将单文件二进制放入 AppDir 的 usr/bin（appimagetool 将其作为 AppRun 封装）
           cp dist/StanzaWeaver "$APPDIR/usr/bin/StanzaWeaver"
           chmod +x "$APPDIR/usr/bin/StanzaWeaver"
           # AppRun 入口（AppImage 运行时以此作为可执行入口）
           ln -s usr/bin/StanzaWeaver "$APPDIR/AppRun"
-          # 图标放到 AppDir 根（配方按名引用）与标准 hicolor 主题目录
-          cp StanzaWeaver.png "$APPDIR/StanzaWeaver.png"
-          cp StanzaWeaver.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/StanzaWeaver.png"
+          # 图标放到 AppDir 根与标准 hicolor 主题目录（Linux 直接用仓库内的 Franx.png）
+          cp Franx.png "$APPDIR/StanzaWeaver.png"
+          cp Franx.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/StanzaWeaver.png"
           # 桌面入口文件（AppImage 与菜单集成均需）
           cat > "$APPDIR/StanzaWeaver.desktop" <<'EOF'
           [Desktop Entry]
@@ -144,30 +140,12 @@ jobs:
           EOF
           cp "$APPDIR/StanzaWeaver.desktop" "$APPDIR/usr/share/applications/StanzaWeaver.desktop"
 
-          # 4) appimage-builder 配方（与 Dockerfile 一致的 3.14 运行时）
-          cat > AppImageBuilder.yml <<'EOF'
-          version: 1
-          AppDir:
-            path: ./StanzaWeaver.AppDir
-            app_info:
-              id: com.stanzaweaver.StanzaWeaver
-              name: StanzaWeaver
-              icon: StanzaWeaver
-              version: "1.0.0"
-              exec: usr/bin/StanzaWeaver
-              exec_args: $@
-            apt:
-              arch: amd64
-              sources:
-                - sourceline: 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse'
-                  key_url: 'http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3B4FE6ACC0B21F32'
-              allow_unauthenticated: true
-              include: []
-          EOF
-
-          # 5) 打包为 AppImage 并统一命名
-          appimage-builder --recipe AppImageBuilder.yml --skip-tests
-          mv StanzaWeaver-*.AppImage StanzaWeaver-Linux.AppImage
+          # 3) 用官方 appimagetool 打包（--appimage-extract-and-run 避免依赖 FUSE）
+          curl -fsSL -o appimagetool-x86_64.AppImage \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          ./appimagetool-x86_64.AppImage --appimage-extract-and-run \
+            --arch x86_64 "$APPDIR" StanzaWeaver-Linux.AppImage
 
       # ---------- 上传产物（分别命名以便后续发布） ----------
       - name: Upload Windows artifact
