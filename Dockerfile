@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 # StanzaWeaver Docker 镜像
 # 以 Web 服务方式运行（无 GUI）：python app.py 在容器中自动回退到 HTTP 服务。
 #

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """Agent 工具定义（OpenAI Function Calling JSON Schema）。
 
 WRITER_TOOLS：编写 AI 可用的四个工具（search_words / refine_line /

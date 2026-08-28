@@ -1,3 +1,6 @@
+REM Copyright (c) 2026 xhdlphzr
+REM SPDX-License-Identifier: MIT
+
 @echo off
 rem ============================================================
 rem  run.bat - 运行 StanzaWeaver 的 Docker 容器（Web 服务）

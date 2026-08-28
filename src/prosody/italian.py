@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """意大利语音节分析器。
 
 - 按正字法切分音节（二合元音并读），并按启发式标注词重音：

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """search_words 工具执行：按约束查询词库并返回候选词。"""
 
 from typing import Any

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """数据模型：词条（Word）。
 
 词库（SQLite）中一个词条的表示：文本、语言、音节切分及释义。

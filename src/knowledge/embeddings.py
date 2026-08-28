@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """词条向量重排。
 
 用 sentence-transformers 多语言模型对候选词按语义相似度排序；

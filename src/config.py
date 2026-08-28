@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """应用配置（LLM 多端点）。
 
 配置文件位于 ~/.stanza_weaver/config.json（权限 0600）。

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """英语音节分析器（基于 CMUdict）。
 
 - CMUdict 音素串 → 音节切分，采用英语常规划音规则分配跨音节辅音。

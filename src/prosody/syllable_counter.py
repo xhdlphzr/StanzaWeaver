@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """多语言统一音节计数与整行分析入口。
 
 按语言路由到对应分析器；中文整行交给 pypinyin（上下文消歧多音字），

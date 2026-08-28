@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """法语格律模板：回旋诗、三韵叠句诗、叙事歌。
 
 押韵采用 FrenchAnalyzer.rhyme_key（最后发音元音 + 其后辅音，静音 e 不参与）。

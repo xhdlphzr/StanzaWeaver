@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """检查 AI：句意终审。
 
 对诗歌做语义评审（句意通顺、语义契合；中文 8 行以上附加对仗检查），

@@ -1,3 +1,6 @@
+-- Copyright (c) 2026 xhdlphzr
+-- SPDX-License-Identifier: MIT
+
 CREATE TABLE IF NOT EXISTS words (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     text TEXT NOT NULL,

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """编写 AI：描述生成、初稿生成、ReAct 炼句循环。
 
 炼句循环无轮数上限：AI 反复调用 search_words/refine_line/rewrite

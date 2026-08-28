@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """StanzaWeaver 应用入口（Flask + SocketIO + pywebview）。
 
 - HTTP API：模板列表、LLM 配置、历史记录、自定义模板、导入状态；

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 ﻿<#
 .SYNOPSIS
 构建 StanzaWeaver Docker 镜像。

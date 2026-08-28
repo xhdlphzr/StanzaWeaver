@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """LLM 调用封装（OpenAI 兼容接口）。
 
 - 回环地址（127.0.0.1/localhost）自动绕过 shell 代理（trust_env=False），

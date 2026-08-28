@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """拉丁语音节分析器。
 
 - 支持长音符号（āēīōūȳ）与短音符号（ăĕĭŏŭ）标注。

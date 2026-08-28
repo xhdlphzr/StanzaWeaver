@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """音节分析器抽象基类。
 
 每种语言实现 SyllableAnalyzer 接口，提供：

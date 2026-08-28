@@ -1,3 +1,6 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
 """英语格律模板：莎士比亚商籁体、维拉内拉诗、英雄双行体。
 
 押韵采用严格重音匹配：韵脚必须落在主/次重音音节上，且该音节起的
