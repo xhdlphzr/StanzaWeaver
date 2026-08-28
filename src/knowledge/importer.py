@@ -19,11 +19,28 @@ from .vocabulary import get_db_path, init_db, insert_words
 
 # y/w 零声母拼写还原为 pypinyin 风格的韵母（与 prosody/chinese.py 实时分析保持一致）
 _YW_MAP: dict[str, str] = {
-    "yu": "ü", "yue": "üe", "yun": "ün", "yuan": "üan",
-    "yi": "i", "ya": "ia", "yan": "ian", "yang": "iang", "yao": "iao",
-    "ye": "ie", "yong": "iong", "you": "iu", "ying": "ing",
-    "wu": "u", "wa": "ua", "wo": "uo", "wai": "uai", "wei": "ui",
-    "wan": "uan", "wen": "uen", "wang": "uang", "weng": "ueng",
+    "yu": "ü",
+    "yue": "üe",
+    "yun": "ün",
+    "yuan": "üan",
+    "yi": "i",
+    "ya": "ia",
+    "yan": "ian",
+    "yang": "iang",
+    "yao": "iao",
+    "ye": "ie",
+    "yong": "iong",
+    "you": "iu",
+    "ying": "ing",
+    "wu": "u",
+    "wa": "ua",
+    "wo": "uo",
+    "wai": "uai",
+    "wei": "ui",
+    "wan": "uan",
+    "wen": "uen",
+    "wang": "uang",
+    "weng": "ueng",
 }
 
 logger: Logger = get_logger(__name__)
@@ -149,7 +166,9 @@ def _import_chinese() -> None:
                 valid_prons.append(toks)
         if not valid_prons:
             continue
-        meaning = meaning_match.group(1).replace("/", "; ")[:120] if meaning_match else ""
+        meaning = (
+            meaning_match.group(1).replace("/", "; ")[:120] if meaning_match else ""
+        )
         seen_pron: set[tuple[str, ...]] = set()
         for toks in valid_prons:
             key = tuple(toks)
