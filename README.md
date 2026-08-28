@@ -162,43 +162,71 @@ flowchart TD
 
 ```
 StanzaWeaver/
+├── .dockerignore
+├── .gitignore
+├── Dockerfile              # 镜像构建（Python 3.14-slim + 桌面/重排依赖）
+├── LICENSE                 # MIT 许可证
+├── README.md               # 项目文档
+├── Franx.ico               # 应用图标
+├── StanzaWeaver.spec       # PyInstaller 构建规格
+├── app.py                  # pywebview + Flask + SocketIO 入口
+├── docker-compose.yml      # Compose 部署编排
 ├── requirements.txt        # 项目依赖
-├── app.py                   # pywebview + Flask + SocketIO 入口
-├── templates/index.html     # 前端 UI
-├── static/style.css         # 样式
+├── assets/
+│   └── 1.png               # 功能演示截图
+├── scripts/                # 跨平台一键构建/运行脚本
+│   ├── build.bat
+│   ├── build.ps1
+│   ├── build.sh
+│   ├── run.bat
+│   ├── run.ps1
+│   └── run.sh
+├── static/
+│   └── style.css           # 前端样式
+├── templates/
+│   └── index.html          # 前端 UI
 └── src/
+    ├── __init__.py
     ├── config.py            # LLM 多端点配置
-    ├── models/              # 数据模型（音节 Syllable、词条 Word）
+    ├── logging_setup.py     # 日志初始化（RotatingFileHandler 轮转）
+    ├── models/              # 数据模型
+    │   ├── __init__.py
+    │   ├── syllable.py      # 音节 Syllable
+    │   └── word.py          # 词条 Word
     ├── prosody/             # 符号层：格律工具
+    │   ├── __init__.py
     │   ├── base.py          # SyllableAnalyzer 抽象基类
     │   ├── chinese.py       # 中文分析器（pypinyin）
     │   ├── english.py       # 英文分析器（CMUdict）
-    │   ├── italian.py       # 意大利语分析器
     │   ├── french.py        # 法语分析器
+    │   ├── italian.py       # 意大利语分析器
     │   ├── latin.py         # 拉丁语分析器
-    │   ├── syllable_counter.py  # 多语言统一音节计数
-    │   └── meter_validator.py   # 格律总校验
+    │   ├── meter_validator.py   # 格律总校验
+    │   └── syllable_counter.py  # 多语言统一音节计数
     ├── knowledge/           # 本地词库
-    │   ├── schema.sql       # SQLite 建表
-    │   ├── vocabulary.py    # 查询接口
+    │   ├── __init__.py
     │   ├── embeddings.py    # sentence-transformers 向量重排
-    │   └── importer.py      # 数据集导入（CC-CEDICT / CMUdict / Lexique / GLAW-IT / Lewis & Short）
+    │   ├── importer.py      # 数据集导入（CC-CEDICT / CMUdict / Lexique / GLAW-IT / Lewis & Short）
+    │   ├── schema.sql       # SQLite 建表
+    │   └── vocabulary.py    # 查询接口
     ├── agents/              # 神经层：AI Agent
+    │   ├── __init__.py
     │   ├── base.py          # LLM 调用封装
-    │   ├── writer_ai.py     # 编写 AI（4 工具）
-    │   └── checker_ai.py    # 检查 AI（1 工具）
+    │   ├── checker_ai.py    # 检查 AI（1 工具）
+    │   └── writer_ai.py     # 编写 AI（4 工具）
     ├── tools/               # Agent 工具定义
     │   ├── __init__.py      # OpenAI Tool JSON Schema（search_words / refine_line / rewrite / submit）
-    │   ├── search_words.py  # 搜词执行
-    │   └── refine_line.py   # 整行替换执行
+    │   ├── refine_line.py   # 整行替换执行
+    │   └── search_words.py  # 搜词执行
     ├── templates/           # 格律模板（Python 类）
     │   ├── __init__.py      # PoetryTemplate 基类 + 注册表
-    │   ├── zh.py            # 中文模板（五绝/七绝/五律/七律/相见欢）
     │   ├── en.py            # 英文模板（商籁体/维拉内拉/英雄双行体）
-    │   ├── it.py            # 意大利语模板（三行体/八行体/歌谣）
     │   ├── fr.py            # 法语模板（回旋诗/三韵叠句诗/叙事歌）
-    │   └── la.py            # 拉丁语模板（六步格/哀歌双行体/十一音节诗）
+    │   ├── it.py            # 意大利语模板（三行体/八行体/歌谣）
+    │   ├── la.py            # 拉丁语模板（六步格/哀歌双行体/十一音节诗）
+    │   └── zh.py            # 中文模板（五绝/七绝/五律/七律/相见欢）
     └── pipeline/
+        ├── __init__.py
         └── pipeline.py      # 4 步流水线 + 打回循环
 ```
 
