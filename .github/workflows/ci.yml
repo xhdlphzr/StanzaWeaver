@@ -109,38 +109,23 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y patchelf file libfuse2 desktop-file-utils appstream
-          pip install appimage-builder pillow
+          pip install appimage-builder
 
-          # 1) 用 PyInstaller 生成 --onedir 目录型产物（而非单文件）
-          #    appimage-builder 无法直接分析 PyInstaller 的“自解压单文件二进制”，
-          #    必须提供含真实共享库/_internal 的目录，才能正确解析依赖并打包。
-          pyinstaller StanzaWeaver.spec --onedir --clean
+          # 1) 用 spec 生成单文件二进制（onefile）
+          #    注: 给定 .spec 时 PyInstaller 不允许再传 --onedir/--onefile，
+          #    故此处直接用 spec；随后把单文件二进制放入 AppDir 由 appimage-builder 封装。
+          pyinstaller StanzaWeaver.spec --clean
 
-          # 2) 图标: 将仓库内的 Franx.ico 转为 AppImage 所需的 PNG
-          #    （ICO 可能含多分辨率，取面积最大的一帧；落盘为标准 PNG）
-          python - <<'PY'
-          from PIL import Image
-          icon = Image.open('Franx.ico')
-          frames = getattr(icon, 'n_frames', 1)
-          best = icon
-          if frames > 1:
-              best = max(
-                  (icon.copy() for _ in range(frames)),
-                  key=lambda im: im.width * im.height,
-              )
-          best = best.convert('RGBA')
-          best.save('StanzaWeaver.png')
-          print('icon exported, size =', best.size)
-          PY
+          # 2) 图标: Linux 直接使用仓库内的 PNG（Franx.png），无需再由 .ico 转换
+          cp Franx.png StanzaWeaver.png
 
           # 3) 组装 AppDir（AppImage 标准目录布局）
           APPDIR=StanzaWeaver.AppDir
           mkdir -p "$APPDIR/usr/bin" \
                    "$APPDIR/usr/share/icons/hicolor/256x256/apps" \
                    "$APPDIR/usr/share/applications"
-          # 将 onedir 产物整体搬入 usr/bin（可执行文件与 _internal 同目录，
-          # PyInstaller 启动器才能相对自身找到运行时）
-          cp -r dist/StanzaWeaver/. "$APPDIR/usr/bin/"
+          # 将单文件二进制放入 AppDir 的 usr/bin（appimage-builder 将其作为 AppRun 封装）
+          cp dist/StanzaWeaver "$APPDIR/usr/bin/StanzaWeaver"
           chmod +x "$APPDIR/usr/bin/StanzaWeaver"
           # AppRun 入口（AppImage 运行时以此作为可执行入口）
           ln -s usr/bin/StanzaWeaver "$APPDIR/AppRun"
@@ -195,8 +180,8 @@ jobs:
         if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: StanzaWeaver-macOS.app
-          path: dist/StanzaWeaver.app
+          name: StanzaWeaver-macOS
+          path: dist/StanzaWeaver
           if-no-files-found: error
 
       - name: Upload Linux artifact
