@@ -1,8 +1,3 @@
-<!--
-Copyright (c) 2026 xhdlphzr
-SPDX-License-Identifier: MIT
--->
-
 # StanzaWeaver
 
 神经符号智能诗歌生成桌面软件
@@ -190,3 +185,9 @@ UI 齿轮按钮中直接编辑保存，或手动编辑 `~/.stanza_weaver/config.
 - **Base URL 必须带 `/v1`**（Ollama 的 OpenAI 兼容端点），否则返回 404。
 - 模型名必须是 `ollama list` 中已安装的模型；`:cloud` 云模型需要 Ollama 订阅，否则返回 403。
 - **502 Bad Gateway**：通常是 shell 中设置了 `HTTP_PROXY`/`HTTPS_PROXY` 环境变量（如 Clash 等代理工具），本地请求被转发给代理导致。StanzaWeaver 已对 `127.0.0.1`/`localhost` 自动绕过代理直连，若仍出现 502，请检查启动 app 的终端环境变量。
+
+## 许可证
+
+所有代码均使用 `MIT` 许可证开源，Copyright (c) 2026 xhdlphzr.
+
+`./Franx.png` Copyright (c) 2026 xhdlphzr. All rights reserved.
