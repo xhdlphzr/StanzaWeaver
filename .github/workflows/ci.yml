@@ -35,13 +35,15 @@ jobs:
   # ------------------------------------------------------------------
   # CI: 三个平台并行执行 lint / 类型检查 / 测试
   # ------------------------------------------------------------------
-  test:
-    name: CI (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+  # ------------------------------------------------------------------
+  # CI: 代码层持续集成（代码无关平台，统一在 ubuntu 上一次跑完）
+  #   - ruff check ./            静态检查（不自动修改）
+  #   - mypy --strict ./         类型检查（零容忍）
+  #   - pytest                   单元测试 + 集成测试（桩 LLM，无网络）
+  # ------------------------------------------------------------------
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,11 +59,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: ruff format
-        run: ruff format ./
-
       - name: ruff check
-        run: ruff check --fix --unsafe-fixes ./
+        run: ruff check ./
 
       - name: mypy (strict)
         run: mypy --strict ./
@@ -74,7 +73,7 @@ jobs:
   # ------------------------------------------------------------------
   build:
     name: Build (${{ matrix.os }})
-    needs: test
+    needs: ci
     # 仅主分支触发打包（PR 不发布产物）
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ${{ matrix.os }}
@@ -159,6 +158,9 @@ jobs:
               exec_args: $@
             apt:
               arch: amd64
+              sources:
+                - sourceline: 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse'
+                  key_url: 'http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3B4FE6ACC0B21F32'
               allow_unauthenticated: true
               include: []
           EOF
