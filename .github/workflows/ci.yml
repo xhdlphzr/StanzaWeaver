@@ -11,8 +11,7 @@
 #
 # CD  (持续交付): CI 全部通过后，仅对主分支打包，产物上传为 artifact
 #   - Windows : pyinstaller StanzaWeaver.spec --clean        -> StanzaWeaver.exe
-#   - macOS   : pyinstaller StanzaWeaver.spec --clean        -> StanzaWeaver.app
-#   - Linux   : pyinstaller + appimage-builder               -> StanzaWeaver.AppImage
+#   - macOS   : pyinstaller StanzaWeaver.spec --clean        -> StanzaWeaver (单文件)
 #
 # 注: 本地 venv 与 Dockerfile 均使用 Python 3.14，故 CI 统一锁定 3.14。
 
@@ -33,7 +32,7 @@ permissions:
 
 jobs:
   # ------------------------------------------------------------------
-  # CI: 三个平台并行执行 lint / 类型检查 / 测试
+  # CI: 两个平台并行执行 lint / 类型检查 / 测试
   # ------------------------------------------------------------------
   # ------------------------------------------------------------------
   # CI: 代码层持续集成（代码无关平台，统一在 ubuntu 上一次跑完）
@@ -80,7 +79,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [windows-latest, macos-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -99,53 +98,7 @@ jobs:
 
       # ---------- Windows / macOS: PyInstaller 直接出包 ----------
       - name: Build with PyInstaller (Windows/macOS)
-        if: matrix.os != 'ubuntu-latest'
         run: pyinstaller StanzaWeaver.spec --clean
-
-      # ---------- Linux: PyInstaller 产出二进制后封装为 AppImage ----------
-      - name: Build AppImage (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y patchelf file libfuse2 desktop-file-utils
-
-          # 1) 用 spec 生成单文件二进制（onefile）
-          #    注: 给定 .spec 时 PyInstaller 不允许再传 --onedir/--onefile，
-          #    故此处直接用 spec；随后把单文件二进制放入 AppDir 由 appimagetool 封装。
-          pyinstaller StanzaWeaver.spec --clean
-
-          # 2) 组装 AppDir（AppImage 标准目录布局，供官方 appimagetool 使用）
-          APPDIR=StanzaWeaver.AppDir
-          mkdir -p "$APPDIR/usr/bin" \
-                   "$APPDIR/usr/share/icons/hicolor/256x256/apps" \
-                   "$APPDIR/usr/share/applications"
-          # 将单文件二进制放入 AppDir 的 usr/bin（appimagetool 将其作为 AppRun 封装）
-          cp dist/StanzaWeaver "$APPDIR/usr/bin/StanzaWeaver"
-          chmod +x "$APPDIR/usr/bin/StanzaWeaver"
-          # AppRun 入口（AppImage 运行时以此作为可执行入口）
-          ln -s usr/bin/StanzaWeaver "$APPDIR/AppRun"
-          # 图标放到 AppDir 根与标准 hicolor 主题目录（Linux 直接用仓库内的 Franx.png）
-          cp Franx.png "$APPDIR/StanzaWeaver.png"
-          cp Franx.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/StanzaWeaver.png"
-          # 桌面入口文件（AppImage 与菜单集成均需）
-          cat > "$APPDIR/StanzaWeaver.desktop" <<'EOF'
-          [Desktop Entry]
-          Type=Application
-          Name=StanzaWeaver
-          Exec=StanzaWeaver
-          Icon=StanzaWeaver
-          Terminal=false
-          Categories=Utility;Education;
-          Comment=以智识，巧织诗
-          EOF
-          cp "$APPDIR/StanzaWeaver.desktop" "$APPDIR/usr/share/applications/StanzaWeaver.desktop"
-
-          # 3) 用官方 appimagetool 打包（--appimage-extract-and-run 避免依赖 FUSE）
-          curl -fsSL -o appimagetool-x86_64.AppImage \
-            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.AppImage
-          ./appimagetool-x86_64.AppImage --appimage-extract-and-run \
-            --arch x86_64 "$APPDIR" StanzaWeaver-Linux.AppImage
 
       # ---------- 上传产物（分别命名以便后续发布） ----------
       - name: Upload Windows artifact
@@ -162,12 +115,4 @@ jobs:
         with:
           name: StanzaWeaver-macOS
           path: dist/StanzaWeaver
-          if-no-files-found: error
-
-      - name: Upload Linux artifact
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: StanzaWeaver-Linux.AppImage
-          path: StanzaWeaver-Linux.AppImage
           if-no-files-found: error
