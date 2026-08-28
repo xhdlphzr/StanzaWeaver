@@ -40,8 +40,9 @@ _VOWEL_PHONEMES = {
     "UX",
 }
 
-# 主重音(1)与次重音(2)均为重读（诗歌格律中次重音同样承担重音位置）
-_STRESS_MAP: dict[str, str] = {"0": "", "1": "heavy", "2": "heavy"}
+# 主重音(1)与次重音(2)均为重读（诗歌格律中次重音同样承担重音位置）；
+# 轻音(0)标记为非重音(light)，与模板中 _l 约束一致，确保抑扬格的弱位被强制为非重读
+_STRESS_MAP: dict[str, str] = {"0": "light", "1": "heavy", "2": "heavy"}
 
 _ARPABET_TO_PHONEMES: dict[str, list[list[str]]] = {}
 _cmudict_loaded = False
@@ -233,7 +234,7 @@ class EnglishAnalyzer(SyllableAnalyzer):
         return [
             Syllable(
                 nucleus="?",
-                attributes={"tone": "", "stress": "", "length": ""},
+                attributes={"tone": "", "stress": "light", "length": ""},
             )
             for _ in range(count)
         ]

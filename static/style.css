@@ -46,7 +46,7 @@ body::before {
   padding: 28px 20px 40px;
 }
 
-/* ---- Header ---- */
+/* ---- 页头 ---- */
 
 header {
   display: flex;
@@ -117,7 +117,7 @@ header h1 {
   transform: rotate(30deg);
 }
 
-/* ---- Card base ---- */
+/* ---- 卡片基础样式 ---- */
 
 .card {
   background: rgba(255, 255, 255, 0.75);
@@ -166,7 +166,7 @@ header h1 {
   letter-spacing: 3px;
 }
 
-/* ---- Input Section ---- */
+/* ---- 输入区 ---- */
 
 .input-section {
   background: rgba(255, 255, 255, 0.75);
@@ -302,7 +302,7 @@ header h1 {
   gap: 12px;
 }
 
-/* ---- Buttons ---- */
+/* ---- 按钮 ---- */
 
 .btn-primary {
   padding: 12px 28px;
@@ -448,7 +448,7 @@ header h1 {
   box-shadow: 0 4px 14px rgba(139, 115, 85, 0.3);
 }
 
-/* ---- Progress Steps ---- */
+/* ---- 进度步骤 ---- */
 
 .progress-step {
   margin-bottom: 2px;
@@ -589,7 +589,7 @@ header h1 {
   cursor: text;
 }
 
-/* ---- Poem Display ---- */
+/* ---- 诗稿展示 ---- */
 
 #poem-display {
   text-align: center;
@@ -638,7 +638,7 @@ header h1 {
   min-height: 24px;
 }
 
-/* ---- Tool Status ---- */
+/* ---- 工具状态 ---- */
 
 .tool-status {
   margin-top: 10px;
@@ -674,7 +674,7 @@ header h1 {
   font-size: 11px;
 }
 
-/* ---- Checker Inline ---- */
+/* ---- 检查内联结果 ---- */
 
 .checker-inline {
   margin-top: 18px;
@@ -729,7 +729,7 @@ header h1 {
   animation: fade-in 0.4s ease-out 0.2s both;
 }
 
-/* ---- Feedback Section ---- */
+/* ---- 反馈区 ---- */
 
 .feedback-buttons {
   display: flex;
@@ -755,7 +755,7 @@ header h1 {
   }
 }
 
-/* ---- Modal ---- */
+/* ---- 弹窗 ---- */
 
 .modal {
   position: fixed;
@@ -856,7 +856,7 @@ header h1 {
   margin-top: 20px;
 }
 
-/* ---- Custom Template Modal ---- */
+/* ---- 自定义模板弹窗 ---- */
 
 .modal-wide {
   width: 680px;
@@ -931,7 +931,7 @@ header h1 {
   text-align: center;
 }
 
-/* ---- Poem Header Row ---- */
+/* ---- 诗稿标题行 ---- */
 
 .section-header-row {
   display: flex;
@@ -963,7 +963,7 @@ header h1 {
   border-color: rgba(139, 115, 85, 0.4);
 }
 
-/* ---- History ---- */
+/* ---- 历史记录 ---- */
 
 .history-list {
   max-height: 420px;
@@ -1028,7 +1028,7 @@ header h1 {
   user-select: text;
 }
 
-/* ---- Import Overlay ---- */
+/* ---- 导入遮罩层 ---- */
 
 .import-overlay {
   position: fixed;
@@ -1076,7 +1076,7 @@ header h1 {
   }
 }
 
-/* ---- Scrollbar ---- */
+/* ---- 滚动条 ---- */
 
 ::-webkit-scrollbar {
   width: 6px;

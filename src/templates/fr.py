@@ -79,7 +79,7 @@ class RondeauTemplate(PoetryTemplate):
         """完整检查：AABBA AAB AABBA 韵式 + 叠句开头 4 词一致。"""
         errors: list[str] = []
         rhyme_groups = [
-            ([0, 1, 4, 5, 6, 9, 10, 13], "A"),
+            ([0, 1, 4, 5, 6, 8, 9, 10, 13, 14], "A"),
             ([2, 3, 7, 11, 12], "B"),
         ]
         for indices, label in rhyme_groups:
@@ -88,10 +88,10 @@ class RondeauTemplate(PoetryTemplate):
         for ref_idx in self._refrain_lines:
             if ref_idx < len(poem):
                 first_words = " ".join(base_refrain.split()[:4])
-                curr_words = " ".join(poem[ref_idx].split()[:4])
-                if first_words and curr_words and first_words != curr_words:
+                last_words = " ".join(poem[ref_idx].split()[-4:])
+                if first_words and last_words and first_words != last_words:
                     errors.append(
-                        f"叠句不匹配: 第1行开头'{first_words}'与第{ref_idx + 1}行开头'{curr_words}'不一致"
+                        f"叠句不匹配: 第1行开头'{first_words}'与第{ref_idx + 1}行末尾'{last_words}'不一致"
                     )
         return errors
 

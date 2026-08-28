@@ -165,16 +165,16 @@ class WriterAI:
         description: str,
         template: dict[str, Any],
         template_obj: object = None,
-        max_attempts: int = 5,
+        max_attempts: int = 0,
         on_stream: ChunkCallback = None,
     ) -> tuple[list[str], str]:
-        """生成初稿（Step 2，仅校验行数与音节数，最多尝试 max_attempts 次）。
+        """生成初稿（Step 2，仅校验行数与音节数，无尝试次数上限）。
 
         Args:
             description: 主题描述。
             template: 模板字典。
             template_obj: 模板对象。
-            max_attempts: 最大尝试次数。
+            max_attempts: 已废弃，保留仅为接口兼容（初稿生成无上限）。
             on_stream: 流式回调。
 
         Returns:
@@ -212,13 +212,15 @@ class WriterAI:
 
         detail_parts: list[str] = []
         poem: list[str] = []
-        for attempt in range(max_attempts):
-            if on_stream and attempt == 0:
+        attempt = 0
+        while True:
+            attempt += 1
+            if on_stream and attempt == 1:
                 response = self.client.chat_stream(messages, on_chunk=on_stream)
             else:
                 response = self.client.chat(messages)
             text = str(response["content"]).strip()
-            detail_parts.append(f"尝试 {attempt + 1}:\n{text}")
+            detail_parts.append(f"尝试 {attempt}:\n{text}")
             poem = [line.strip() for line in text.split("\n") if line.strip()]
 
             if len(poem) != lines:
@@ -245,8 +247,6 @@ class WriterAI:
                     + "\n请修正后重新输出。",
                 }
             )
-
-        return poem, "\n\n".join(detail_parts)
 
     def refine(
         self,
@@ -473,7 +473,7 @@ class WriterAI:
         args: dict[str, Any] | None = None,
         on_stream: ChunkCallback = None,
     ) -> dict[str, Any]:
-        """执行整体重写（最多 3 次尝试，通过格律校验即返回）。
+        """执行整体重写（无尝试次数上限，通过格律校验即返回）。
 
         Args:
             description: 主题描述。
@@ -523,8 +523,10 @@ class WriterAI:
         ]
 
         new_poem = poem
-        for attempt in range(3):
-            if on_stream and attempt == 0:
+        attempt = 0
+        while True:
+            attempt += 1
+            if on_stream and attempt == 1:
                 _fire_stream(on_stream, "[rewrite] 生成中...")
                 response = self.client.chat_stream(
                     messages,

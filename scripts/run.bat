@@ -1,22 +1,22 @@
 @echo off
 rem ============================================================
-rem  run.bat - Run StanzaWeaver Docker container (Web service)
+rem  run.bat - 运行 StanzaWeaver 的 Docker 容器（Web 服务）
 rem
-rem  Usage:
-rem    scripts\run.bat                    foreground
-rem    scripts\run.bat -d -l              detached + follow logs
-rem    scripts\run.bat -p 8080            custom host port
-rem    scripts\run.bat --no-volume        no persistent volume
+rem  用法:
+rem    scripts\run.bat                    前台运行
+rem    scripts\run.bat -d -l              后台运行并跟随日志
+rem    scripts\run.bat -p 8080            自定义宿主机端口
+rem    scripts\run.bat --no-volume        不挂载持久化数据卷
 rem
-rem  Options:
-rem    -i, --image <img>    image tag (default stanzaweaver:latest)
-rem    -n, --name <name>    container name (default stanzaweaver)
-rem    -p, --port <port>    host port (default 5000)
-rem    -v, --volume <vol>   volume name (default stanzaweaver-data)
-rem    -d, --detach         run in background
-rem    -l, --logs           follow container logs
-rem        --no-volume      do not mount volume
-rem    -h, --help           show this help
+rem  选项:
+rem    -i, --image <img>    镜像标签（默认 stanzaweaver:latest）
+rem    -n, --name <name>    容器名（默认 stanzaweaver）
+rem    -p, --port <port>    宿主机端口（默认 5000）
+rem    -v, --volume <vol>   数据卷名（默认 stanzaweaver-data）
+rem    -d, --detach         后台运行
+rem    -l, --logs           跟随容器日志
+rem        --no-volume      不挂载数据卷
+rem    -h, --help           显示本帮助
 rem ============================================================
 @setlocal enabledelayedexpansion
 
@@ -55,7 +55,7 @@ if not defined NO_VOLUME (
     docker volume create %VOLUME% >nul 2>&1
 )
 
-rem Remove old container with the same name
+rem 清理同名旧容器（避免端口/名称冲突）
 docker rm -f %NAME% >nul 2>&1
 
 set "RUN_ARGS=run --name %NAME% -p %PORT%:5000 --restart unless-stopped"
@@ -70,7 +70,7 @@ set "RUN_ARGS=%RUN_ARGS% %IMAGE%"
 
 docker %RUN_ARGS%
 if errorlevel 1 (
-    echo [run] ERROR: docker run failed
+    echo [run] 错误: docker run 失败
     exit /b 1
 )
 
@@ -84,15 +84,15 @@ exit /b 0
 
 :usage
 echo.
-echo Usage:
+echo 用法:
 echo   run.bat [-i image] [-n name] [-p port] [-v volume] [-d] [-l] [--no-volume] [-h]
 echo.
-echo   -i, --image ^<img^>    image tag (default stanzaweaver:latest)
-echo   -n, --name ^<name^>    container name (default stanzaweaver)
-echo   -p, --port ^<port^>    host port (default 5000)
-echo   -v, --volume ^<vol^>   volume name (default stanzaweaver-data)
-echo   -d, --detach         run in background
-echo   -l, --logs           follow container logs
-echo       --no-volume      do not mount volume
-echo   -h, --help           show this help
+echo   -i, --image ^<img^>    镜像标签（默认 stanzaweaver:latest）
+echo   -n, --name ^<name^>    容器名（默认 stanzaweaver）
+echo   -p, --port ^<port^>    宿主机端口（默认 5000）
+echo   -v, --volume ^<vol^>   数据卷名（默认 stanzaweaver-data）
+echo   -d, --detach         后台运行
+echo   -l, --logs           跟随容器日志
+echo       --no-volume      不挂载数据卷
+echo   -h, --help           显示本帮助
 exit /b 0

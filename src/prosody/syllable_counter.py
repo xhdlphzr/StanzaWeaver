@@ -81,6 +81,10 @@ def analyze_line(line: str, language: str) -> list[Syllable]:
     elif language == "it":
         result: list[Syllable] = analyzer.syllabify_line(line)  # type: ignore[attr-defined]
         return result
+    elif language == "la":
+        # 拉丁语需跨词判定音长（muta cum liquida / 双辅音成位）
+        la_syls: list[Syllable] = analyzer.analyze_line(line)  # type: ignore[attr-defined]
+        return la_syls
     else:
         words = analyzer.tokenize_line(line)
         syllables: list[Syllable] = []

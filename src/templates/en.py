@@ -38,7 +38,7 @@ def _make_syl(**kwargs: Any) -> dict[str, Any]:
     }
 
 
-_l: dict[str, Any] = _make_syl(attributes={"stress": ""})
+_l: dict[str, Any] = _make_syl(attributes={"stress": "light"})
 _h: dict[str, Any] = _make_syl(attributes={"stress": "heavy"})
 
 

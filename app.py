@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from flask import Flask, jsonify, render_template, request
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit  # type: ignore[import-untyped]
 
 from src.logging_setup import get_logger, setup_logging
 from src.templates import list_dicts
@@ -172,7 +172,7 @@ def api_save_config() -> Any:
     return jsonify({"status": "ok"})
 
 
-@socketio.on("connect")
+@socketio.on("connect")  # type: ignore[untyped-decorator]
 def handle_connect() -> None:
     """Socket 连接建立。"""
 
@@ -197,7 +197,7 @@ def _emit_done(session_id: str, result: Any) -> None:
     )
 
 
-@socketio.on("generate")
+@socketio.on("generate")  # type: ignore[untyped-decorator]
 def handle_generate(data: dict[str, Any]) -> None:
     """开始生成：后台线程跑四步流水线。"""
     from src.pipeline.pipeline import PoetryPipeline
@@ -243,7 +243,7 @@ def handle_generate(data: dict[str, Any]) -> None:
     threading.Thread(target=run, daemon=True).start()
 
 
-@socketio.on("feedback")
+@socketio.on("feedback")  # type: ignore[untyped-decorator]
 def handle_feedback(data: dict[str, Any]) -> None:
     """用户反馈续跑：打回 Step 3 按反馈重新炼句。"""
     from src.pipeline.pipeline import PoetryPipeline
@@ -287,7 +287,7 @@ def handle_feedback(data: dict[str, Any]) -> None:
     threading.Thread(target=run, daemon=True).start()
 
 
-@socketio.on("disconnect")
+@socketio.on("disconnect")  # type: ignore[untyped-decorator]
 def handle_disconnect() -> None:
     """连接断开：清理会话状态。"""
     _active_states.pop(request.sid, None)  # type: ignore[attr-defined]  # flask_socketio 注入

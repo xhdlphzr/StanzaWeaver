@@ -2,8 +2,8 @@
 
 Step 1 描述生成 → Step 2 初稿（仅验音节）→ Step 3 炼句循环
 （ReAct 工具，改完自动全量格律校验）→ Step 4 检查 AI 句意终审。
-终审不通过自动打回 Step 3 继续炼句（外层最多 10 轮兜底，防止
-检查 AI 无限打回）；用户"不定稿"反馈走 continue_with_feedback 续跑。
+终审不通过自动打回 Step 3 继续炼句（无轮数上限，持续打回直到终审通过）；
+用户"不定稿"反馈走 continue_with_feedback 续跑。
 """
 
 import json
@@ -248,15 +248,14 @@ class PoetryPipeline:
         self._report(state)
 
     def _run_refine_loop(self, state: PipelineState) -> None:
-        """Step 3→4 打回循环：炼句直到终审通过或外层轮数用尽。
+        """Step 3→4 打回循环：炼句直到终审通过（无轮数上限）。
 
-        外层最多 10 轮（防止检查 AI 无限打回死循环）；
-        炼句本身无轮数上限。
+        炼句本身（writer.refine）无轮数上限，本外层循环在检查 AI 不通过时
+        持续打回重炼，同样不设上限。
         """
-        max_outer_loops = 10
         checker_feedback = state.user_feedback
 
-        for outer in range(max_outer_loops):
+        while True:
             state.current_step = "step3_refine"
             self._report(state)
 
@@ -422,7 +421,7 @@ def _describe_unsubmitted(history: list[dict[str, Any]], detail: str) -> str:
             stats.append(f"工具调用失败{failed}次(多为格律未通过)")
         stats.append(f"已执行工具: {'、'.join(dict.fromkeys(tool_calls))}")
     tail_lines = detail.strip().splitlines()[-6:] if detail else []
-    msg = "炼句未完成提交(20轮内未成功提交): " + "；".join(stats)
+    msg = "炼句未完成提交: " + "；".join(stats)
     if tail_lines:
         msg += "\n最近日志:\n" + "\n".join(tail_lines)
     return msg
