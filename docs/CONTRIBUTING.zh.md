@@ -3,8 +3,8 @@
 
 # 贡献指南（CONTRIBUTING）
 
-[![English](https://img.shields.io/badge/English-CONTRIBUTING-007EC6)](https://github.com/xhdlphzr/StanzaWeaver/blob/main/CONTRIBUTING.md)
-[![汉语](https://img.shields.io/badge/汉语-CONTRIBUTING-007EC6)](https://github.com/xhdlphzr/StanzaWeaver/blob/main/docs/CONTRIBUTING.zh.md)
+[![English](https://img.shields.io/badge/English-CONTRIBUTING-007EC6)](https://github.com/xhdlphzr/StanzaWeaver/blob/master/CONTRIBUTING.md)
+[![汉语](https://img.shields.io/badge/汉语-CONTRIBUTING-007EC6)](https://github.com/xhdlphzr/StanzaWeaver/blob/master/docs/CONTRIBUTING.zh.md)
 
 感谢你为 **StanzaWeaver**（以智识，巧织诗）贡献力量！本文件说明如何搭建开发环境、提交前必须通过的检查，以及如何在符号层新增**诗体**与**语言**。
 
