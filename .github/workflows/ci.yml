@@ -3,7 +3,7 @@
 
 # StanzaWeaver CI/CD
 #
-# CI  (持续集成): 每次 push / PR 在三个平台运行
+# CI  (持续集成): 每次 push / PR 在 ubuntu-latest 上运行
 #   - ruff format ./           代码格式化
 #   - ruff check --fix --unsafe-fixes ./   静态检查与自动修复
 #   - mypy --strict ./         类型检查（零容忍）
@@ -12,6 +12,7 @@
 # CD  (持续交付): CI 全部通过后，仅对主分支打包，产物上传为 artifact
 #   - Windows : pyinstaller StanzaWeaver.spec --clean        -> StanzaWeaver.exe
 #   - macOS   : pyinstaller StanzaWeaver.spec --clean        -> StanzaWeaver (单文件)
+#   - Linux   : pyinstaller StanzaWeaver.spec --clean        -> StanzaWeaver (单文件)
 #
 # 注: 本地 venv 与 Dockerfile 均使用 Python 3.14，故 CI 统一锁定 3.14。
 
@@ -35,7 +36,7 @@ jobs:
   # CI: 两个平台并行执行 lint / 类型检查 / 测试
   # ------------------------------------------------------------------
   # ------------------------------------------------------------------
-  # CI: 代码层持续集成（代码无关平台，统一在 ubuntu 上一次跑完）
+  # CI: 代码层持续集成（代码无关平台，统一在 ubuntu-latest 上一次跑完）
   #   - ruff check ./            静态检查（不自动修改）
   #   - mypy --strict ./         类型检查（零容忍）
   #   - pytest                   单元测试 + 集成测试（桩 LLM，无网络）
@@ -79,7 +80,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -96,8 +97,8 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      # ---------- Windows / macOS: PyInstaller 直接出包 ----------
-      - name: Build with PyInstaller (Windows/macOS)
+      # ---------- Windows / macOS / Linux: PyInstaller 直接出包（单文件） ----------
+      - name: Build with PyInstaller
         run: pyinstaller StanzaWeaver.spec --clean
 
       # ---------- 上传产物（分别命名以便后续发布） ----------
@@ -114,5 +115,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: StanzaWeaver-macOS
+          path: dist/StanzaWeaver
+          if-no-files-found: error
+
+      - name: Upload Linux artifact
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: StanzaWeaver-Linux
           path: dist/StanzaWeaver
           if-no-files-found: error
