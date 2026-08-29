@@ -3,7 +3,8 @@
 
 """法语格律模板：回旋诗、三韵叠句诗、叙事歌。
 
-押韵采用 FrenchAnalyzer.rhyme_key（最后发音元音 + 其后辅音，静音 e 不参与）。
+押韵采用 FrenchAnalyzer.rhyme_key：取词末发音元音核（鼻化归并），
+并丢弃词尾静音辅音（s/t/x/p 等）。
 """
 
 import re
@@ -64,7 +65,8 @@ class RondeauTemplate(PoetryTemplate):
     name = "回旋诗"
     language = "fr"
     lines = 15
-    syllables_per_line: ClassVar[list[int]] = [8] * 15
+    # 每行允许 8 或 10 音节（经典回旋诗可统一为 10 音节）
+    syllables_per_line: ClassVar[list[int | tuple[int, int]]] = [(8, 10)] * 15
     _refrain_lines: ClassVar[list[int]] = [8, 14]  # 0-based: 叠句出现在第 9、15 行
     rule_description = (
         "格律规则：15行，分三节（5+4+6）；韵式 AABBA AAB AABBA（仅用A、B两韵）；"

@@ -4,7 +4,8 @@
 """英语格律模板：莎士比亚商籁体、维拉内拉诗、英雄双行体。
 
 押韵采用严格重音匹配：韵脚必须落在主/次重音音节上，且该音节起的
-全部音素（含重音层级）完全一致（由 EnglishAnalyzer.rhyme_tail 实现）。
+全部音素（含重音层级）完全一致，任一发音满足押韵即通过
+（由 EnglishAnalyzer.rhyme_tails 实现）。
 """
 
 import re
@@ -59,19 +60,25 @@ def _last_word(line: str) -> str:
     return re.sub(r"[^A-Za-z0-9'-]", "", line.strip().split()[-1]).lower()
 
 
-def _en_rhyme_key(line_text: str) -> str | None:
-    """严格重音押韵 key：行末词最后一个重读元音起到词尾的音素串。
+def _en_rhyme_key(line_text: str) -> tuple[str, ...] | None:
+    """严格重音押韵 key：行末词全部发音中"自重读音节起的音素串"集合。
+
+    押韵须为严格重音匹配（含重音层级），且任一发音满足押韵即通过，
+    故返回去重后的尾串元组（可哈希，便于集合运算）。
 
     Args:
         line_text: 一行诗。
 
     Returns:
-        押韵尾串；行末词无重读音节时返回 None（不能作韵脚）。
+        押韵尾串元组；行末词无重读音节时返回 None（不能作韵脚）。
     """
     word = _last_word(line_text)
     if not word:
         return None
-    return _EN_ANALYZER.rhyme_tail(word)
+    tails = _EN_ANALYZER.rhyme_tails(word)
+    if not tails:
+        return None
+    return tuple(sorted(set(tails)))
 
 
 def _check_stress_count(
@@ -94,7 +101,7 @@ def _check_stress_count(
 def _check_rhyme_group(
     poem: list[str], indices: list[int], label: str, errors: list[str]
 ) -> None:
-    """检查一组行严格重音押韵一致。
+    """检查一组行严格重音押韵一致（组内所有行共享至少一个韵尾）。
 
     Args:
         poem: 诗行列表。
@@ -102,7 +109,7 @@ def _check_rhyme_group(
         label: 韵组名（A/B/AA 等）。
         errors: 错误列表（就地追加）。
     """
-    keys: list[tuple[int, str]] = []
+    keys: list[tuple[int, tuple[str, ...]]] = []
     for idx in indices:
         if idx >= len(poem):
             continue
@@ -112,13 +119,17 @@ def _check_rhyme_group(
             continue
         keys.append((idx, k))
     if len(keys) >= 2:
-        base_idx, base = keys[0]
-        for idx, k in keys[1:]:
-            if k != base:
-                errors.append(
-                    f"押韵{label}不匹配: 第{base_idx + 1}行韵脚'{base}'，"
-                    f"第{idx + 1}行韵脚'{k}'（要求自重读音节起音素及重音完全一致）"
-                )
+        common: set[str] = set(keys[0][1])
+        for _, k in keys[1:]:
+            common &= set(k)
+        if not common:
+            first_idx, first_key = keys[0]
+            last_idx, last_key = keys[-1]
+            errors.append(
+                f"押韵{label}不匹配: 第{first_idx + 1}行韵脚{first_key}，"
+                f"第{last_idx + 1}行韵脚{last_key}"
+                f"（要求组内所有行共享一个自重读音节起的音素尾串）"
+            )
 
 
 class ShakespeareSonnetTemplate(PoetryTemplate):
@@ -156,26 +167,26 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
             ("F", [9, 11], 2),
             ("G", [12, 13], 3),
         ]
-        quatrain_rhymes: dict[int, dict[str, str | None]] = {}
+        quatrain_rhymes: dict[int, dict[str, tuple[str, ...] | None]] = {}
         for letter, indices, q_idx in rhyme_groups:
             if q_idx not in quatrain_rhymes:
                 quatrain_rhymes[q_idx] = {}
             _check_rhyme_group(poem, indices, letter, errors)
-            keys: list[str | None] = []
             for idx in indices:
                 if idx < len(poem):
-                    keys.append(_en_rhyme_key(poem[idx]))
-            if keys and keys[0] is not None:
-                quatrain_rhymes[q_idx][letter] = keys[0]
+                    quatrain_rhymes[q_idx][letter] = _en_rhyme_key(poem[idx])
 
         for q_idx in range(3):
             values = quatrain_rhymes.get(q_idx, {})
-            distinct = {v for v in values.values() if v is not None}
-            if len(distinct) < 2 and len(values) >= 2:
-                a_rhyme = next(iter(values.values()))
-                errors.append(
-                    f"第{q_idx + 1}段对韵: A/B 韵脚应不同，当前均为'{a_rhyme}'"
-                )
+            present = [v for v in values.values() if v is not None]
+            if len(present) >= 2:
+                for i in range(len(present)):
+                    for j in range(i + 1, len(present)):
+                        if not set(present[i]).isdisjoint(present[j]):
+                            errors.append(
+                                f"第{q_idx + 1}段对韵: A/B 韵脚应不同，"
+                                f"当前共享韵尾{set(present[i]) & set(present[j])}"
+                            )
 
         return errors
 
@@ -211,14 +222,14 @@ class VillanelleTemplate(PoetryTemplate):
         _check_stress_count(poem, syllables, 4, errors)
 
         if len(poem) > 0:
-            base_a1 = poem[0].strip()
+            base_a1 = _norm_refrain(poem[0])
             for ref_idx in self._refrain_a1[1:]:
-                if ref_idx < len(poem) and poem[ref_idx].strip() != base_a1:
+                if ref_idx < len(poem) and _norm_refrain(poem[ref_idx]) != base_a1:
                     errors.append(f"叠句A1不匹配: 第1行与第{ref_idx + 1}行文本不一致")
         if len(poem) > 2:
-            base_a2 = poem[2].strip()
+            base_a2 = _norm_refrain(poem[2])
             for ref_idx in self._refrain_a2[1:]:
-                if ref_idx < len(poem) and poem[ref_idx].strip() != base_a2:
+                if ref_idx < len(poem) and _norm_refrain(poem[ref_idx]) != base_a2:
                     errors.append(f"叠句A2不匹配: 第3行与第{ref_idx + 1}行文本不一致")
 
         _check_rhyme_group(poem, self._rhyme_a, "A", errors)
@@ -226,10 +237,22 @@ class VillanelleTemplate(PoetryTemplate):
 
         a_key = _en_rhyme_key(poem[0]) if poem else None
         b_key = _en_rhyme_key(poem[1]) if len(poem) > 1 else None
-        if a_key and b_key and a_key == b_key:
-            errors.append(f"A/B韵脚应不同，当前均为'{a_key}'")
+        if a_key and b_key and not set(a_key).isdisjoint(b_key):
+            errors.append(f"A/B韵脚应不同，当前共享韵尾{set(a_key) & set(b_key)}")
 
         return errors
+
+
+def _norm_refrain(line: str) -> str:
+    """叠句归一化：折叠空白并忽略大小写。
+
+    Args:
+        line: 一行诗。
+
+    Returns:
+        归一化后的文本。
+    """
+    return " ".join(line.split()).casefold()
 
 
 class HeroicCoupletTemplate(PoetryTemplate):

@@ -1,3 +1,6 @@
+<!-- Copyright (c) 2026 xhdlphzr -->
+<!-- SPDX-License-Identifier: MIT -->
+
 # 贡献指南（CONTRIBUTING）
 
 感谢你为 **StanzaWeaver**（以智识，巧织诗）贡献力量！本文件说明如何搭建开发环境、提交前必须通过的检查，以及如何在符号层新增**诗体**与**语言**。
@@ -107,14 +110,16 @@ pytest
 
 ```python
 class PoetryTemplate(ABC):
-    name: str                      # 诗体名称
-    language: str                 # 语言代码（zh/en/it/fr/la）
-    lines: int                    # 行数
+    name: str  # 诗体名称
+    language: str  # 语言代码（zh/en/it/fr/la）
+    lines: int  # 行数
     syllables_per_line: Sequence[int | tuple[int, int]]  # 每行音节数（区间用元组）
-    rule_description: str         # 格律规则文本（用于提示 LLM）
+    rule_description: str  # 格律规则文本（用于提示 LLM）
 
     def get_syllable_constraints(self) -> ConstraintTable | None: ...
-    def validate_full(self, poem: list[str], syllables: list[list[Syllable]]) -> list[str]: ...
+    def validate_full(
+        self, poem: list[str], syllables: list[list[Syllable]]
+    ) -> list[str]: ...
 ```
 
 - `get_syllable_constraints()` 返回每位置约束表（`list[list[dict]]`），单条约束形如：
@@ -174,12 +179,12 @@ class PoetryTemplate(ABC):
 class SyllableAnalyzer(ABC):
     language: str
 
-    def analyze_word(self, word: str) -> list[Syllable]: ...   # 抽象
-    def count_syllables(self, text: str) -> int: ...           # 抽象
-    def tokenize_line(self, line: str) -> list[str]: ...       # 可重写（中文按字切分）
+    def analyze_word(self, word: str) -> list[Syllable]: ...  # 抽象
+    def count_syllables(self, text: str) -> int: ...  # 抽象
+    def tokenize_line(self, line: str) -> list[str]: ...  # 可重写（中文按字切分）
 ```
 
- 实现后注册到多语言分发器 `src/prosody/syllable_counter.py`。
+实现后注册到多语言分发器 `src/prosody/syllable_counter.py`。
 
 #### `_ANALYZERS` 字典 / 分发机制（详细）
 
@@ -187,11 +192,11 @@ class SyllableAnalyzer(ABC):
 
 ```python
 _ANALYZERS: dict[str, SyllableAnalyzer] = {
-    "zh": ChineseAnalyzer(),   # 中文：整行经 pypinyin 处理多音字
-    "en": EnglishAnalyzer(),   # 英文：逐词 + 重音/变体
-    "it": ItalianAnalyzer(),   # 意大利语：整行 sinalefe 跨词合并
-    "fr": FrenchAnalyzer(),    # 法语：逐词
-    "la": LatinAnalyzer(),     # 拉丁语：整行跨词判定音长
+    "zh": ChineseAnalyzer(),  # 中文：整行经 pypinyin 处理多音字
+    "en": EnglishAnalyzer(),  # 英文：逐词 + 重音/变体
+    "it": ItalianAnalyzer(),  # 意大利语：整行 sinalefe 跨词合并
+    "fr": FrenchAnalyzer(),  # 法语：逐词
+    "la": LatinAnalyzer(),  # 拉丁语：整行跨词判定音长
 }
 ```
 
@@ -215,7 +220,6 @@ _ANALYZERS: dict[str, SyllableAnalyzer] = {
   ```
 
 > ⚠️ 重要：若你的新语言需要**整行级**特殊处理（像 `zh` / `it` / `la` 那样不能简单逐词拼接），除了把分析器加入 `_ANALYZERS`，还必须**在 `analyze_line()` 的 `if/elif` 分支中新增对应的 `language == "xx"` 分支**，否则会退化为默认的逐词拼接逻辑。若新语言只需逐词分析，则无需改 `analyze_line`。
-
 
 ### 4.2 模板语言标签
 

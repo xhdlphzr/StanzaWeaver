@@ -44,7 +44,10 @@ class ItalianAnalyzer(SyllableAnalyzer):
     language = "it"
 
     def _count_syllables_in_word(self, word: str) -> int:
-        """单词语节数（含二合元音合并）。
+        """单词语节数（含二合元音合并，重读元音视为元音分裂）。
+
+        当候选二合元音 i/u 中任一字符带重音符号（à è é ì ò ó ù）时，
+        不合并而计为两个音节（hiatus）。
 
         Args:
             word: 意大利语单词。
@@ -61,7 +64,12 @@ class ItalianAnalyzer(SyllableAnalyzer):
         while i < n:
             if word[i] in _VOWELS:
                 count += 1
-                if i + 1 < n and word[i : i + 2] in _DIPHTHONGS:
+                if (
+                    i + 1 < n
+                    and word[i : i + 2] in _DIPHTHONGS
+                    and word[i] not in _ACCENTED_VOWELS
+                    and word[i + 1] not in _ACCENTED_VOWELS
+                ):
                     i += 1
             i += 1
         return count if count > 0 else 1
@@ -69,11 +77,14 @@ class ItalianAnalyzer(SyllableAnalyzer):
     def _syllabify_word(self, word: str) -> list[Syllable]:
         """按词切分音节并标注重音（启发式）。
 
+        重读元音（如 ì）所在的 i/u 与其后元音不构成二合元音，而是作为
+        元音分裂计为两个音节。重音位置由 :meth:`_mark_word_stress` 判定。
+
         Args:
             word: 意大利语单词。
 
         Returns:
-            音节列表（重音标在 attributes["stress"]）。
+            音节列表（重音标在 attributes["stress"]，重读为 "heavy"）。
         """
         w = _APOSTROPHE_RE.sub("", word.lower())
         if not w:
@@ -83,7 +94,12 @@ class ItalianAnalyzer(SyllableAnalyzer):
         n = len(w)
         while i < n:
             if w[i] in _VOWELS:
-                if i + 1 < n and w[i : i + 2] in _DIPHTHONGS:
+                if (
+                    i + 1 < n
+                    and w[i : i + 2] in _DIPHTHONGS
+                    and w[i] not in _ACCENTED_VOWELS
+                    and w[i + 1] not in _ACCENTED_VOWELS
+                ):
                     nucleus = w[i : i + 2]
                     i += 2
                 else:
@@ -109,23 +125,56 @@ class ItalianAnalyzer(SyllableAnalyzer):
                 )
             ]
 
-        final_char = w[-1]
-        if final_char in _ACCENTED_VOWELS or final_char not in _VOWELS:
-            stress_idx = len(syls) - 1
-        else:
-            stress_idx = len(syls) - 2 if len(syls) >= 2 else 0
-        if 0 <= stress_idx < len(syls):
-            syls[stress_idx].attributes["stress"] = "heavy"
+        self._mark_word_stress(w, syls)
         return syls
+
+    def _mark_word_stress(self, word: str, syls: list[Syllable]) -> None:
+        """按启发式标注重音（写入各音节的 attributes["stress"]）。
+
+        规则：
+        - 含显式重音符号（à è é ì ò ó ù）的音节重读；
+        - 以辅音结尾 -> 末音节重读（tronca）；
+        - 以两个辅音结尾 -> 倒数第二音节重读；
+        - 以元音结尾的多音节词 -> 倒数第二音节重读（piana）；
+        - 单元音且无重音符号的词（如 la、mi）视为非重读小品词。
+
+        Args:
+            word: 已小写、去省音撇的纯字母词。
+            syls: 已切分好的音节列表（就地修改）。
+        """
+        n = len(syls)
+        accent_idx = -1
+        for idx, s in enumerate(syls):
+            if any(ch in _ACCENTED_VOWELS for ch in s.nucleus):
+                accent_idx = idx
+                break
+
+        if accent_idx >= 0:
+            stress_idx = accent_idx
+        elif word[-1] not in _VOWELS:
+            if len(word) >= 2 and word[-2] not in _VOWELS:
+                stress_idx = n - 2
+            else:
+                stress_idx = n - 1
+        elif n == 1:
+            stress_idx = -1
+        else:
+            stress_idx = n - 2
+
+        if 0 <= stress_idx < n:
+            syls[stress_idx].attributes["stress"] = "heavy"
 
     def syllabify_line(self, text: str) -> list[Syllable]:
         """整行切分：逐词切分后应用 sinalefe 合并跨词元音。
+
+        当词界处两元音相遇，但其中任一元音为重读（hiatus，如 virtù eterna）
+        时，不执行 sinalefe，保留为两个独立音节。
 
         Args:
             text: 一行意大利语诗。
 
         Returns:
-            整行音节列表（已合并 sinalefe 与省音）。
+            整行音节列表（已处理省音与可能的 sinalefe 合并）。
         """
         words = [w for w in _WORD_SPLIT_RE.split(text.lower()) if w]
         all_syls: list[Syllable] = []
@@ -136,19 +185,24 @@ class ItalianAnalyzer(SyllableAnalyzer):
             if wi > 0:
                 prev_clean = _APOSTROPHE_RE.sub("", words[wi - 1])
                 curr_clean = _APOSTROPHE_RE.sub("", w)
-                if (
+                prev_syl = all_syls[-1] if all_syls else None
+                can_sinalefe = (
                     prev_clean
                     and curr_clean
                     and prev_clean[-1] in _VOWELS
                     and curr_clean[0] in _VOWELS
-                    and all_syls
-                    and all_syls[-1].coda == ""
-                ):
-                    # sinalefe: 前词末音节并入后词首音节，重音随之合并
-                    prev_stress = all_syls[-1].attributes.get("stress") == "heavy"
-                    all_syls.pop()
-                    if prev_stress and syls:
-                        syls[0].attributes["stress"] = "heavy"
+                    and prev_syl is not None
+                    and prev_syl.coda == ""
+                )
+                if can_sinalefe:
+                    assert prev_syl is not None
+                    prev_heavy = prev_syl.attributes.get("stress") == "heavy"
+                    next_heavy = syls[0].attributes.get("stress") == "heavy"
+                    if prev_heavy or next_heavy:
+                        # 元音分裂（hiatus）：不合并，保留两个音节
+                        pass
+                    else:
+                        all_syls.pop()
             all_syls.extend(syls)
         return all_syls
 
@@ -173,3 +227,14 @@ class ItalianAnalyzer(SyllableAnalyzer):
             音节总数。
         """
         return len(self.syllabify_line(text))
+
+    def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
+        """整行切分变体（意大利语标准诵读下 sinalefe 为强制，故仅返回标准切分）。
+
+        Args:
+            line: 一行意大利语诗。
+
+        Returns:
+            仅含标准切分（已应用 sinalefe）的变体列表。
+        """
+        return [self.syllabify_line(line)]

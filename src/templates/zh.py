@@ -5,8 +5,8 @@
 
 实现近体诗/词牌的符号层规则：
 - 平仄骨架：每句 2/4(6) 位相间、联内相对、联间相粘、出句仄脚/对句平脚；
-- 押韵：偶数行平声韵（一韵到底），首句可入韵，词牌按谱换韵；
-- 禁忌：三平尾、三仄尾、孤平。
+- 押韵：偶数行平声韵（一韵到底，依《中华通韵》16 韵部），首句可入韵，词牌按谱换韵；
+- 禁忌：三平尾（三仄尾、孤平已不计入禁忌）。
 """
 
 from typing import Any, ClassVar
@@ -71,28 +71,11 @@ def _check_sanpingwei(syllables: list[Syllable]) -> list[str]:
     return errors
 
 
-def _check_sanzewei(syllables: list[Syllable]) -> list[str]:
-    """检查三仄尾（末三字全仄）。
-
-    Args:
-        syllables: 一行音节。
-
-    Returns:
-        错误列表。
-    """
-    errors: list[str] = []
-    if len(syllables) >= 3:
-        last3 = [s.attributes.get("tone", "") for s in syllables[-3:]]
-        if last3 == ["仄", "仄", "仄"]:
-            errors.append("三仄尾: 末三字皆为仄声，不合律")
-    return errors
-
-
 def _check_guping(syllables: list[Syllable]) -> list[str]:
-    """检查孤平（平脚句中除韵脚外仅余一个平声）。
+    """检查孤平：平脚句（尾字平声）全句仅一个平声字（即韵脚）即为孤平。
 
-    孤平只发生在平声收尾的句子：除末字（韵脚）外，句中若只有一个平声，
-    即为孤平。此定义精确对应近体诗「仄仄平平仄仄平」改为「仄仄仄平仄仄平」的犯规。
+    孤平为近体诗大忌：平声收尾之句若除去韵脚外再无第二个平声字，则孤平失律。
+    仄脚句（尾字仄声）不检孤平。
 
     Args:
         syllables: 一行音节。
@@ -101,16 +84,13 @@ def _check_guping(syllables: list[Syllable]) -> list[str]:
         错误列表。
     """
     errors: list[str] = []
-    n = len(syllables)
-    if n < 2:
+    if not syllables:
         return errors
-    last = syllables[-1].attributes.get("tone", "")
-    if last != "平":
+    if syllables[-1].attributes.get("tone", "") != "平":
         return errors
-    body = [s.attributes.get("tone", "") for s in syllables[:-1]]
-    if body.count("平") == 1:
-        idx = body.index("平")
-        errors.append(f"孤平: 第{idx + 1}字为句中唯一平声（除韵脚外仅一平）")
+    ping_count = sum(1 for s in syllables if s.attributes.get("tone", "") == "平")
+    if ping_count == 1:
+        errors.append("孤平: 平脚句全句仅一平声（韵脚），孤平失律")
     return errors
 
 
@@ -137,71 +117,75 @@ def _check_alternation(syllables: list[Syllable], even_pattern: list[str]) -> li
     return errors
 
 
-# 十三辙归并：eng/ing/ong/iong/ueng 同属中东辙，en/in/un/ün 同属人辰辙等
-_ZHE: dict[str, str] = {
-    "a": "a",
-    "ia": "a",
-    "ua": "a",
-    "o": "o",
-    "e": "o",
-    "uo": "o",
-    "ie": "e",
-    "üe": "e",
-    "i": "i",
-    "ü": "i",
-    "er": "i",
-    "v": "i",
-    "u": "u",
-    "ai": "ai",
-    "uai": "ai",
-    "ei": "ei",
-    "ui": "ei",
-    "ao": "ao",
-    "iao": "ao",
-    "ou": "ou",
-    "iu": "ou",
-    "an": "an",
-    "ian": "an",
-    "uan": "an",
-    "üan": "an",
-    "van": "an",
-    "en": "en",
-    "in": "en",
-    "un": "en",
-    "vn": "en",
-    "ün": "en",
-    "ang": "ang",
-    "iang": "ang",
-    "uang": "ang",
-    "eng": "eng",
-    "ing": "eng",
-    "ong": "eng",
-    "iong": "eng",
-    "ueng": "eng",
+# 《中华通韵》16 韵部归并（以韵腹+韵尾为键，ü 在 pypinyin 中记为 v）。
+# 关键修正（相对旧十三辙）：齐齿 "i/ü/er" 与 "u" 不同部；舌尖元音 -i 单列 "支" 部。
+_TONGYUN: dict[str, str] = {
+    "a": "麻",
+    "ia": "麻",
+    "ua": "麻",
+    "o": "波",
+    "e": "波",
+    "uo": "波",
+    "ie": "皆",
+    "üe": "皆",
+    "ve": "皆",
+    "ai": "开",
+    "uai": "开",
+    "ei": "微",
+    "ui": "微",
+    "ao": "豪",
+    "iao": "豪",
+    "ou": "尤",
+    "iu": "尤",
+    "an": "寒",
+    "ian": "寒",
+    "uan": "寒",
+    "üan": "寒",
+    "van": "寒",
+    "en": "文",
+    "in": "文",
+    "un": "文",
+    "ün": "文",
+    "vn": "文",
+    "ang": "唐",
+    "iang": "唐",
+    "uang": "唐",
+    "eng": "庚",
+    "ing": "庚",
+    "ueng": "庚",
+    "ong": "庚",
+    "iong": "庚",
+    "i": "齐",
+    "er": "齐",
+    "ü": "齐",
+    "v": "齐",
+    "u": "姑",
 }
+
+# 舌尖元音（知/吃/诗/日…）的声母：其韵母 -i 归入「支」部而非「齐」部。
+_APICAL_ONSETS: frozenset[str] = frozenset({"z", "c", "s", "zh", "ch", "sh", "r"})
 
 
 def _rhyme_key(syl: Syllable) -> str:
-    """生成韵脚 key：按十三辙归并韵腹+韵尾。
+    """生成韵脚 key：按《中华通韵》归并韵腹+韵尾。
 
-    例如中东辙把 eng/ing/ong/iong/ueng 归为一类，人辰辙把 en/in/un/ün 归为一类，
-    避免相近韵母被误判为不押韵或过度拆散；ü 与 u 仍按衣期/姑苏分属不同辙。
+    取音节的韵腹+韵尾（已去除声调数字）查韵部表。特别地：当韵母为 "i"
+    且声母属舌尖音 z/c/s/zh/ch/sh/r 时，归「支」部；否则 "i/ü/er" 归「齐」部，
+    "u" 归「姑」部——齐与姑不同部，故 "i" 与 "u" 不押韵。
 
     Args:
         syl: 韵脚音节。
 
     Returns:
-        韵脚串。
+        韵部名（如 "庚"、"麻"），未知韵母返回原串或 "?"。
     """
     nucleus = syl.nucleus or ""
     coda = syl.coda or ""
     raw = nucleus + coda
-    if raw in _ZHE:
-        return _ZHE[raw]
-    if len(raw) > 1 and raw[0] in ("i", "u", "ü", "v"):
-        stripped = raw[1:]
-        if stripped in _ZHE:
-            return _ZHE[stripped]
+    if raw == "i" and syl.onset in _APICAL_ONSETS:
+        return "支"
+    if raw in _TONGYUN:
+        return _TONGYUN[raw]
     return raw or "?"
 
 
@@ -394,7 +378,7 @@ class WujueTemplate(PoetryTemplate):
     rule_description = (
         "格律规则：每句第2、4字平仄相间；每联上下句第2、4字平仄相对；"
         "下一联首句与上一联对句第2、4字平仄相粘；"
-        "偶数句押平声韵，首句尾字可押韵(平)可不押韵(仄)；忌三平尾、三仄尾、孤平。"
+        "偶数句押平声韵，首句尾字可押韵(平)可不押韵(仄)；忌三平尾、孤平。"
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
@@ -404,11 +388,10 @@ class WujueTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整规则检查：三平尾/三仄尾/孤平/结构/押韵。"""
+        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）。"""
         errors: list[str] = []
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
-            errors.extend(_check_sanzewei(syls))
             errors.extend(_check_guping(syls))
         errors.extend(_check_jinti_structure(syllables))
         errors.extend(_check_jinti_rhyme(syllables, [1, 3], "押韵(二四行)"))
@@ -425,7 +408,7 @@ class QijueTemplate(PoetryTemplate):
     rule_description = (
         "格律规则：每句第2、4、6字平仄相间；每联上下句第2、4、6字平仄相对；"
         "下一联首句与上一联对句第2、4、6字平仄相粘；"
-        "偶数句押平声韵，首句尾字可押韵(平)可不押韵(仄)；忌三平尾、三仄尾、孤平。"
+        "偶数句押平声韵，首句尾字可押韵(平)可不押韵(仄)；忌三平尾、孤平。"
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
@@ -435,11 +418,10 @@ class QijueTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整规则检查：三平尾/三仄尾/孤平/结构/押韵。"""
+        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）。"""
         errors: list[str] = []
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
-            errors.extend(_check_sanzewei(syls))
             errors.extend(_check_guping(syls))
         errors.extend(_check_jinti_structure(syllables))
         errors.extend(_check_jinti_rhyme(syllables, [1, 3], "押韵(二四行)"))
@@ -462,11 +444,10 @@ class WulvTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整规则检查：三平尾/三仄尾/孤平/结构/押韵。"""
+        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）。"""
         errors: list[str] = []
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
-            errors.extend(_check_sanzewei(syls))
             errors.extend(_check_guping(syls))
         errors.extend(_check_jinti_structure(syllables))
         errors.extend(_check_jinti_rhyme(syllables, [1, 3, 5, 7], "押韵(二四六八行)"))
@@ -489,11 +470,10 @@ class QilvTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整规则检查：三平尾/三仄尾/孤平/结构/押韵。"""
+        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）。"""
         errors: list[str] = []
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
-            errors.extend(_check_sanzewei(syls))
             errors.extend(_check_guping(syls))
         errors.extend(_check_jinti_structure(syllables))
         errors.extend(_check_jinti_rhyme(syllables, [1, 3, 5, 7], "押韵(二四六八行)"))

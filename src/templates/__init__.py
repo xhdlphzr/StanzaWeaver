@@ -6,7 +6,7 @@
 模板（PoetryTemplate）定义一种诗体的全部格律规则：
 - syllables_per_line: 每行音节数（int 或 (min, max) 区间）；
 - get_syllable_constraints(): 逐位约束（供 refine_line 单行校验与 LLM 提示）；
-- validate_full(): 完整规则检查（押韵、三平尾、孤平等跨行规则）；
+- validate_full(): 完整规则检查（押韵、三平尾等跨行规则）；
 - describe(): 给 LLM 的人类可读格律描述。
 """
 

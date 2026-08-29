@@ -5,13 +5,21 @@
 
 对整首诗执行三层校验：
 1. 行数匹配；
-2. 每行音节数（英语按多音变体任选其一满足即可）；
-3. 逐位音节约束（平仄/重音/长短），英语同样支持任一变体；
+2. 每行音节数（任一切分变体满足即通过）；
+3. 逐位音节约束（平仄/重音/长短），任一切分变体满足即通过；
 4. 模板自定义完整规则（validate_full：押韵、三平尾、孤平等）。
+
+第 4 层不再仅取主变体，而是把每行全部发音/切分变体逐一带入审查：
+对每行变体做组合搜索，存在任一组合使全部规则通过即视为合律。
 """
 
+import itertools
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
+
+# 组合搜索逐行变体时的最大组合数，超出则截断（避免意大利语 sinalefe /
+# 英语多切分等导致组合数爆炸），截断后返回错误数最少的组合。
+MAX_FULL_COMBOS = 20000
 
 from ..models.syllable import Syllable
 from ..templates import format_count
@@ -100,10 +108,11 @@ class MeterValidator:
 
         all_syllables: list[VariantList] = []
         for i in range(len(poem)):
-            if language == "en":
-                # 英语多音词：保留全部发音的组合切分，任一变体满足格律即通过
+            analyzer = get_analyzer(language)
+            if hasattr(analyzer, "analyze_line_variants"):
+                # 多音语言（zh/en/it/la）：保留全部切分变体，任一满足格律即通过
                 all_syllables.append(
-                    get_analyzer(language).analyze_line_variants(poem[i])  # type: ignore[attr-defined]
+                    cast("VariantList", analyzer.analyze_line_variants(poem[i]))
                 )
             else:
                 all_syllables.append([analyze_line(poem[i], language)])
@@ -136,11 +145,11 @@ class MeterValidator:
                         result.add_error(
                             f"第{i + 1}行第{j + 1}音节不匹配: 要求{constraint_desc}, 实际{actual_desc}"
                         )
-                        break
 
         if template_obj is not None and hasattr(template_obj, "validate_full"):
-            primary = [v[0] for v in all_syllables]
-            full_errors = template_obj.validate_full(poem, primary)
+            full_errors = self._validate_full_variants(
+                template_obj, poem, all_syllables, language
+            )
             for err in full_errors:
                 result.add_error(err)
 
@@ -164,6 +173,71 @@ class MeterValidator:
             if not variant[j].match_constraint(line_constraints[j]):
                 return False
         return True
+
+    @staticmethod
+    def _order_variants(
+        language: str, variants: list[list[Syllable]]
+    ) -> list[list[Syllable]]:
+        """为组合搜索排序每行变体（主变体优先，作为首个被尝试的组合）。
+
+        Args:
+            language: 语言代码。
+            variants: 该行的候选切分列表。
+
+        Returns:
+            排序后的变体列表（主变体在前）。
+        """
+        if language == "en":
+            return sorted(
+                variants,
+                key=lambda v: sum(
+                    1 for s in v if s.attributes.get("stress") == "heavy"
+                ),
+                reverse=True,
+            )
+        return variants
+
+    def _validate_full_variants(
+        self,
+        template_obj: Any,
+        poem: list[str],
+        all_syllables: list[list[list[Syllable]]],
+        language: str,
+    ) -> list[str]:
+        """对每行全部发音/切分变体做组合搜索，任一组合通过即视为合律。
+
+        不再仅取主变体：把每个变体逐一带入 validate_full 审查。若存在一个
+        逐行变体组合使全部格律规则通过，则返回空错误；否则返回错误数最少的
+        组合对应的错误（兜底为各语言主变体）。组合数过大时截断于
+        ``MAX_FULL_COMBOS``，避免意大利语 sinalefe / 英语多切分导致的爆炸。
+
+        Args:
+            template_obj: 模板对象（含 validate_full）。
+            poem: 诗行文本（押韵/叠句等文本级规则使用）。
+            all_syllables: 每行一个变体列表（VariantList）。
+            language: 语言代码。
+
+        Returns:
+            错误列表；存在合律组合时返回空列表。
+        """
+        line_variants: list[list[list[Syllable]]] = []
+        for vs in all_syllables:
+            if vs:
+                line_variants.append(self._order_variants(language, list(vs)))
+            else:
+                line_variants.append([[]])
+        best: list[str] | None = None
+        best_len: int | None = None
+        for tried, combo in enumerate(itertools.product(*line_variants), start=1):
+            errs = template_obj.validate_full(poem, list(combo))
+            if not errs:
+                return []
+            if best_len is None or len(errs) < best_len:
+                best_len = len(errs)
+                best = errs
+            if tried >= MAX_FULL_COMBOS:
+                break
+        return best if best is not None else []
 
     def validate_count_only(
         self,
@@ -242,8 +316,14 @@ class MeterValidator:
 
         if line_index < len(syllables_expected):
             expected_count = syllables_expected[line_index]
-            actual_count = count_syllables(line_text, language)
-            if not _count_matches(actual_count, expected_count):
+            if language == "en":
+                variants = get_analyzer(language).analyze_line_variants(line_text)  # type: ignore[attr-defined]
+                ok = any(_count_matches(len(v), expected_count) for v in variants)
+                actual_count = len(variants[0]) if variants else 0
+            else:
+                actual_count = count_syllables(line_text, language)
+                ok = _count_matches(actual_count, expected_count)
+            if not ok:
                 result.add_error(
                     f"音节数不匹配: 期望 {format_count(expected_count)}, 实际 {actual_count}"
                 )
