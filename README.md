@@ -3,7 +3,7 @@
 
 # StanzaWeaver
 
-> **Weaving with Wisdom** — A Neuro-Symbolic Intelligent Poetry Generation Desktop Application
+> **Weaving Stanzas with Wisdom** — A Neuro-Symbolic Intelligent Poetry Generation Desktop Application
 
 [![Stars](https://img.shields.io/github/stars/xhdlphzr/StanzaWeaver)](https://github.com/xhdlphzr/StanzaWeaver/stargazers)
 [![Issues](https://img.shields.io/github/issues/xhdlphzr/StanzaWeaver)](https://github.com/xhdlphzr/StanzaWeaver/issues)

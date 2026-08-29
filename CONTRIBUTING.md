@@ -6,7 +6,7 @@
 [![English](https://img.shields.io/badge/English-CONTRIBUTING-007EC6)](https://github.com/xhdlphzr/StanzaWeaver/blob/main/CONTRIBUTING.md)
 [![汉语](https://img.shields.io/badge/汉语-CONTRIBUTING-007EC6)](https://github.com/xhdlphzr/StanzaWeaver/blob/main/docs/CONTRIBUTING.zh.md)
 
-Thank you for contributing to **StanzaWeaver** (Weaving with Wisdom)! This document explains how to set up the development environment, the mandatory checks before submitting, and how to add new **meter templates** and **languages** to the symbolic layer.
+Thank you for contributing to **StanzaWeaver** (Weaving Stanzas with Wisdom)! This document explains how to set up the development environment, the mandatory checks before submitting, and how to add new **meter templates** and **languages** to the symbolic layer.
 
 > All new features must pass tests; for logic that cannot be verified offline (e.g., requiring network download of lexicons), at least provide stub‑based unit tests to keep `pytest` green.
 
