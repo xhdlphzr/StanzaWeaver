@@ -3,6 +3,7 @@
 
 """MeterValidator 单元测试（符号层）。"""
 
+from src.models.syllable import Syllable
 from src.prosody.meter_validator import (
     MeterValidator,
     ValidationResult,
@@ -135,3 +136,40 @@ def test_validate_english_count_variant() -> None:
     }
     assert v.validate_count_only(["I see the light at night"], tpl).passed is True
     assert v.validate_count_only(["light"], tpl).passed is False
+
+
+def test_validate_full_tries_all_variants() -> None:
+    """组合搜索应尝试每行全部变体，任一组合合律即通过（不再只取主变体）。"""
+
+    class StubTemplate:
+        def validate_full(
+            self, poem: list[str], syllables: list[list[Syllable]]
+        ) -> list[str]:
+            first = syllables[0]
+            if first and first[0].nucleus == "GOOD":
+                return []
+            return ["bad"]
+
+    v = MeterValidator()
+    good = Syllable(onset="", nucleus="GOOD", coda="", attributes={})
+    bad = Syllable(onset="", nucleus="BAD", coda="", attributes={})
+    other = Syllable(onset="", nucleus="x", coda="", attributes={})
+    all_syl: list[list[list[Syllable]]] = [[[bad], [good]], [[other]]]
+    errs = v._validate_full_variants(StubTemplate(), ["a", "b"], all_syl, "zh")
+    assert errs == []
+
+
+def test_validate_full_falls_back_to_best_variant() -> None:
+    """若无任何组合合律，应回退到错误数最少的组合（不崩溃）。"""
+
+    class StubTemplate:
+        def validate_full(
+            self, poem: list[str], syllables: list[list[Syllable]]
+        ) -> list[str]:
+            return ["err"]
+
+    v = MeterValidator()
+    a = Syllable(onset="", nucleus="a", coda="", attributes={})
+    all_syl: list[list[list[Syllable]]] = [[[a]], [[a]]]
+    errs = v._validate_full_variants(StubTemplate(), ["x", "y"], all_syl, "zh")
+    assert errs == ["err"]

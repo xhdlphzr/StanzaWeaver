@@ -82,14 +82,70 @@ class EnglishAnalyzer(SyllableAnalyzer):
     def _get_pronunciations(self, word: str) -> list[list[str]]:
         """查询词的全部音素发音。
 
+        优先从本地 SQLite 词库（en_pron 表）读取，离线场景亦可工作；
+        未命中时回退到 CMUdict（首次使用会联网下载并缓存到内存）。
+
         Args:
             word: 英文单词。
 
         Returns:
             音素列表的列表（每个元素是一个发音）；未知词返回空列表。
         """
+        lowered = word.lower()
+        from ..knowledge import vocabulary
+
+        db_prons = vocabulary.get_en_pron(lowered)
+        if db_prons is not None:
+            return db_prons
         _load_cmudict()
-        return _ARPABET_TO_PHONEMES.get(word.lower(), [])
+        return _ARPABET_TO_PHONEMES.get(lowered, [])
+
+    def rhyme_tail(self, word: str) -> str | None:
+        """最后一个重读元音（主/次重音）起到词尾的音素串（含重音层级）。
+
+        押韵须为严格重音匹配：韵脚必须落在主/次重音音节，且该音节起的
+        全部音素（含重音数字）完全一致。
+
+        Args:
+            word: 英文单词。
+
+        Returns:
+            押韵尾串（如 "AY1 T"）；无重读音节时返回 None（不能作韵脚）。
+        """
+        tails = self.rhyme_tails(word)
+        return tails[0] if tails else None
+
+    def rhyme_tails(self, word: str) -> list[str]:
+        """返回该词全部发音中所有可用于押韵的尾串（含重音层级）。
+
+        每个发音取最后一个主/次重读音节起到词尾的音素序列；同一词的
+        多个发音会全部返回（去重），用于押韵校验时"任一发音押韵即通过"。
+
+        Args:
+            word: 英文单词。
+
+        Returns:
+            押韵尾串列表（可能包含多个）；无重读音节时返回空列表。
+        """
+        prons = self._get_pronunciations(word)
+        if not prons:
+            return []
+        result: list[str] = []
+        seen: set[str] = set()
+        for phones in prons:
+            for i in range(len(phones) - 1, -1, -1):
+                sm = _NUMBERS_RE.search(phones[i])
+                if (
+                    sm
+                    and sm.group() in ("1", "2")
+                    and _NUMBERS_RE.sub("", phones[i]) in _VOWEL_PHONEMES
+                ):
+                    tail = " ".join(phones[i:])
+                    if tail not in seen:
+                        seen.add(tail)
+                        result.append(tail)
+                    break
+        return result
 
     def analyze_variants(self, word: str) -> list[list[Syllable]]:
         """返回该词全部发音的音节切分结果。
@@ -197,29 +253,6 @@ class EnglishAnalyzer(SyllableAnalyzer):
                 )
             )
         return syllables
-
-    def rhyme_tail(self, word: str) -> str | None:
-        """最后一个重读元音（主/次重音）起到词尾的音素串（含重音标记）。
-
-        Args:
-            word: 英文单词。
-
-        Returns:
-            押韵尾串（如 "AY1 T"）；无重读音节时返回 None（不能作韵脚）。
-        """
-        prons = self._get_pronunciations(word)
-        if not prons:
-            return None
-        for phones in prons:
-            for i in range(len(phones) - 1, -1, -1):
-                sm = _NUMBERS_RE.search(phones[i])
-                if (
-                    sm
-                    and sm.group() in ("1", "2")
-                    and _NUMBERS_RE.sub("", phones[i]) in _VOWEL_PHONEMES
-                ):
-                    return " ".join(phones[i:])
-        return None
 
     def _fallback_analyze(self, word: str) -> list[Syllable]:
         """未知词启发式切分：按元音字母组数估音节数。

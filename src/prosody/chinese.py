@@ -124,20 +124,28 @@ def _split_final(final_str: str) -> tuple[str, str]:
 def _tone_to_pingze(tone_str: str) -> str:
     """声调 → 平仄标签。
 
+    一声、二声与轻声（含无调号）均归为平声；三声、四声归为仄声。
+
     Args:
-        tone_str: 带声调数字的韵母串（如 "iao3"）或纯标签。
+        tone_str: 带声调数字的韵母串（如 "iao3"），无声调号（轻声/无调）
+            或空串也按平声处理。
 
     Returns:
-        "平"、"仄" 或 ""（轻声/未知）。
+        "平" 或 "仄"。
     """
     if not tone_str:
-        return ""
-    t = tone_str[-1] if tone_str[-1].isdigit() else tone_str
+        return "平"
+    if tone_str[-1].isdigit():
+        t = tone_str[-1]
+    else:
+        # 无声调号视为轻声 → 平声
+        return "平"
     if t in _PING_TONES:
         return "平"
     if t in _ZE_TONES:
         return "仄"
-    return ""
+    # 5 声（轻声）等非常规数字亦归平声
+    return "平"
 
 
 class ChineseAnalyzer(SyllableAnalyzer):
@@ -150,7 +158,9 @@ class ChineseAnalyzer(SyllableAnalyzer):
     language = "zh"
 
     def analyze_word(self, word: str) -> list[Syllable]:
-        """分析中文文本（可多字）的音节。
+        """分析中文文本（可多字）的音节，返回首选（第一）读音。
+
+        为向后兼容保留单读音接口：返回 :meth:`analyze_word_variants` 的首个变体。
 
         Args:
             word: 中文文本，如 "弹琴" 或整行诗。
@@ -158,31 +168,122 @@ class ChineseAnalyzer(SyllableAnalyzer):
         Returns:
             每字一个 Syllable（平仄标在 attributes["tone"]）。
         """
+        variants = self.analyze_word_variants(word)
+        if not variants:
+            return []
+        return variants[0]
+
+    def analyze_word_variants(self, word: str) -> list[list[Syllable]]:
+        """返回某词的全部多音字读音组合（笛卡尔积）。
+
+        对每个字调用 pypinyin 的 heteronym 模式，得到该字的候选
+        (声母, 韵母) 列表，再对所有字做笛卡尔积，得到整词的全部读音。
+
+        结果上限 64 种组合；超出时按生成顺序保留前 64 种（确定性截断）。
+
+        Args:
+            word: 中文文本，如 "中" 或 "弹琴"。
+
+        Returns:
+            读音列表；每个元素是一整词的 Syllable 序列（一种读法）。
+        """
         if not word:
             return []
-        results: list[Syllable] = []
-        initials_list = pinyin(
-            word, style=Style.INITIALS, strict=False, heteronym=False
-        )
+
+        initials_list = pinyin(word, style=Style.INITIALS, strict=False, heteronym=True)
         finals_list = pinyin(
-            word, style=Style.FINALS_TONE3, strict=False, heteronym=False
+            word, style=Style.FINALS_TONE3, strict=False, heteronym=True
         )
 
+        # 逐字候选 Syllable 列表
+        candidates: list[list[Syllable]] = []
         for initials, finals in zip(initials_list, finals_list):
-            onset = str(initials[0]) if initials[0] else ""
-            final_raw = str(finals[0]) if finals[0] else ""
-            nucleus, coda = _split_final(final_raw)
-            tone_label = _tone_to_pingze(final_raw)
-
-            results.append(
-                Syllable(
-                    onset=onset,
-                    nucleus=nucleus,
-                    coda=coda,
-                    attributes={"tone": tone_label, "stress": "", "length": ""},
+            char_syls: list[Syllable] = []
+            for onset_r in initials:
+                for final_r in finals:
+                    onset = str(onset_r) if onset_r else ""
+                    final_raw = str(final_r) if final_r else ""
+                    nucleus, coda = _split_final(final_raw)
+                    tone_label = _tone_to_pingze(final_raw)
+                    char_syls.append(
+                        Syllable(
+                            onset=onset,
+                            nucleus=nucleus,
+                            coda=coda,
+                            attributes={
+                                "tone": tone_label,
+                                "stress": "",
+                                "length": "",
+                            },
+                        )
+                    )
+            # 去重（按内容），保持顺序
+            seen: set[tuple[str, str, str, str]] = set()
+            deduped: list[Syllable] = []
+            for syl in char_syls:
+                key = (
+                    syl.onset,
+                    syl.nucleus,
+                    syl.coda,
+                    syl.attributes.get("tone", ""),
                 )
-            )
-        return results
+                if key not in seen:
+                    seen.add(key)
+                    deduped.append(syl)
+            candidates.append(deduped)
+
+        # 逐字笛卡尔积（上限 64）
+        result: list[list[Syllable]] = [[]]
+        for char_syls in candidates:
+            if not char_syls:
+                char_syls = [
+                    Syllable(
+                        onset="",
+                        nucleus="",
+                        coda="",
+                        attributes={"tone": "", "stress": "", "length": ""},
+                    )
+                ]
+            new_result: list[list[Syllable]] = []
+            for combo in result:
+                for syl in char_syls:
+                    new_result.append(combo + [syl])
+            result = new_result
+            if len(result) > 64:
+                result = result[:64]
+        return result
+
+    def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
+        """返回整行诗的全部读音组合（逐字笛卡尔积）。
+
+        先按 :meth:`tokenize_line` 将行拆为汉字，逐字调用
+        :meth:`analyze_word_variants` 得到候选读音，再对整行做笛卡尔积。
+
+        结果上限 64 种组合；超出时按生成顺序保留前 64 种（确定性截断）。
+
+        Args:
+            line: 一行诗。
+
+        Returns:
+            读音列表；每个元素是一整行的 Syllable 序列（一种读法）。
+        """
+        chars = self.tokenize_line(line)
+        if not chars:
+            return []
+        word_variants = [self.analyze_word_variants(ch) for ch in chars]
+
+        result: list[list[Syllable]] = [[]]
+        for wv in word_variants:
+            if not wv:
+                wv = [[]]
+            new_result: list[list[Syllable]] = []
+            for combo in result:
+                for variant in wv:
+                    new_result.append(combo + variant)
+            result = new_result
+            if len(result) > 64:
+                result = result[:64]
+        return result
 
     def count_syllables(self, text: str) -> int:
         """中文字符数即音节数。

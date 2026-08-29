@@ -13,3 +13,10 @@ CREATE TABLE IF NOT EXISTS words (
 CREATE INDEX IF NOT EXISTS idx_words_language ON words(language);
 CREATE INDEX IF NOT EXISTS idx_words_text ON words(text);
 CREATE INDEX IF NOT EXISTS idx_words_syllable_count ON words(syllable_count);
+
+CREATE TABLE IF NOT EXISTS en_pron (
+    word TEXT PRIMARY KEY,
+    phones_json TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_en_pron_word ON en_pron(word);

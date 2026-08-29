@@ -186,18 +186,38 @@ def search_words(
         conditions.append("syllable_count = ?")
         params.append(syllable_count)
 
+    if onset or nucleus or coda or tone or stress or length:
+        exist_conds: list[str] = []
+        if onset:
+            exist_conds.append("json_extract(j.value, '$.onset') = ?")
+            params.append(onset)
+        if nucleus:
+            exist_conds.append("json_extract(j.value, '$.nucleus') = ?")
+            params.append(nucleus)
+        if coda:
+            exist_conds.append("json_extract(j.value, '$.coda') = ?")
+            params.append(coda)
+        if tone:
+            exist_conds.append("json_extract(j.value, '$.attributes.tone') = ?")
+            params.append(tone)
+        if stress:
+            exist_conds.append("json_extract(j.value, '$.attributes.stress') = ?")
+            params.append(stress)
+        if length:
+            exist_conds.append("json_extract(j.value, '$.attributes.length') = ?")
+            params.append(length)
+        exist_clause = " AND ".join(exist_conds)
+        conditions.append(
+            "EXISTS (SELECT 1 FROM json_each(words.syllables_json) j "
+            f"WHERE {exist_clause})"
+        )
+
     where_clause = " AND ".join(conditions)
-    sql = f"SELECT text, language, meaning, syllables_json, syllable_count FROM words WHERE {where_clause} LIMIT ?"
-    params.append(
-        limit * 4
-        if not onset
-        and not nucleus
-        and not coda
-        and not tone
-        and not stress
-        and not length
-        else limit * 8
+    sql = (
+        "SELECT text, language, meaning, syllables_json, syllable_count "
+        f"FROM words WHERE {where_clause} ORDER BY rowid LIMIT ?"
     )
+    params.append(limit)
 
     rows = conn.execute(sql, params).fetchall()
     conn.close()
@@ -274,3 +294,39 @@ def has_words(language: str = "") -> bool:
         非空返回 True。
     """
     return word_count(language) > 0
+
+
+def set_en_pron(word: str, prons: list[list[str]]) -> None:
+    """写入英文词的 CMUdict 全部发音（本地缓存，供 EnglishAnalyzer 离线使用）。
+
+    Args:
+        word: 小写英文词。
+        prons: 音素列表的列表（每个元素是一个发音）。
+    """
+    conn = _get_conn()
+    conn.execute(
+        "INSERT OR REPLACE INTO en_pron (word, phones_json) VALUES (?, ?)",
+        (word, json.dumps(prons, ensure_ascii=False)),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_en_pron(word: str) -> list[list[str]] | None:
+    """读取英文词的 CMUdict 全部发音（本地缓存）。
+
+    Args:
+        word: 小写英文词。
+
+    Returns:
+        音素列表的列表；词不存在于本地缓存时返回 None（调用方应回退到 CMUdict）。
+    """
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT phones_json FROM en_pron WHERE word = ?", (word,)
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    data: list[list[str]] = json.loads(row[0])
+    return data

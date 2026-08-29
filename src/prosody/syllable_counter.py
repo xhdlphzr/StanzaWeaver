@@ -7,6 +7,9 @@
 意大利语整行做 sinalefe 合并，其余语言逐词切分。
 """
 
+from collections.abc import Callable
+from typing import cast
+
 from ..models.syllable import Syllable
 from .base import SyllableAnalyzer
 from .chinese import ChineseAnalyzer
@@ -21,6 +24,58 @@ _ANALYZERS: dict[str, SyllableAnalyzer] = {
     "it": ItalianAnalyzer(),
     "fr": FrenchAnalyzer(),
     "la": LatinAnalyzer(),
+}
+
+_LineHandler = Callable[[SyllableAnalyzer, str], list[Syllable]]
+
+
+def _zh_line(analyzer: SyllableAnalyzer, line: str) -> list[Syllable]:
+    """中文整行分析：取多音字消歧后的首选变体。
+
+    Args:
+        analyzer: 中文分析器。
+        line: 一行诗。
+
+    Returns:
+        首选音节切分。
+    """
+    variants = analyzer.analyze_line_variants(line)  # type: ignore[attr-defined]
+    for v in variants:
+        if v:
+            return cast("list[Syllable]", v)
+    return []
+
+
+def _it_line(analyzer: SyllableAnalyzer, line: str) -> list[Syllable]:
+    """意大利语整行分析（含 sinalefe 合并）。
+
+    Args:
+        analyzer: 意大利语分析器。
+        line: 一行诗。
+
+    Returns:
+        整行音节列表。
+    """
+    return cast("list[Syllable]", analyzer.syllabify_line(line))  # type: ignore[attr-defined]
+
+
+def _la_line(analyzer: SyllableAnalyzer, line: str) -> list[Syllable]:
+    """拉丁语整行分析（跨词音长判定）。
+
+    Args:
+        analyzer: 拉丁语分析器。
+        line: 一行诗。
+
+    Returns:
+        整行音节列表。
+    """
+    return cast("list[Syllable]", analyzer.analyze_line(line))  # type: ignore[attr-defined]
+
+
+_LINE_HANDLERS: dict[str, _LineHandler] = {
+    "zh": _zh_line,
+    "it": _it_line,
+    "la": _la_line,
 }
 
 
@@ -78,20 +133,12 @@ def analyze_line(line: str, language: str) -> list[Syllable]:
         整行音节列表。
     """
     analyzer = get_analyzer(language)
-    if language == "zh":
-        chars = analyzer.tokenize_line(line)
-        return analyzer.analyze_word("".join(chars))
-    elif language == "it":
-        result: list[Syllable] = analyzer.syllabify_line(line)  # type: ignore[attr-defined]
-        return result
-    elif language == "la":
-        # 拉丁语需跨词判定音长（muta cum liquida / 双辅音成位）
-        la_syls: list[Syllable] = analyzer.analyze_line(line)  # type: ignore[attr-defined]
-        return la_syls
-    else:
-        words = analyzer.tokenize_line(line)
-        syllables: list[Syllable] = []
-        for w in words:
-            analyzed = analyzer.analyze_word(w)
-            syllables.extend(analyzed)
-        return syllables
+    handler = _LINE_HANDLERS.get(language)
+    if handler is not None:
+        return handler(analyzer, line)
+    words = analyzer.tokenize_line(line)
+    syllables: list[Syllable] = []
+    for w in words:
+        analyzed = analyzer.analyze_word(w)
+        syllables.extend(analyzed)
+    return syllables

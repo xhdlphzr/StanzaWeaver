@@ -15,7 +15,7 @@ from ..logging_setup import get_logger
 from ..models.syllable import Syllable
 from ..models.word import Word
 from ..prosody.chinese import CHINESE_INITIALS, FINAL_TO_PARTS
-from .vocabulary import get_db_path, init_db, insert_words
+from .vocabulary import get_db_path, init_db, insert_words, set_en_pron
 
 # y/w 零声母拼写还原为 pypinyin 风格的韵母（与 prosody/chinese.py 实时分析保持一致）
 _YW_MAP: dict[str, str] = {
@@ -201,7 +201,7 @@ def _parse_pinyin(raw_list: list[str]) -> list[Syllable]:
     Returns:
         音节列表（平仄标在 tone）。
     """
-    tone_map: dict[str, str] = {"1": "平", "2": "平", "3": "仄", "4": "仄", "5": ""}
+    tone_map: dict[str, str] = {"1": "平", "2": "平", "3": "仄", "4": "仄", "5": "平"}
     results: list[Syllable] = []
     for raw in raw_list:
         tone_num = ""
@@ -266,86 +266,33 @@ def _import_english() -> None:
         nltk.download("cmudict", quiet=True)
     from nltk.corpus import cmudict  # type: ignore[import-untyped]
 
+    from ..prosody.english import EnglishAnalyzer
+
+    en_analyzer = EnglishAnalyzer()
     batch: list[Word] = []
     total = 0
-    _VOWELS = {
-        "AA",
-        "AE",
-        "AH",
-        "AO",
-        "AW",
-        "AX",
-        "AXR",
-        "AY",
-        "EH",
-        "ER",
-        "EY",
-        "IH",
-        "IX",
-        "IY",
-        "OW",
-        "OY",
-        "UH",
-        "UW",
-        "UX",
-    }
-    _SMAP: dict[str, str] = {"0": "light", "1": "heavy", "2": "heavy"}
     for word, pron_list in cmudict.dict().items():
-        if not str(word).isalpha():
+        key = str(word).lower()
+        if not key.isalpha():
             continue
         seen: set[tuple[str, ...]] = set()
+        pron_holder: list[list[str]] = []
         for phones in pron_list:
-            pron_key: tuple[str, ...] = tuple(str(p) for p in phones)
+            phones_list = [str(p) for p in phones]
+            pron_key = tuple(phones_list)
             if pron_key in seen:
                 continue
             seen.add(pron_key)
-            syls: list[Syllable] = []
-            ons: list[str] = []
-            nuc = ""
-            stre = ""
-            cod: list[str] = []
-            for p in phones:
-                cl = re.sub(r"\d+", "", p)
-                sm = re.search(r"\d", p)
-                st = sm.group() if sm else ""
-                if cl in _VOWELS:
-                    if nuc:
-                        syls.append(
-                            Syllable(
-                                onset="".join(ons),
-                                nucleus=nuc,
-                                coda="".join(cod),
-                                attributes={"tone": "", "stress": stre, "length": ""},
-                            )
-                        )
-                        ons = []
-                        cod = []
-                    nuc = cl
-                    stre = _SMAP.get(st, "")
-                else:
-                    (cod if nuc else ons).append(cl)
-            if nuc:
-                syls.append(
-                    Syllable(
-                        onset="".join(ons),
-                        nucleus=nuc,
-                        coda="".join(cod),
-                        attributes={"tone": "", "stress": stre, "length": ""},
-                    )
-                )
+            pron_holder.append(phones_list)
+            syls = en_analyzer._parse_phones(phones_list)
             if syls:
-                batch.append(
-                    Word(
-                        text=str(word).upper(),
-                        language="en",
-                        syllables=syls,
-                        meaning="",
-                    )
-                )
+                batch.append(Word(text=key, language="en", syllables=syls, meaning=""))
                 total += 1
                 if len(batch) >= 500:
                     insert_words(batch)
                     batch.clear()
+        if pron_holder:
+            set_en_pron(key, pron_holder)
     if batch:
         insert_words(batch)
     if total > 0:
@@ -395,14 +342,25 @@ def _import_french() -> None:
                         n = 1
                 phon = cols[pc] if pc >= 0 and pc < len(cols) else ""
                 syls = _fr_analyzer._syllabify_word(w)
+                n = max(n, 1)
                 if not syls:
                     syls = [
                         Syllable(
                             nucleus="?",
                             attributes={"tone": "", "stress": "", "length": ""},
                         )
-                        for _ in range(max(n, 1))
+                        for _ in range(n)
                     ]
+                elif len(syls) != n:
+                    placeholder = Syllable(
+                        nucleus="?",
+                        attributes={"tone": "", "stress": "", "length": ""},
+                    )
+                    if len(syls) < n:
+                        while len(syls) < n:
+                            syls.append(placeholder)
+                    else:
+                        syls = syls[:n]
                 batch.append(Word(text=w, language="fr", syllables=syls, meaning=phon))
                 total += 1
                 if len(batch) >= 500:
@@ -531,7 +489,7 @@ def _import_latin() -> None:
                 continue
             meaning = parts[1].strip()[:120] if len(parts) > 1 else ""
             seen.add(clean)
-            syllables = analyzer.analyze_word(clean)
+            syllables = analyzer.analyze_line(clean)
             if not syllables:
                 syllables = [
                     Syllable(

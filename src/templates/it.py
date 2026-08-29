@@ -13,29 +13,44 @@ from . import ConstraintTable, PoetryTemplate, register
 
 
 def _check_tenth_syllable_stress(
-    syllables: list[list[Syllable]], errors: list[str]
+    syllables: list[list[Syllable]],
+    errors: list[str],
+    indices: list[int] | None = None,
 ) -> None:
-    """检查每行第 10 个音节（0-based 9）必须重读。
+    """检查 11 音节句的第 10 音节须重读、第 11 音节须非重读。
+
+    仅对传入（或默认全部）行中长度足够的行生效：10 音节及以上需第 10
+    音节重读；11 音节及以上还需第 11 音节不可重读（避免 tronca 误判）。
 
     Args:
         syllables: 各行音节。
         errors: 错误列表（就地追加）。
+        indices: 仅检查这些行号（0-based）；为 None 时检查全部行。
     """
-    for i, syls in enumerate(syllables):
+    targets = indices if indices is not None else list(range(len(syllables)))
+    for i in targets:
+        syls = syllables[i]
         if len(syls) >= 10 and syls[9].attributes.get("stress") != "heavy":
             errors.append(f"第{i + 1}行第10音节应重读，实际未重读")
+        if len(syls) >= 11 and syls[10].attributes.get("stress") == "heavy":
+            errors.append(f"第{i + 1}行第11音节不应重读")
 
 
 def _check_last_syllable_stress(
-    syllables: list[list[Syllable]], errors: list[str]
+    syllables: list[list[Syllable]],
+    errors: list[str],
+    indices: list[int] | None = None,
 ) -> None:
-    """检查每行末音节必须重读（tronca 行尾）。
+    """检查指定行末音节必须重读（tronca 行尾）。
 
     Args:
         syllables: 各行音节。
         errors: 错误列表（就地追加）。
+        indices: 仅检查这些行号（0-based）；为 None 时检查全部行。
     """
-    for i, syls in enumerate(syllables):
+    targets = indices if indices is not None else list(range(len(syllables)))
+    for i in targets:
+        syls = syllables[i]
         if syls and syls[-1].attributes.get("stress") != "heavy":
             errors.append(f"第{i + 1}行末音节应重读，实际未重读")
 
@@ -135,7 +150,7 @@ class OttavaRimaTemplate(PoetryTemplate):
 
 
 class CanzoneTemplate(PoetryTemplate):
-    """歌谣：13 行（11/7 音节交错），末音节重读，韵脚至多 4 个。"""
+    """歌谣：13 行（11/7 音节交错），奇数行末非重读、偶数行与末行重读，韵脚至多 4 个。"""
 
     name = "歌谣"
     language = "it"
@@ -156,9 +171,9 @@ class CanzoneTemplate(PoetryTemplate):
         7,
     ]
     rule_description = (
-        "格律规则：奇数行（1、3、5、7、9、11）为11音节，"
-        "偶数行（2、4、6、8、10、12）为7音节，第13行为7音节；"
-        "每行末音节必须重读（行尾须用 tronca 词，如 amor、virtù、perché）；"
+        "格律规则：奇数行（1、3、5、7、9、11）为11音节（endecasillabo femminile），"
+        "第10音节重读、第11音节非重读；"
+        "偶数行（2、4、6、8、10、12）与第13行为7音节（settenario femminile），末音节重读；"
         "全诗使用 A、B、C、D 四个韵脚，同一韵脚连续出现不得超过两次，末三行韵脚各不相同。"
     )
 
@@ -169,9 +184,14 @@ class CanzoneTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：末音节重读、韵脚 ≤4、连续同韵 ≤2、末三行各异。"""
+        """完整检查：奇数行（11 音节）第 10 重读/第 11 非重读，偶数行与
+        第 13 行（7 音节）末音节重读；韵脚 ≤4、连续同韵 ≤2、末三行各异。
+        """
         errors: list[str] = []
-        _check_last_syllable_stress(syllables, errors)
+        # 奇数行（1,3,5,7,9,11）：11 音节，第 10 音节重读、第 11 不可重读
+        _check_tenth_syllable_stress(syllables, errors, indices=[0, 2, 4, 6, 8, 10])
+        # 偶数行（2,4,6,8,10,12）及第 13 行：7 音节，末音节重读
+        _check_last_syllable_stress(syllables, errors, indices=[1, 3, 5, 7, 9, 11, 12])
 
         distinct: set[str] = set()
         for syls in syllables:

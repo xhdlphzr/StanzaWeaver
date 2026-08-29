@@ -171,10 +171,40 @@ class DistichonTemplate(PoetryTemplate):
         """无固定位置约束（同六步格）。"""
         return None
 
+    @staticmethod
+    def _has_pentameter_caesura(line: str, total: int) -> bool:
+        """判断五步格诗行前后两半之间（即倒数第 6 音节处）是否存在词界停顿。
+
+        五步格后半固定为两个完整扬抑抑格（6 音节），故停顿须落在
+        ``total - 6`` 个音节之后的词边界上。
+
+        Args:
+            line: 第 2 行（五步格）文本。
+            total: 整行音节总数。
+
+        Returns:
+            若在前半与后半之间存在词界返回 True，否则 False。
+        """
+        if total < 6:
+            return False
+        split = total - 6
+        cum = 0
+        for w in line.split():
+            w_clean = w.strip(".,;:!?\"'()[]{}")
+            if not w_clean:
+                continue
+            n = len(_LATIN.analyze_word(w_clean))
+            if n == 0:
+                continue
+            if cum + n == split:
+                return True
+            cum += n
+        return False
+
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：第 1 行六步格、第 2 行末 6 音节扬抑抑×2、AA 押韵。"""
+        """完整检查：第 1 行六步格、第 2 行末 6 音节扬抑抑×2、中部 caesura、AA 押韵。"""
         errors: list[str] = []
         if not syllables or len(syllables) < 2:
             return errors
@@ -190,6 +220,11 @@ class DistichonTemplate(PoetryTemplate):
                     errors.append(
                         f"第2行倒数第{6 - j}音节应为{exp}（后2.5音步须为两个完整扬抑抑格），实际为{actual}"
                     )
+            line2 = poem[1] if len(poem) > 1 else ""
+            if not self._has_pentameter_caesura(line2, len(pent_syls)):
+                errors.append(
+                    "第2行五步格中部缺少停顿（caesura）：前半(2.5音步)与后半(2.5音步)之间须有词界"
+                )
         elif len(pent_syls) >= 2:
             errors.append("第2行音节数不足: 至少11个")
         if len(poem) >= 2 and syllables[0] and syllables[1]:
@@ -222,7 +257,7 @@ class HendecasyllabusTemplate(PoetryTemplate):
                 {},
                 _L,
                 _S,
-                _S,
+                _L,
                 _L,
                 _S,
                 _L,
@@ -244,6 +279,7 @@ class HendecasyllabusTemplate(PoetryTemplate):
             errors.append(f"音节数不足: 需要11个，实际{len(syls)}个")
         patterns = [
             (2, "long"),
+            (4, "long"),
             (5, "long"),
             (7, "long"),
             (9, "long"),
