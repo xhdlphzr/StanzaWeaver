@@ -297,4 +297,4 @@ UI 齿轮按钮中直接编辑保存，或手动编辑 `~/.stanza_weaver/config.
 
 所有代码均使用 `MIT` 许可证开源，Copyright (c) 2026 xhdlphzr。
 
-应用图标 `Franx.ico` 、 `Franx.png` 与 `assets/` 目录内所有文件，均 Copyright (c) 2026 xhdlphzr. All rights reserved.
+应用图标 `Franx.png` 、 `Franx.ico` 、 `Franx.icns` 与 `assets/` 目录内所有文件，均 Copyright (c) 2026 xhdlphzr. All rights reserved.
