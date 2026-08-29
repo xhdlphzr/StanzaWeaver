@@ -3,7 +3,7 @@
 
 # StanzaWeaver
 
-> **以智识，巧织诗** —— 神经符号智能诗歌生成桌面软件
+> **Weaving Stanzas with Wisdom** — A Neuro-Symbolic Intelligent Poetry Generation Desktop Application
 
 [![Stars](https://img.shields.io/github/stars/xhdlphzr/StanzaWeaver)](https://github.com/xhdlphzr/StanzaWeaver/stargazers)
 [![Issues](https://img.shields.io/github/issues/xhdlphzr/StanzaWeaver)](https://github.com/xhdlphzr/StanzaWeaver/issues)
@@ -13,167 +13,169 @@
 [![Ruff](https://img.shields.io/badge/ruff-passing-brightgreen)](https://github.com/xhdlphzr/StanzaWeaver)
 [![mypy](https://img.shields.io/badge/mypy--strict-passing-brightgreen)](https://github.com/xhdlphzr/StanzaWeaver)
 [![Project Status](https://img.shields.io/badge/Project%20Status-Active-brightgreen)](https://github.com/xhdlphzr/StanzaWeaver)
+[![English](https://img.shields.io/badge/English-README-007EC6)](https://github.com/xhdlphzr/StanzaWeaver/blob/main/README.md)
+[![汉语](https://img.shields.io/badge/汉语-README-007EC6)](https://github.com/xhdlphzr/StanzaWeaver/blob/main/docs/README.zh.md)
 
-StanzaWeaver 把「AI 的想象力」与「格律的硬规则」编织在一起：现代大模型负责遣词造句与意境构思，一套零 AI 开销的符号引擎负责把每一行诗钉死在平仄、押韵与字数的格子上。两者通过结构化的工具调用解耦，既不让模型天马行空地打破格律，也不让规则僵化成填空题。
-
----
-
-## 目录
-
-- [项目简介（项目书）](#项目简介项目书)
-- [系统架构](#系统架构)
-- [核心特性](#核心特性)
-- [功能演示](#功能演示)
-- [四步生成流水线](#四步生成流水线)
-- [Docker 部署](#docker-部署)
-- [项目结构](#项目结构)
-- [格律模板](#格律模板)
-- [LLM 配置](#llm-配置)
-- [许可证](#许可证)
+StanzaWeaver weaves together the "imagination of AI" and the "hard rules of meter": a modern large language model handles wording, phrasing, and artistic conception, while a zero‑AI‑overhead symbolic engine pins every line to the grid of tone, rhyme, and syllable count. The two are decoupled via structured tool calls—neither letting the model break the rules, nor freezing creativity into a fill‑in‑the‑blanks exercise.
 
 ---
 
-## 项目简介（项目书）
+## Table of Contents
 
-### 设计理念：神经符号（Neuro-Symbolic）
-
-诗歌是「戴着镣铐跳舞」的艺术。纯神经网络生成常常文采斐然却平仄尽失、韵脚错乱；纯规则系统又能对却毫无灵气。StanzaWeaver 采用**神经符号**架构，让两层各司其职：
-
-| 层                    | 角色       | 实现               | 特点                       |
-| --------------------- | ---------- | ------------------ | -------------------------- |
-| **符号层**（硬规则）  | 格律裁判   | 纯 Python 校验代码 | 零 AI 开销、确定、可解释   |
-| **神经层**（AI 语义） | 诗意创作者 | LLM + Tool Calling | 负责描述、意境、炼句、终审 |
-
-符号层负责：音节计数、平仄/轻重/长短约束、押韵检测、三平尾、孤平、二四六分明等，全部由 Python 代码完成，不消耗任何一次模型调用。神经层负责：从现代文描述生成诗歌主题、构思句意、在约束下反复炼句、以及对成稿做句意终审，通过大语言模型（兼容 OpenAI API 的任意端点）与工具调用实现。
-
-### 为何用工具调用解耦
-
-两层之间**只通过结构化工具通信**，AI 永远不能输出一大段自由文本来「假装」交稿，只能调用以下四个工具给出结构化数据：
-
-- `search_words`：按释义/平仄/韵部检索本地词库，给 AI 提供合规的字词候选；
-- `refine_line`：整行替换，每次调用后立即跑一遍全部格律约束；
-- `rewrite`：带着指令整体重写；
-- `submit`：提交定稿（当且仅当已成功修改过诗句）。
-
-这种「工具即接口」的设计，使 AI 的创造力被牢牢框在格律的边界内，也让每一次修改都可被符号层即时验证——既不会生成不合规的诗句，也不会让 AI 用散文糊弄过去。
-
-### 三要素反馈闭环
-
-编写 AI、检查 AI、用户构成三角反馈：**任意一环不通过，都打回 Step 3 继续炼句**，直到检查 AI 终审通过或用户满意定稿。炼句轮数不设上限，模型可一直精修到通过为止。
+- [Project Introduction](#project-introduction)
+- [System Architecture](#system-architecture)
+- [Core Features](#core-features)
+- [Demo](#demo)
+- [Four‑Step Generation Pipeline](#fourstep-generation-pipeline)
+- [Docker Deployment](#docker-deployment)
+- [Project Structure](#project-structure)
+- [Meter Templates](#meter-templates)
+- [LLM Configuration](#llm-configuration)
+- [License](#license)
 
 ---
 
-## 系统架构
+## Project Introduction
+
+### Design Philosophy: Neuro‑Symbolic
+
+Poetry is the art of "dancing in chains". Pure neural network generation often produces beautiful words but loses tone and rhyme; pure rule‑based systems can be perfectly correct but utterly lifeless. StanzaWeaver adopts a **Neuro‑Symbolic** architecture, giving each layer its own role:
+
+| Layer                     | Role           | Implementation              | Characteristics                                                        |
+| :------------------------ | :------------- | :-------------------------- | :--------------------------------------------------------------------- |
+| **Symbolic** (Hard Rules) | Meter Judge    | Pure Python validation code | Zero AI cost, deterministic, explainable                               |
+| **Neural** (AI Semantics) | Poetic Creator | LLM + Tool Calling          | Handles description, artistic conception, refinement, and final review |
+
+The symbolic layer handles: syllable counting, tone/stress/length constraints, rhyme checking, “three‑level‑tail”, “solitary level”, and “alternating tones at even positions” — all done in pure Python with zero LLM calls. The neural layer takes a modern‑language description, generates a poetic theme, conceives meaning, repeatedly refines under constraints, and finally reviews the finished piece for semantic coherence — all via a large language model (compatible with any OpenAI‑style endpoint) and tool calls.
+
+### Why Tool‑Call Decoupling?
+
+The two layers communicate **only through structured tools**. The AI can never output a block of free‑form text to "pretend" it has finished; it can only call these four tools with structured data:
+
+- `search_words` – retrieve candidate words/phrases from the local lexicon by meaning, tone, or rhyme category
+- `refine_line` – replace an entire line, then immediately run full meter validation
+- `rewrite` – rewrite the whole poem with a given instruction
+- `submit` – submit the final draft (only allowed after at least one successful line change)
+
+This "tools‑as‑interface" design keeps the AI’s creativity firmly within the boundaries of meter, and every modification is instantly verified by the symbolic layer — neither generating illegal lines, nor allowing the AI to bluff its way through with prose.
+
+### Three‑Element Feedback Loop
+
+The Writer AI, Checker AI, and the user form a triangular feedback loop: **if any link fails, the process is sent back to Step 3 for further refinement** — until the Checker AI passes it or the user is satisfied. There is no upper limit on refinement rounds; the model can keep polishing until it passes.
+
+---
+
+## System Architecture
 
 ```mermaid
 flowchart TD
-    User([用户]) -->|主题描述 / 反馈| UI[前端 UI<br/>templates/index.html · static/style.css]
+    User([User]) -->|theme description / feedback| UI[Frontend UI<br/>templates/index.html · static/style.css]
     UI -->|HTTP + SocketIO| App[app.py<br/>Flask + SocketIO + pywebview]
 
-    App --> Pipe[PoetryPipeline · 四步流水线]
+    App --> Pipe[PoetryPipeline · 4‑step pipeline]
 
-    subgraph S1 [Step 1 · 描述生成]
-        W1[编写 AI writer_ai]
+    subgraph S1 [Step 1 · Description Generation]
+        W1[Writer AI]
     end
-    subgraph S2 [Step 2 · 初稿]
-        W2[编写 AI 生成初稿<br/>仅校验行数 / 音节数]
+    subgraph S2 [Step 2 · First Draft]
+        W2[Writer AI produces initial draft<br/>only validates line count / syllable count]
     end
-    subgraph S3 [Step 3 · 炼句循环 ReAct]
-        W3[编写 AI 工具调用]
-        T[工具执行 tools/<br/>search_words · refine_line · rewrite · submit]
-        Sym[符号层 prosody/<br/>音节计数 · 平仄 · 押韵 · 孤平]
+    subgraph S3 [Step 3 · Refinement Loop ReAct]
+        W3[Writer AI tool calls]
+        T[Tool execution tools/<br/>search_words · refine_line · rewrite · submit]
+        Sym[Symbolic layer prosody/<br/>syllable count · tone · rhyme · solitary level]
         W3 -->|search_words / refine_line / rewrite| T
         T --> Sym
-        Sym -->|逐位格律校验| W3
+        Sym -->|per‑syllable meter validation| W3
     end
-    subgraph S4 [Step 4 · 句意终审]
-        C[检查 AI checker_ai]
+    subgraph S4 [Step 4 · Semantic Final Review]
+        C[Checker AI]
     end
 
     Pipe --> S1 --> S2 --> S3
-    S3 -->|submit 定稿| S4
-    S4 -->|不通过 · 打回| S3
-    S4 -->|通过| Out([定稿诗歌])
+    S3 -->|submit final draft| S4
+    S4 -->|fail · send back| S3
+    S4 -->|pass| Out([Final Poem])
 
-    W1 & W2 & W3 & C --> LLM{{LLM 端点<br/>writer / checker 可独立配置}}
-    T --> KB[(本地词库 SQLite<br/>vocabulary · embeddings · importer)]
-    KB -->|CC-CEDICT / CMUdict / Lexique / GLAW-IT / Lewis & Short| Imp[importer.py]
+    W1 & W2 & W3 & C --> LLM{{LLM Endpoint<br/>writer / checker independently configurable}}
+    T --> KB[(Local SQLite Lexicon<br/>vocabulary · embeddings · importer)]
+    KB -->|CC‑CEDICT / CMUdict / Lexique / GLAW‑IT / Lewis & Short| Imp[importer.py]
 ```
 
 ---
 
-## 核心特性
+## Core Features
 
-- **神经符号双引擎**：硬格律规则由纯 Python 确定性校验，AI 只负责诗意，二者经结构化工具解耦。
-- **四步生成流水线**：描述生成 → 初稿（仅验音节数）→ ReAct 炼句循环（搜词 + 整行替换 + 整体重写，每次改动即时全量格律校验）→ 检查 AI 句意终审。
-- **三要素反馈闭环**：编写 AI → 检查 AI → 用户，任一环不通过即打回 Step 3 续炼，**炼句轮数无上限**。
-- **多语言格律**：中文（五绝 / 七绝 / 五律 / 七律 / 相见欢）、英文（商籁体 / 维拉内拉 / 英雄双行体）、意大利语、法语、古典拉丁语；模板以 Python 类定义，可无限扩展。
-- **多层格律校验**：逐位平仄/轻重约束 + 三平尾 + 孤平 + 二四六分明 + 押韵检测（中文按十三辙归并，西语按实时音素韵脚）。
-- **实时流式输出**：LLM 生成过程逐 token 推送到前端，Step 详情区持续展开更新。
-- **双 AI 代理可分离**：编写 AI（4 工具）与检查 AI（1 工具）可各自配置不同 LLM 端点与模型。
-- **本地词库 + 向量重排**：SQLite 词库（CC-CEDICT / CMUdict / Lexique / GLAW-IT / Lewis & Short），`sentence-transformers` 做语义重排。
-- **桌面打包分发**：pywebview + Flask + SocketIO，pyinstaller 打包为单文件 exe。
-
----
-
-## 功能演示
-
-下图展示 StanzaWeaver 的生成界面与炼句过程：
-
-![功能演示](assets/1.png)
+- **Neuro‑Symbolic Dual Engine** – Hard meter rules are enforced by deterministic pure‑Python validation; the AI is responsible only for poetic meaning, decoupled via structured tools.
+- **Four‑Step Generation Pipeline** – Description generation → First draft (syllable count only) → ReAct refinement loop (search + line replacement + full rewrite, with immediate full‑poem validation after each change) → Checker AI semantic final review.
+- **Three‑Element Feedback Loop** – Writer AI → Checker AI → User; any failure sends the work back to Step 3 for further refinement, **with no upper limit on refinement rounds**.
+- **Multi‑language Meter** – Chinese (5‑character quatrain, 7‑character quatrain, 5‑character regulated verse, 7‑character regulated verse, Xiangjianhuan), English (Shakespearean sonnet, villanelle, heroic couplet), Italian, French, Classical Latin; templates are defined as Python classes and can be extended indefinitely.
+- **Multi‑Layer Meter Validation** – Per‑syllable tone/stress constraints + three‑level‑tail + solitary level + alternating tone rule + rhyme checking (Chinese grouped by Thirteen Rhymes, Western languages by real‑time phoneme‑based rhyme).
+- **Real‑time Streaming Output** – LLM generation tokens are pushed to the frontend token by token, with the Step detail area continuously updating.
+- **Separable Dual AI Agents** – Writer AI (4 tools) and Checker AI (1 tool) can use different LLM endpoints and models independently.
+- **Local Lexicon + Vector Reranking** – SQLite lexicon (CC‑CEDICT / CMUdict / Lexique / GLAW‑IT / Lewis & Short), with `sentence‑transformers` for semantic reranking.
+- **Desktop Packaging** – pywebview + Flask + SocketIO, packaged as a single executable using PyInstaller.
 
 ---
 
-## 四步生成流水线
+## Demo
 
-1. **Step 1 · 描述生成**：编写 AI 根据用户输入的现代文主题，提炼出诗歌的主题描述（供后续步骤复用的「创作大纲」）。
-2. **Step 2 · 初稿**：编写 AI 依据模板的格律要求（行数、音节数）生成初稿，此阶段仅做行数与音节数校验。
-3. **Step 3 · 炼句循环（ReAct）**：AI 反复调用 `search_words` 检索合规字词、`refine_line` 整行替换、`rewrite` 整体重写；每一次修改都立即触发符号层对全诗的格律校验。AI 只有在确实修改过诗句后才允许 `submit`，否则被拒绝并要求继续打磨。**该循环无轮数上限**，直到提交定稿。
-4. **Step 4 · 句意终审**：检查 AI 从句意、主题贴合度、格律之外的高级维度评审成稿，调用 `submit` 给出「通过 / 打回」。不通过则携带建议打回 Step 3 继续炼句；通过则定稿。
+The following image shows the generation interface and refinement process:
+
+![Demo](assets/1.png)
 
 ---
 
-## Docker 部署
+## Four‑Step Generation Pipeline
 
-以 Web 服务方式运行（无需本地 Python 环境）：
+1. **Step 1 · Description Generation** – The Writer AI takes the user’s modern‑language theme and produces a poetic description (a “creative outline” reused in later steps).
+2. **Step 2 · First Draft** – The Writer AI produces an initial draft respecting the template’s meter requirements (line count, syllable count). Only line and syllable counts are validated at this stage.
+3. **Step 3 · Refinement Loop (ReAct)** – The AI repeatedly calls `search_words` to find compliant words/phrases, `refine_line` to replace lines, and `rewrite` to rewrite entire poems; every modification immediately triggers symbolic‑layer full‑poem validation. The AI is allowed to `submit` only after it has actually modified at least one line — otherwise it is rejected and asked to keep polishing. **There is no upper limit on this loop**; it continues until the draft is submitted.
+4. **Step 4 · Semantic Final Review** – The Checker AI reviews the final draft from aspects such as coherence, thematic fit, and higher‑level dimensions beyond meter, then calls `submit` to give a pass/fail decision. If it fails, suggestions are sent back to Step 3 for further refinement; if it passes, the poem is finalised.
 
-用 `scripts/` 下的一键脚本（Windows 与 Linux/macOS 通用，均支持 `-h` 查看参数）：
+---
 
-| 平台       | 构建                                                | 运行                                                  |
-| ---------- | --------------------------------------------------- | ----------------------------------------------------- |
+## Docker Deployment
+
+Run as a web service (no local Python environment required):
+
+Use the one‑click scripts in `scripts/` (Windows and Linux/macOS, all support `-h` for help):
+
+| Platform   | Build                                               | Run                                                   |
+| :--------- | :-------------------------------------------------- | :---------------------------------------------------- |
 | PowerShell | `.\scripts\build.ps1 [-t tag] [-b base-image] [-n]` | `.\scripts\run.ps1 [-p port] [-d] [-l] [--no-volume]` |
 | cmd        | `scripts\build.bat [-t tag] [-b base-image] [-n]`   | `scripts\run.bat [-p port] [-d] [-l] [--no-volume]`   |
 | bash       | `./scripts/build.sh [-t tag] [-b base-image] [-n]`  | `./scripts/run.sh [-p port] [-d] [-l] [--no-volume]`  |
 
-示例：`.\scripts\build.ps1 -b docker.m.daocloud.io/library/python:3.14-slim` 构建，`.\scripts\run.ps1 -d -l` 后台运行并跟随日志。
+Example: `.\scripts\build.ps1 -b docker.m.daocloud.io/library/python:3.14-slim` to build, and `.\scripts\run.ps1 -d -l` to run in background and follow logs.
 
-说明：
+Notes:
 
-- **依赖**：直接用项目完整 `requirements.txt`（含桌面 GUI 与嵌入重排组件，功能与本地一致）；Linux 镜像会同时包含这些依赖，镜像较大、首次构建较慢，但构建一次后可复用。
-- **数据持久化**：配置、词库、历史记录、日志通过 volume `stanzaweaver-data` 持久化到容器内 `~/.stanza_weaver`。
-- **安全设计**：应用仅接受 `localhost`/`127.0.0.1` 的 Host 头（`app.py` 的 `_guard_local_access`），Docker 部署需通过 `http://localhost:5000` 访问；Linux 下也可改用 `network_mode: host`（见 `docker-compose.yml` 注释）。
-- **自定义模板**：通过 UI 创建的自定义模板写入容器内 `/app/src/templates/`，容器重建后需重新创建（源码未挂载）。
-- **日志**：容器内日志文件位于 `~/.stanza_weaver/logs/stanza.log`（随 volume 持久化），`STANZAWEAVER_LOG_DIR` 可重定向；`docker compose logs` 可看标准输出。
+- **Dependencies** – Uses the full project `requirements.txt` (including desktop GUI and embedded reranking components, same functionality as local). The Linux image includes all these dependencies, so the image is large and initial build is slow, but can be reused after the first build.
+- **Data Persistence** – Configuration, lexicon, history, and logs are persisted via the `stanzaweaver-data` volume, mounted to `~/.stanza_weaver` inside the container.
+- **Security** – The application only accepts `localhost`/`127.0.0.1` Host headers (via `app.py`’s `_guard_local_access`). Docker deployment must access via `http://localhost:5000`; on Linux you can also use `network_mode: host` (see comments in `docker-compose.yml`).
+- **Custom Templates** – Templates created via the UI are written to `/app/src/templates/` inside the container; they will be lost when the container is rebuilt (source is not mounted). To persist them, you would need to mount the directory.
+- **Logs** – Container log files are located at `~/.stanza_weaver/logs/stanza.log` (persisted via the volume); you can override with `STANZAWEAVER_LOG_DIR`. `docker compose logs` shows standard output.
 
 ---
 
-## 项目结构
+## Project Structure
 
 ```
 StanzaWeaver/
 ├── .dockerignore
 ├── .gitignore
-├── Dockerfile              # 镜像构建（Python 3.14-slim + 桌面/重排依赖）
-├── LICENSE                 # MIT 许可证
-├── README.md               # 项目文档
-├── Franx.ico               # 应用图标
-├── StanzaWeaver.spec       # PyInstaller 构建规格
-├── app.py                  # pywebview + Flask + SocketIO 入口
-├── docker-compose.yml      # Compose 部署编排
-├── requirements.txt        # 项目依赖
+├── Dockerfile              # Image build (Python 3.14-slim + desktop/reranking dependencies)
+├── LICENSE                 # MIT License
+├── README.md               # Project documentation
+├── Franx.ico               # Application icon
+├── StanzaWeaver.spec       # PyInstaller build spec
+├── app.py                  # pywebview + Flask + SocketIO entry point
+├── docker-compose.yml      # Compose deployment
+├── requirements.txt        # Project dependencies
 ├── assets/
-│   └── 1.png               # 功能演示截图
-├── scripts/                # 跨平台一键构建/运行脚本
+│   └── 1.png               # Demo screenshot
+├── scripts/                # Cross‑platform one‑click build/run scripts
 │   ├── build.bat
 │   ├── build.ps1
 │   ├── build.sh
@@ -181,75 +183,75 @@ StanzaWeaver/
 │   ├── run.ps1
 │   └── run.sh
 ├── static/
-│   └── style.css           # 前端样式
+│   └── style.css           # Frontend styles
 ├── templates/
-│   └── index.html          # 前端 UI
+│   └── index.html          # Frontend UI
 └── src/
     ├── __init__.py
-    ├── config.py            # LLM 多端点配置
-    ├── logging_setup.py     # 日志初始化（RotatingFileHandler 轮转）
-    ├── models/              # 数据模型
+    ├── config.py            # LLM multi‑endpoint configuration
+    ├── logging_setup.py     # Logging initialisation (RotatingFileHandler rotation)
+    ├── models/              # Data models
     │   ├── __init__.py
-    │   ├── syllable.py      # 音节 Syllable
-    │   └── word.py          # 词条 Word
-    ├── prosody/             # 符号层：格律工具
+    │   ├── syllable.py      # Syllable
+    │   └── word.py          # Word entry
+    ├── prosody/             # Symbolic layer: meter utilities
     │   ├── __init__.py
-    │   ├── base.py          # SyllableAnalyzer 抽象基类
-    │   ├── chinese.py       # 中文分析器（pypinyin）
-    │   ├── english.py       # 英文分析器（CMUdict）
-    │   ├── french.py        # 法语分析器
-    │   ├── italian.py       # 意大利语分析器
-    │   ├── latin.py         # 拉丁语分析器
-    │   ├── meter_validator.py   # 格律总校验
-    │   └── syllable_counter.py  # 多语言统一音节计数
-    ├── knowledge/           # 本地词库
+    │   ├── base.py          # SyllableAnalyzer abstract base class
+    │   ├── chinese.py       # Chinese analyser (pypinyin)
+    │   ├── english.py       # English analyser (CMUdict)
+    │   ├── french.py        # French analyser
+    │   ├── italian.py       # Italian analyser
+    │   ├── latin.py         # Latin analyser
+    │   ├── meter_validator.py   # Master meter validator
+    │   └── syllable_counter.py  # Unified multi‑language syllable counting
+    ├── knowledge/           # Local lexicon
     │   ├── __init__.py
-    │   ├── embeddings.py    # sentence-transformers 向量重排
-    │   ├── importer.py      # 数据集导入（CC-CEDICT / CMUdict / Lexique / GLAW-IT / Lewis & Short）
-    │   ├── schema.sql       # SQLite 建表
-    │   └── vocabulary.py    # 查询接口
-    ├── agents/              # 神经层：AI Agent
+    │   ├── embeddings.py    # sentence‑transformers vector reranking
+    │   ├── importer.py      # Dataset import (CC‑CEDICT / CMUdict / Lexique / GLAW‑IT / Lewis & Short)
+    │   ├── schema.sql       # SQLite schema
+    │   └── vocabulary.py    # Query interface
+    ├── agents/              # Neural layer: AI Agents
     │   ├── __init__.py
-    │   ├── base.py          # LLM 调用封装
-    │   ├── checker_ai.py    # 检查 AI（1 工具）
-    │   └── writer_ai.py     # 编写 AI（4 工具）
-    ├── tools/               # Agent 工具定义
-    │   ├── __init__.py      # OpenAI Tool JSON Schema（search_words / refine_line / rewrite / submit）
-    │   ├── refine_line.py   # 整行替换执行
-    │   └── search_words.py  # 搜词执行
-    ├── templates/           # 格律模板（Python 类）
-    │   ├── __init__.py      # PoetryTemplate 基类 + 注册表
-    │   ├── en.py            # 英文模板（商籁体/维拉内拉/英雄双行体）
-    │   ├── fr.py            # 法语模板（回旋诗/三韵叠句诗/叙事歌）
-    │   ├── it.py            # 意大利语模板（三行体/八行体/歌谣）
-    │   ├── la.py            # 拉丁语模板（六步格/哀歌双行体/十一音节诗）
-    │   └── zh.py            # 中文模板（五绝/七绝/五律/七律/相见欢）
+    │   ├── base.py          # LLM call wrapper
+    │   ├── checker_ai.py    # Checker AI (1 tool)
+    │   └── writer_ai.py     # Writer AI (4 tools)
+    ├── tools/               # Agent tool definitions
+    │   ├── __init__.py      # OpenAI Tool JSON Schemas
+    │   ├── refine_line.py   # Line replacement execution
+    │   └── search_words.py  # Word search execution
+    ├── templates/           # Meter templates (Python classes)
+    │   ├── __init__.py      # PoetryTemplate base class + registry
+    │   ├── en.py            # English templates (sonnet, villanelle, heroic couplet)
+    │   ├── fr.py            # French templates (rondeau, triolet, ballade)
+    │   ├── it.py            # Italian templates (terza rima, ottava rima, canzone)
+    │   ├── la.py            # Latin templates (hexameter, elegiac couplet, hendecasyllabic)
+    │   └── zh.py            # Chinese templates (5‑char quatrain, 7‑char quatrain, etc.)
     └── pipeline/
         ├── __init__.py
-        └── pipeline.py      # 4 步流水线 + 打回循环
+        └── pipeline.py      # 4‑step pipeline + feedback loop
 ```
 
 ---
 
-## 格律模板
+## Meter Templates
 
-模板以 Python 类形式定义，继承 `PoetryTemplate`，需实现：
+Templates are defined as Python classes inheriting from `PoetryTemplate`, and must implement:
 
-| 方法                         | 说明                                    |
-| ---------------------------- | --------------------------------------- |
-| `get_syllable_constraints()` | 逐位音节约束（供 refine_line 单行校验） |
-| `validate_full()`            | 完整规则检查（三平尾、孤平、押韵等）    |
-| `describe()`                 | 人类可读的格律描述（供 AI prompt 使用） |
+| Method                       | Description                                                                          |
+| :--------------------------- | :----------------------------------------------------------------------------------- |
+| `get_syllable_constraints()` | Per‑position syllable constraints (used by `refine_line` for single‑line validation) |
+| `validate_full()`            | Full‑poem rule checking (three‑level‑tail, solitary level, rhyme, etc.)              |
+| `describe()`                 | Human‑readable meter description (used in the AI prompt)                             |
 
-内置模板：五言绝句、七言绝句、五言律诗、七言律诗、相见欢、莎士比亚商籁体、维拉内拉诗、英雄双行体、意大利语三行体/八行体/歌谣、法语回旋诗/三韵叠句诗/叙事歌、拉丁语六步格/哀歌双行体/十一音节诗。
+Built‑in templates: 5‑character quatrain, 7‑character quatrain, 5‑character regulated verse, 7‑character regulated verse, Xiangjianhuan, Shakespearean sonnet, villanelle, heroic couplet, Italian terza rima / ottava rima / canzone, French rondeau / triolet / ballade, Latin hexameter / elegiac couplet / hendecasyllabic.
 
-扩展方式：在 `src/templates/` 下新增 Python 文件，实现模板类后在 `app.py` 中注册；或在 UI 中通过「+ 自定义」生成模板（自动落盘到 `src/templates/custom_*.py`，重启后自动恢复注册）。
+To extend: add a new Python file under `src/templates/`, define the class, and register it in `app.py`; or use the UI’s “+ Custom” button to generate a template (automatically saved to `src/templates/custom_*.py` and restored on restart).
 
 ---
 
-## LLM 配置
+## LLM Configuration
 
-支持任何兼容 OpenAI API 格式的端点（OpenAI / Ollama / vLLM / DeepSeek / Groq 等）：
+Supports any OpenAI‑compatible endpoint (OpenAI / Ollama / vLLM / DeepSeek / Groq, etc.):
 
 ```json
 {
@@ -266,35 +268,35 @@ StanzaWeaver/
 }
 ```
 
-UI 齿轮按钮中直接编辑保存，或手动编辑 `~/.stanza_weaver/config.json`。
+Edit directly in the UI via the gear icon, or manually edit `~/.stanza_weaver/config.json`.
 
-### Ollama 本地部署
+### Ollama Local Deployment
 
 ```json
 {
   "writer": {
     "base_url": "http://127.0.0.1:11434/v1",
     "api_key": "ollama",
-    "model": "你的本地模型名"
+    "model": "your_local_model_name"
   },
   "checker": {
     "base_url": "http://127.0.0.1:11434/v1",
     "api_key": "ollama",
-    "model": "你的本地模型名"
+    "model": "your_local_model_name"
   }
 }
 ```
 
-注意事项：
+Notes:
 
-- **Base URL 必须带 `/v1`**（Ollama 的 OpenAI 兼容端点），否则返回 404。
-- 模型名必须是 `ollama list` 中已安装的模型；`:cloud` 云模型需要 Ollama 订阅，否则返回 403。
-- **502 Bad Gateway**：通常是 shell 中设置了 `HTTP_PROXY`/`HTTPS_PROXY` 环境变量（如 Clash 等代理工具），本地请求被转发给代理导致。StanzaWeaver 已对 `127.0.0.1`/`localhost` 自动绕过代理直连，若仍出现 502，请检查启动 app 的终端环境变量。
+- **Base URL must end with `/v1`** (Ollama’s OpenAI‑compatible endpoint), otherwise returns 404.
+- The model name must be one installed (visible via `ollama list`); `:cloud` cloud models require an Ollama subscription, otherwise returns 403.
+- **502 Bad Gateway** – Usually caused by `HTTP_PROXY`/`HTTPS_PROXY` environment variables set in the shell (e.g., Clash). StanzaWeaver automatically bypasses the proxy for `127.0.0.1`/`localhost`; if you still see 502, check your terminal environment variables.
 
 ---
 
-## 许可证
+## License
 
-所有代码均使用 `MIT` 许可证开源，Copyright (c) 2026 xhdlphzr。
+All code is open‑source under the **MIT License**, Copyright (c) 2026 xhdlphzr.
 
-应用图标 `Franx.png` 、 `Franx.ico` 、 `Franx.icns` 与 `assets/` 目录内所有文件，均 Copyright (c) 2026 xhdlphzr. All rights reserved.
+The application icons `Franx.png`, `Franx.ico`, `Franx.icns` and all files under `assets/` are Copyright (c) 2026 xhdlphzr. All rights reserved.
