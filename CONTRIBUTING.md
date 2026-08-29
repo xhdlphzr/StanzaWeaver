@@ -1,21 +1,21 @@
 <!-- Copyright (c) 2026 xhdlphzr -->
 <!-- SPDX-License-Identifier: MIT -->
 
-# 贡献指南（CONTRIBUTING）
+# Contributing Guide
 
-感谢你为 **StanzaWeaver**（以智识，巧织诗）贡献力量！本文件说明如何搭建开发环境、提交前必须通过的检查，以及如何在符号层新增**诗体**与**语言**。
+Thank you for contributing to **StanzaWeaver** (Weaving with Wisdom)! This document explains how to set up the development environment, the mandatory checks before submitting, and how to add new **meter templates** and **languages** to the symbolic layer.
 
-> 所有新增功能都必须通过测试；无法离线验证的逻辑（如需要联网下载词库）至少要提供走桩（stub）的单测，保证 `pytest` 全绿。
+> All new features must pass tests; for logic that cannot be verified offline (e.g., requiring network download of lexicons), at least provide stub‑based unit tests to keep `pytest` green.
 
 ---
 
-## 1. 开发环境搭建（Docker）
+## 1. Development Environment Setup (Docker)
 
-推荐用 Docker 启动一个与 CI 一致的开发/运行环境（基础镜像 `python:3.14-slim`，与 `.github/workflows/ci.yml` 锁定的 Python 版本一致）。
+It is recommended to use Docker to start a development/runtime environment consistent with CI (base image `python:3.14-slim`, matching the Python version locked in `.github/workflows/ci.yml`).
 
-### 1.1 构建镜像
+### 1.1 Build the Image
 
-仓库 `scripts/` 下提供了跨平台脚本（`.sh` / `.ps1` / `.bat`），直接用它们构建即可：
+Cross‑platform scripts (`.sh` / `.ps1` / `.bat`) are provided under the `scripts/` directory – use them directly to build:
 
 ```bash
 # Linux / macOS
@@ -25,34 +25,34 @@
 .\scripts\build.ps1
 ```
 
-- 国内无法直连 Docker Hub 时，可指定加速器前缀基础镜像：
+- If you cannot directly reach Docker Hub from China, specify an accelerator‑prefixed base image:
   `./scripts/build.sh -b docker.m.daocloud.io/library/python:3.14-slim`
-- 其他可选参数见脚本 `--help`（如 `-t <tag>` 指定镜像标签、`-n` 无缓存重建）。
+- For other optional parameters, see the script `--help` (e.g., `-t <tag>` to specify image tag, `-n` for no‑cache rebuild).
 
-### 1.2 运行（带数据持久化）
+### 1.2 Run (with Data Persistence)
 
 ```bash
 # Linux / macOS
-./scripts/run.sh              # 前台运行；-d 后台，-l 跟随日志，-p <port> 改端口
+./scripts/run.sh              # foreground; -d for background, -l to follow logs, -p <port> to change port
 
 # Windows (PowerShell)
 .\scripts\run.ps1
 ```
 
-- 访问：<http://localhost:5000>（安全设计仅接受 `localhost`/`127.0.0.1` 的 Host 头）
-- 数据卷 `stanzaweaver-data` 自动创建，持久化配置 / 词库 / 历史 / 日志（`~/.stanza_weaver`）
+- Access: <http://localhost:5000> (security design only accepts `localhost`/`127.0.0.1` Host headers)
+- The data volume `stanzaweaver-data` is created automatically, persisting configuration / lexicon / history / logs (`~/.stanza_weaver`)
 
-### 1.3 使用 docker-compose
+### 1.3 Using docker‑compose
 
 ```bash
-docker compose up -d --build     # 启动
-docker compose logs -f stanzaweaver   # 查看日志
-docker compose down              # 停止
+docker compose up -d --build     # start
+docker compose logs -f stanzaweaver   # view logs
+docker compose down              # stop
 ```
 
-### 1.4 在容器内开发
+### 1.4 Developing Inside the Container
 
-镜像已构建后，进入容器即可使用与本地相同的命令（`mypy` / `ruff` / `pytest`）：
+After the image is built, enter the container to use the same commands as locally (`mypy` / `ruff` / `pytest`):
 
 ```bash
 docker exec -it stanzaweaver bash
@@ -60,61 +60,63 @@ cd /app
 python -m pytest
 ```
 
-### 1.5 不使用 Docker（可选）
+### 1.5 Without Docker (Optional)
 
-本地用虚拟环境也可，但需 Python **3.14**：
+You can also use a local virtual environment, but Python **3.14** is required:
 
 ```bash
 python -m venv .venv
 .venv\Scripts\Activate.ps1          # Windows
 #   source .venv/bin/activate       # Linux / macOS
 pip install -r requirements.txt
-pip install pytest ruff mypy        # 测试/检查工具
+pip install pytest ruff mypy        # testing/linting tools
 ```
 
 ---
 
-## 2. 提交前必须通过的检查
+## 2. Pre‑Commit Checks
 
-每次提交（PR）前，请在仓库根目录依次运行以下命令，**全部 0 退出码 / 无输出错误** 才允许提交：
+Before each commit (or PR), run the following commands in the repository root – **all must exit with 0 / no errors** before you commit:
 
 ```bash
-# 1) 类型检查（零容忍，--strict）
+# 1) Type checking (zero tolerance, --strict)
 mypy --strict ./
 
-# 2) 静态检查并自动修复（含 unsafe 修复）
+# 2) Lint and auto‑fix (including unsafe fixes)
 ruff check --fix --unsafe-fixes ./
 
-# 3) 代码格式化
+# 3) Code formatting
 ruff format ./
 
-# 4) 测试
+# 4) Tests
 pytest
 ```
 
-说明：
+Notes:
 
-- CI 中 `ruff` 以 `ruff check ./`（不自动修改）执行，因此**你本地必须先用上面的 `--fix --unsafe-fixes` 与 `format` 把代码整理干净**，否则 CI 会失败。
-- `mypy` 必须使用本项目配套的虚拟环境版本（`python3.14` + 项目依赖），系统全局 `mypy` 可能出现 import-not-found 的误报。
-- `pytest` 通过 `tests/pytest.ini` 配置（`pythonpath = .`，`testpaths = tests`）。测试使用 `tests/helpers.py` 中的 `StubLLMClient` 走桩，**不调用任何真实 LLM / 不联网**，可离线全量运行。
+- In CI, `ruff` is run as `ruff check ./` (without auto‑fix), so **you must locally clean up with `--fix --unsafe-fixes` and `format`** first, otherwise CI will fail.
+- `mypy` must be used with the virtual environment that matches this project (`python3.14` + project dependencies); a system‑wide `mypy` may produce false‑positive import‑not‑found errors.
+- `pytest` uses `tests/pytest.ini` configuration (`pythonpath = .`, `testpaths = tests`). Tests use the `StubLLMClient` from `tests/helpers.py` – **no real LLM calls / no network**; they can run fully offline.
 
 ---
 
-## 3. 如何新增诗体（模板）
+## 3. How to Add a New Meter Template
 
-诗体（如十四行诗、绝句、俳句）由 `src/templates/` 下的 `PoetryTemplate` 子类定义，并注册到全局模板表。
+Meter templates (e.g., sonnet, quatrain, haiku) are defined as subclasses of `PoetryTemplate` under `src/templates/` and registered in the global template table.
 
-### 3.1 接口
+### 3.1 Interface
 
-基类位于 `src/templates/__init__.py`：
+The base class is located in `src/templates/__init__.py`:
 
 ```python
 class PoetryTemplate(ABC):
-    name: str  # 诗体名称
-    language: str  # 语言代码（zh/en/it/fr/la）
-    lines: int  # 行数
-    syllables_per_line: Sequence[int | tuple[int, int]]  # 每行音节数（区间用元组）
-    rule_description: str  # 格律规则文本（用于提示 LLM）
+    name: str  # template name
+    language: str  # language code (zh/en/it/fr/la)
+    lines: int  # number of lines
+    syllables_per_line: Sequence[
+        int | tuple[int, int]
+    ]  # syllables per line (range expressed as tuple)
+    rule_description: str  # meter rule description (used in LLM prompts)
 
     def get_syllable_constraints(self) -> ConstraintTable | None: ...
     def validate_full(
@@ -122,13 +124,13 @@ class PoetryTemplate(ABC):
     ) -> list[str]: ...
 ```
 
-- `get_syllable_constraints()` 返回每位置约束表（`list[list[dict]]`），单条约束形如：
-  `{"onset": "", "nucleus": "", "coda": "", "attributes": {"tone": "", "stress": "", "length": ""}}`，空字符串表示不限制（详见 `src/models/syllable.py` 的 `match_constraint`）。返回 `None` 表示不施加逐位置约束。
-- `validate_full(poem, syllables) -> list[str]`：返回错误字符串列表，**空列表即校验通过**。
+- `get_syllable_constraints()` returns a position‑wise constraint table (`list[list[dict]]`). A single constraint looks like:
+  `{"onset": "", "nucleus": "", "coda": "", "attributes": {"tone": "", "stress": "", "length": ""}}` – empty strings mean no restriction (see `match_constraint` in `src/models/syllable.py`). Returning `None` means no positional constraints are applied.
+- `validate_full(poem, syllables) -> list[str]` returns a list of error strings; **an empty list means validation passes**.
 
-### 3.2 新增步骤
+### 3.2 Steps to Add
 
-1. 在对应语言模块（如 `src/templates/en.py`）新增子类，设置类属性并实现两个方法：
+1. Add a new subclass in the appropriate language module (e.g., `src/templates/en.py`), set class attributes and implement the two methods:
 
    ```python
    class MyNewFormTemplate(PoetryTemplate):
@@ -136,124 +138,126 @@ class PoetryTemplate(ABC):
        language = "en"
        lines = 4
        syllables_per_line = [8, 8, 8, 8]
-       rule_description = "四行，每行八音节，ABAB 押韵。"
+       rule_description = "Four lines, eight syllables each, ABAB rhyme."
 
        def get_syllable_constraints(self):
-           # 返回每位置约束；不需要可返回 None
+           # return position‑wise constraints; return None if not needed
            return None
 
        def validate_full(self, poem, syllables):
            errors: list[str] = []
-           # 自行实现押韵 / 字数 / 平仄等校验
+           # implement rhyme / syllable / tone validation yourself
            return errors
    ```
 
-2. 在该模块的 `register_<lang>_templates()` 函数中注册：
+2. Register it in the module’s `register_<lang>_templates()` function:
 
    ```python
    register("en_my_new_form", MyNewFormTemplate())
    ```
 
-3. 在 `app.py` 中调用注册函数（与其他 `register_*_templates()` 并列，约 34–38 行），使服务端与 UI 可见。
+3. Call the registration function in `app.py` (alongside other `register_*_templates()` calls, around lines 34–38) to make it visible to the server and UI.
 
-4. 在 `tests/conftest.py` 的 `_register_all_templates` fixture 中同样加入该注册调用，确保测试能自动加载新诗体。
+4. Also add the same registration call in the `_register_all_templates` fixture in `tests/conftest.py` to ensure tests can automatically load the new template.
 
-### 3.3 必须新增的测试
+### 3.3 Required Tests
 
-- 在 `tests/unit/` 增加 `test_<lang>_analyzer.py`（若涉及语言）或针对该诗体的校验测试；至少应覆盖：
-  - 合法诗作 `validate_full` 返回 `[]`；
-  - 明显违规（行数错 / 音节错 / 不押韵）能被 `validate_full` 捕获。
-- 如有 UI / 端到端诉求，可在 `tests/integration/` 用 `helpers.make_stub` 驱动 `Pipeline` / SocketIO 验证全流程。
+- Add a test file (e.g., `test_<lang>_analyzer.py` in `tests/unit/` if a new language is involved, or a test specific to the new template) that at least covers:
+  - A valid poem where `validate_full` returns `[]`.
+  - Obvious violations (wrong line count / wrong syllable count / no rhyme) are caught by `validate_full`.
+- For UI / end‑to‑end scenarios, you can use `helpers.make_stub` in `tests/integration/` to drive the `Pipeline` / SocketIO and verify the full flow.
 
 ---
 
-## 4. 如何新增语言
+## 4. How to Add a New Language
 
-语言需要三处配合：① 音节分析器；② 模板表的语言标签；③ 词库导入器（可选但推荐，否则 `search_words` 工具无数据）。
+Adding a language requires three parts: ① a syllable analyser; ② a language label in the template registry; ③ a lexicon importer (optional but recommended, otherwise the `search_words` tool will have no data).
 
-### 4.1 实现分析器
+### 4.1 Implement the Analyser
 
-在 `src/prosody/` 新增 `<lang>.py`，继承 `src/prosody/base.py` 的 `SyllableAnalyzer`：
+Add a new `<lang>.py` under `src/prosody/` that inherits from `SyllableAnalyzer` in `src/prosody/base.py`:
 
 ```python
 class SyllableAnalyzer(ABC):
     language: str
 
-    def analyze_word(self, word: str) -> list[Syllable]: ...  # 抽象
-    def count_syllables(self, text: str) -> int: ...  # 抽象
-    def tokenize_line(self, line: str) -> list[str]: ...  # 可重写（中文按字切分）
+    def analyze_word(self, word: str) -> list[Syllable]: ...  # abstract
+    def count_syllables(self, text: str) -> int: ...  # abstract
+    def tokenize_line(
+        self, line: str
+    ) -> list[str]: ...  # override if needed (Chinese splits by character)
 ```
 
-实现后注册到多语言分发器 `src/prosody/syllable_counter.py`。
+After implementing, register it in the multi‑language dispatcher `src/prosody/syllable_counter.py`.
 
-#### `_ANALYZERS` 字典 / 分发机制（详细）
+#### The `_ANALYZERS` Dictionary / Dispatch Mechanism (Detailed)
 
-模块级 `_ANALYZERS` 是一个**语言代码 → 分析器实例**的映射表，是所有音节分析的路由核心：
+The module‑level `_ANALYZERS` is a **language‑code → analyser instance** mapping that routes all syllable analysis:
 
 ```python
 _ANALYZERS: dict[str, SyllableAnalyzer] = {
-    "zh": ChineseAnalyzer(),  # 中文：整行经 pypinyin 处理多音字
-    "en": EnglishAnalyzer(),  # 英文：逐词 + 重音/变体
-    "it": ItalianAnalyzer(),  # 意大利语：整行 sinalefe 跨词合并
-    "fr": FrenchAnalyzer(),  # 法语：逐词
-    "la": LatinAnalyzer(),  # 拉丁语：整行跨词判定音长
+    "zh": ChineseAnalyzer(),  # Chinese: whole line processed with pypinyin for polyphonic characters
+    "en": EnglishAnalyzer(),  # English: word‑by‑word with stress / variants
+    "it": ItalianAnalyzer(),  # Italian: whole line with sinalefe (cross‑word syllable merging)
+    "fr": FrenchAnalyzer(),  # French: word‑by‑word
+    "la": LatinAnalyzer(),  # Latin: whole line cross‑word length determination
 }
 ```
 
-- **注册 / 获取**：
-  - `register_analyzer(language, analyzer)` —— 新增或覆盖某语言的分析器（写入 `_ANALYZERS[language] = analyzer`）。
-  - `get_analyzer(language)` —— 按语言取实例；未注册时抛 `ValueError("No syllable analyzer registered for language: <lang>")`。
-- **对外入口**（均内部调用 `get_analyzer`）：
-  - `count_syllables(text, language) -> int`：返回音节总数。
-  - `analyze_line(line, language) -> list[Syllable]`：返回整行音节列表，其路由逻辑按语言分三种：
-    1. `zh`：整行送 `ChineseAnalyzer.analyze_word("".join(tokenize_line(line)))`，靠 pypinyin 上下文消歧多音字。
-    2. `it`：调用 `ItalianAnalyzer.syllabify_line(line)` 做 sinalefe（跨词音节合并）。
-    3. `la`：调用 `LatinAnalyzer.analyze_line(line)` 做跨词音长判定（muta cum liquida 等）。
-    4. 其它语言：`tokenize_line` 先按词切分，再对每个词 `analyze_word` 后拼接。
+- **Registration / Retrieval**:
+  - `register_analyzer(language, analyzer)` – add or override an analyser for a language (writes to `_ANALYZERS[language] = analyzer`).
+  - `get_analyzer(language)` – returns the instance for the given language; raises `ValueError("No syllable analyzer registered for language: <lang>")` if not found.
+- **Public Entry Points** (both internally call `get_analyzer`):
+  - `count_syllables(text, language) -> int`: returns total syllable count.
+  - `analyze_line(line, language) -> list[Syllable]`: returns the syllable list for the whole line. The routing logic varies by language:
+    1. `zh`: the whole line is passed to `ChineseAnalyzer.analyze_word("".join(tokenize_line(line)))`, using pypinyin’s context to disambiguate polyphonic characters.
+    2. `it`: calls `ItalianAnalyzer.syllabify_line(line)` to perform sinalefe (cross‑word syllable merging).
+    3. `la`: calls `LatinAnalyzer.analyze_line(line)` for cross‑word length determination (muta cum liquida, etc.).
+    4. Other languages: `tokenize_line` splits into words, then `analyze_word` is called on each word and the results are concatenated.
 
-新增语言时的两种注册方式（二选一即可）：
+When adding a new language, you can register it in one of two ways (choose either):
 
-- **方式 A（静态，推荐）**：直接在 `_ANALYZERS` 中加一行 `"xx": XxAnalyzer()`。
-- **方式 B（动态）**：在模块加载处调用：
+- **Method A (static, recommended)**: add a line `"xx": XxAnalyzer()` directly in `_ANALYZERS`.
+- **Method B (dynamic)**: call at module load:
   ```python
   register_analyzer("xx", XxAnalyzer())
   ```
 
-> ⚠️ 重要：若你的新语言需要**整行级**特殊处理（像 `zh` / `it` / `la` 那样不能简单逐词拼接），除了把分析器加入 `_ANALYZERS`，还必须**在 `analyze_line()` 的 `if/elif` 分支中新增对应的 `language == "xx"` 分支**，否则会退化为默认的逐词拼接逻辑。若新语言只需逐词分析，则无需改 `analyze_line`。
+> ⚠️ Important: If your new language requires **whole‑line** special handling (like `zh` / `it` / `la`, where simple word‑by‑word concatenation is not enough), besides adding the analyser to `_ANALYZERS`, you must also **add a new `elif language == "xx"` branch inside `analyze_line()`** – otherwise it will fall back to the default word‑by‑word concatenation logic. If your new language only needs word‑by‑word analysis, no changes to `analyze_line()` are required.
 
-### 4.2 模板语言标签
+### 4.2 Template Language Label
 
-在 `src/templates/__init__.py` 的 `_LANGUAGE_LABELS` 中为新语言增加显示名（供前端下拉框使用），例如 `"xx": "新语言"`。
+Add a display name for the new language in `_LANGUAGE_LABELS` in `src/templates/__init__.py` (used in the frontend dropdown), e.g., `"xx": "New Language"`.
 
-### 4.3 词库导入（可选但推荐）
+### 4.3 Lexicon Importer (Optional but Recommended)
 
-在 `src/knowledge/importer.py` 增加 `_import_<lang>()`，从公开词表解析为 `Word(text, language, syllables, meaning)`（`syllables` 由你的分析器产出），并接入 `import_all()`。查询层 `src/knowledge/vocabulary.py` 的 `search_words` 会据此为 `search_words` 工具提供离线候选。
+Add a `_import_<lang>()` function in `src/knowledge/importer.py` that parses a public word list into `Word(text, language, syllables, meaning)` (where `syllables` are produced by your analyser), and wire it into `import_all()`. The query layer `src/knowledge/vocabulary.py` will then provide offline candidates to the `search_words` tool.
 
-### 4.4 必须新增的测试
+### 4.4 Required Tests
 
-- `tests/unit/test_<lang>_analyzer.py`：覆盖 `analyze_word` / `count_syllables` / `tokenize_line` 的典型用例（含多音节词、特殊拼写）。
-- 若新增约束/校验逻辑，补充 `test_meter_validator.py` 相关用例。
-- 词库导入若为离线内置样例，提供不联网的断言；若必须联网下载，请在测试中以本地样例或走桩替代，保证 `pytest` 离线可过。
-
----
-
-## 5. 测试总则
-
-- 运行：`pytest`（根目录执行，依赖 `tests/pytest.ini`）。
-- 全部测试**不依赖真实 LLM / 不联网**：LLM 由 `tests/helpers.py` 的 `StubLLMClient` 替换。
-- 任何新功能（诗体 / 语言 / 分析器 / 校验器）都必须有对应单测；集成改动需有 `integration/` 下的端到端用例。
-- 提交前确保 `mypy --strict ./`、`ruff check --fix --unsafe-fixes ./`、`ruff format ./`、`pytest` 四项全绿。
+- `tests/unit/test_<lang>_analyzer.py`: cover typical use cases for `analyze_word` / `count_syllables` / `tokenize_line` (including multisyllabic words, special spellings).
+- If new validation logic is added, add corresponding test cases in `test_meter_validator.py`.
+- If the lexicon importer uses offline built‑in examples, provide assertions that do not require network; if it must download data, replace with a local sample or stub in tests to keep `pytest` offline‑capable.
 
 ---
 
-## 6. 提交清单（PR Checklist）
+## 5. Testing Guidelines
 
-- [ ] 代码通过 `mypy --strict ./`
-- [ ] 代码通过 `ruff check --fix --unsafe-fixes ./`
-- [ ] 代码通过 `ruff format ./`
-- [ ] `pytest` 全绿（含新增测试）
-- [ ] 新增诗体已在 `app.py` 与 `tests/conftest.py` 注册
-- [ ] 新增语言已注册分析器、语言标签，并有对应单测
-- [ ] 相关改动已在 PR 描述中说明用途与验证方式
+- Run: `pytest` (from the repository root, using `tests/pytest.ini`).
+- All tests **do not depend on real LLMs / network**: LLMs are replaced by `StubLLMClient` from `tests/helpers.py`.
+- Any new feature (meter template / language / analyser / validator) must have corresponding unit tests; integration changes require end‑to‑end tests under `integration/`.
+- Before submitting, ensure `mypy --strict ./`, `ruff check --fix --unsafe-fixes ./`, `ruff format ./`, and `pytest` are all green.
 
-合并以 `main` 分支为目标的 PR；CI（`ci` + `build`）通过后由维护者合入。
+---
+
+## 6. PR Checklist
+
+- [ ] Code passes `mypy --strict ./`
+- [ ] Code passes `ruff check --fix --unsafe-fixes ./`
+- [ ] Code passes `ruff format ./`
+- [ ] `pytest` is fully green (including new tests)
+- [ ] New meter templates are registered in both `app.py` and `tests/conftest.py`
+- [ ] New language has its analyser registered, language label added, and corresponding unit tests written
+- [ ] The PR description explains the purpose and verification method of the changes
+
+PRs should target the `main` branch; after CI (`ci` + `build`) passes, a maintainer will merge.
