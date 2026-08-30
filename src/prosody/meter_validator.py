@@ -15,7 +15,7 @@
 
 import itertools
 from dataclasses import dataclass, field
-from typing import Any, cast
+from typing import Any
 
 # 组合搜索逐行变体时的最大组合数，超出则截断（避免意大利语 sinalefe /
 # 英语多切分等导致组合数爆炸），截断后返回错误数最少的组合。
@@ -24,7 +24,7 @@ MAX_FULL_COMBOS = 20000
 from ..models.syllable import Syllable
 from ..templates import format_count
 from .english import EnglishAnalyzer
-from .syllable_counter import analyze_line, count_syllables, get_analyzer
+from .syllable_counter import count_syllables, get_analyzer
 
 SyllableCount = int | tuple[int, int]
 Constraint = dict[str, Any]
@@ -109,13 +109,7 @@ class MeterValidator:
         all_syllables: list[VariantList] = []
         for i in range(len(poem)):
             analyzer = get_analyzer(language)
-            if hasattr(analyzer, "analyze_line_variants"):
-                # 多音语言（zh/en/it/la）：保留全部切分变体，任一满足格律即通过
-                all_syllables.append(
-                    cast("VariantList", analyzer.analyze_line_variants(poem[i]))
-                )
-            else:
-                all_syllables.append([analyze_line(poem[i], language)])
+            all_syllables.append(analyzer.analyze_line_variants(poem[i]))
 
         for i in range(min(len(poem), len(syllables_expected))):
             expected_count = syllables_expected[i]
@@ -323,13 +317,9 @@ class MeterValidator:
 
         if line_index < len(syllables_expected):
             expected_count = syllables_expected[line_index]
-            if language == "en":
-                variants = get_analyzer(language).analyze_line_variants(line_text)  # type: ignore[attr-defined]
-                ok = any(_count_matches(len(v), expected_count) for v in variants)
-                actual_count = len(variants[0]) if variants else 0
-            else:
-                actual_count = count_syllables(line_text, language)
-                ok = _count_matches(actual_count, expected_count)
+            variants = get_analyzer(language).analyze_line_variants(line_text)
+            ok = any(_count_matches(len(v), expected_count) for v in variants)
+            actual_count = len(variants[0]) if variants else 0
             if not ok:
                 result.add_error(
                     f"音节数不匹配: 期望 {format_count(expected_count)}, 实际 {actual_count}"
@@ -337,15 +327,10 @@ class MeterValidator:
 
         if constraints and line_index < len(constraints):
             line_constraints = constraints[line_index]
-            if language == "en":
-                variants = get_analyzer(language).analyze_line_variants(line_text)  # type: ignore[attr-defined]
-                if any(
-                    self._line_matches_variant(v, line_constraints) for v in variants
-                ):
-                    return result
-                syllables = variants[0]
-            else:
-                syllables = analyze_line(line_text, language)
+            variants = get_analyzer(language).analyze_line_variants(line_text)
+            if any(self._line_matches_variant(v, line_constraints) for v in variants):
+                return result
+            syllables = variants[0]
             min_syl = min(len(syllables), len(line_constraints))
             for j in range(min_syl):
                 if not syllables[j].match_constraint(line_constraints[j]):

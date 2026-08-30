@@ -4,7 +4,7 @@
 """补充单元测试：将 italian.py 与 latin.py 的行覆盖拉满到 100%。
 
 覆盖目标（缺失行）：
-- italian.py: 58-75 (_count_syllables_in_word 私有方法), 91 (_syllabify_word 空串),
+- italian.py: 58-75 (count_syllables_in_word 私有方法), 91 (_syllabify_word 空串),
   122 (无元音词回退), 156 (词尾双辅音重音分支), 184 (行内空词 continue),
   240 (analyze_line_variants).
 - latin.py: 103 (空串词), 162 (短音符号分支), 209 (main 循环 else-coda 分支,
@@ -17,24 +17,24 @@ from src.prosody.italian import ItalianAnalyzer
 from src.prosody.latin import LatinAnalyzer
 
 
-def test_it_count_syllables_in_word_empty() -> None:
+def test_itcount_syllables_in_word_empty() -> None:
     """空串应返回 0（覆盖 59）。"""
-    assert ItalianAnalyzer()._count_syllables_in_word("") == 0
+    assert ItalianAnalyzer().count_syllables_in_word("") == 0
 
 
-def test_it_count_syllables_in_word_no_vowel() -> None:
+def test_itcount_syllables_in_word_no_vowel() -> None:
     """无元音词应回退返回 1（覆盖 75 的 else 分支及主循环）。"""
-    assert ItalianAnalyzer()._count_syllables_in_word("xyz") == 1
+    assert ItalianAnalyzer().count_syllables_in_word("xyz") == 1
 
 
-def test_it_count_syllables_in_word_no_diphthong() -> None:
+def test_itcount_syllables_in_word_no_diphthong() -> None:
     """无二合元音词逐元音计数（覆盖 65-66, 74）。"""
-    assert ItalianAnalyzer()._count_syllables_in_word("casa") == 2
+    assert ItalianAnalyzer().count_syllables_in_word("casa") == 2
 
 
-def test_it_count_syllables_in_word_diphthong() -> None:
+def test_itcount_syllables_in_word_diphthong() -> None:
     """含二合元音词触发 i+=1 合并分支（覆盖 67-73）。"""
-    assert ItalianAnalyzer()._count_syllables_in_word("ciao") == 2
+    assert ItalianAnalyzer().count_syllables_in_word("ciao") == 2
 
 
 def test_it_syllabify_word_empty() -> None:

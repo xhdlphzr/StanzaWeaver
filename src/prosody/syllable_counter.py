@@ -39,10 +39,10 @@ def _zh_line(analyzer: SyllableAnalyzer, line: str) -> list[Syllable]:
     Returns:
         首选音节切分。
     """
-    variants = analyzer.analyze_line_variants(line)  # type: ignore[attr-defined]
+    variants = analyzer.analyze_line_variants(line)
     for v in variants:
         if v:
-            return cast("list[Syllable]", v)
+            return v
     return []
 
 

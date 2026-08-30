@@ -493,7 +493,7 @@ def test_import_italian_success() -> None:
     """Italian import covers title/gloss/form branches and two flushes."""
     it_instance = mock.MagicMock()
     it_instance._syllabify_word.side_effect = _it_syl
-    it_instance._count_syllables_in_word.return_value = 2
+    it_instance.count_syllables_in_word.return_value = 2
     text = _italian_text()
     with (
         mock.patch("src.prosody.italian.ItalianAnalyzer", return_value=it_instance),
@@ -511,7 +511,7 @@ def test_import_italian_bz2() -> None:
     """Italian import decompresses raw bz2 payloads."""
     it_instance = mock.MagicMock()
     it_instance._syllabify_word.side_effect = _it_syl
-    it_instance._count_syllables_in_word.return_value = 2
+    it_instance.count_syllables_in_word.return_value = 2
     text = _italian_text()
     raw = bz2.compress(text.encode("utf-8"))
     with (

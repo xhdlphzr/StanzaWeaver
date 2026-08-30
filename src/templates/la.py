@@ -13,33 +13,9 @@ from typing import Any, ClassVar
 
 from ..models.syllable import Syllable
 from ..prosody.latin import LatinAnalyzer
-from . import ConstraintTable, PoetryTemplate, register
+from . import ConstraintTable, PoetryTemplate, _make_syl, register
 
 _LATIN = LatinAnalyzer()
-
-
-def _make_syl(**kwargs: Any) -> dict[str, Any]:
-    """构造逐位约束字典。
-
-    Args:
-        **kwargs: 可含 onset/nucleus/coda 及 attributes。
-
-    Returns:
-        约束字典。
-    """
-    attrs = kwargs.pop("attributes", {})
-    if not isinstance(attrs, dict):
-        attrs = {}
-    return {
-        "onset": kwargs.get("onset", ""),
-        "nucleus": kwargs.get("nucleus", ""),
-        "coda": kwargs.get("coda", ""),
-        "attributes": {
-            "tone": attrs.get("tone", ""),
-            "stress": attrs.get("stress", ""),
-            "length": attrs.get("length", ""),
-        },
-    }
 
 
 _L: dict[str, Any] = _make_syl(attributes={"length": "long"})

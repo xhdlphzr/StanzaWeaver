@@ -12,31 +12,7 @@
 from typing import Any, ClassVar
 
 from ..models.syllable import Syllable
-from . import ConstraintTable, PoetryTemplate, register
-
-
-def _make_syl(**kwargs: Any) -> dict[str, Any]:
-    """构造逐位约束字典。
-
-    Args:
-        **kwargs: 可含 onset/nucleus/coda 及 attributes 子字典。
-
-    Returns:
-        约束字典（含完整 attributes 三键）。
-    """
-    attrs = kwargs.pop("attributes", {})
-    if not isinstance(attrs, dict):
-        attrs = {}
-    return {
-        "onset": kwargs.get("onset", ""),
-        "nucleus": kwargs.get("nucleus", ""),
-        "coda": kwargs.get("coda", ""),
-        "attributes": {
-            "tone": attrs.get("tone", ""),
-            "stress": attrs.get("stress", ""),
-            "length": attrs.get("length", ""),
-        },
-    }
+from . import ConstraintTable, PoetryTemplate, _make_syl, register
 
 
 def _tone(t: str) -> dict[str, Any]:

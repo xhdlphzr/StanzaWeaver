@@ -10,6 +10,7 @@
 - describe(): 给 LLM 的人类可读格律描述。
 """
 
+import re
 from abc import ABC
 from collections.abc import Sequence
 from typing import Any, ClassVar
@@ -20,6 +21,81 @@ SyllableCount = int | tuple[int, int]
 ConstraintDict = dict[str, Any]
 ConstraintLine = list[ConstraintDict]
 ConstraintTable = list[ConstraintLine]
+
+
+def _make_syl(**kwargs: Any) -> dict[str, Any]:
+    """构造逐位约束字典。
+
+    Args:
+        **kwargs: 可含 onset/nucleus/coda 及 attributes 子字典。
+
+    Returns:
+        约束字典（含完整 attributes 三键）。
+    """
+    attrs = kwargs.pop("attributes", {})
+    if not isinstance(attrs, dict):
+        attrs = {}
+    return {
+        "onset": kwargs.get("onset", ""),
+        "nucleus": kwargs.get("nucleus", ""),
+        "coda": kwargs.get("coda", ""),
+        "attributes": {
+            "tone": attrs.get("tone", ""),
+            "stress": attrs.get("stress", ""),
+            "length": attrs.get("length", ""),
+        },
+    }
+
+
+def _last_word(line: str, allowed_chars: str) -> str:
+    """取行末词（去标点、小写）。
+
+    Args:
+        line: 一行诗。
+        allowed_chars: 正则字符类中允许的字符集（不含方括号）。
+
+    Returns:
+        行末词；空行返回空串。
+    """
+    if not line.strip():
+        return ""
+    return re.sub(rf"[^{allowed_chars}]", "", line.strip().split()[-1]).lower()
+
+
+def describe_template_from_dict(template_dict: dict[str, Any]) -> str:
+    """从模板字典生成格律描述（无模板对象时的降级方案）。
+
+    Args:
+        template_dict: 含 lines/syllables_per_line/syllable_constraints 的字典。
+
+    Returns:
+        多行格律描述文本。
+    """
+    lines_spec = template_dict.get("syllables_per_line", [])
+    lines_desc = f"共 {template_dict.get('lines', len(lines_spec))} 行"
+    constraints = template_dict.get("syllable_constraints") or []
+    for i, cnt in enumerate(lines_spec):
+        line_constraints = constraints[i] if i < len(constraints) else []
+        line_info = f"  第{i + 1}行: {format_count(cnt)}音节"
+        if line_constraints:
+            parts = []
+            for j, c in enumerate(line_constraints):
+                desc_parts = []
+                if c.get("onset"):
+                    desc_parts.append(f"声母={c['onset']}")
+                if c.get("nucleus"):
+                    desc_parts.append(f"韵母={c['nucleus']}")
+                if c.get("coda"):
+                    desc_parts.append(f"韵尾={c['coda']}")
+                for k, v in c.get("attributes", {}).items():
+                    if v:
+                        desc_parts.append(f"{k}={v}")
+                if desc_parts:
+                    parts.append(f"    第{j + 1}位: {','.join(desc_parts)}")
+            if parts:
+                line_info += "\n" + "\n".join(parts)
+        lines_desc += "\n" + line_info
+    return lines_desc
 
 
 class PoetryTemplate(ABC):
@@ -75,28 +151,13 @@ class PoetryTemplate(ABC):
         Returns:
             多行文本：行数、每行音节数、逐位约束、自然语言规则。
         """
-        lines_desc = f"共 {self.lines} 行"
-        for i, cnt in enumerate(self.syllables_per_line):
-            constraints = self.get_syllable_constraints()
-            line_info = f"  第{i + 1}行: {format_count(cnt)}音节"
-            if constraints and i < len(constraints):
-                parts = []
-                for j, c in enumerate(constraints[i]):
-                    desc_parts = []
-                    if c.get("onset"):
-                        desc_parts.append(f"声母={c['onset']}")
-                    if c.get("nucleus"):
-                        desc_parts.append(f"韵母={c['nucleus']}")
-                    if c.get("coda"):
-                        desc_parts.append(f"韵尾={c['coda']}")
-                    for k, v in c.get("attributes", {}).items():
-                        if v:
-                            desc_parts.append(f"{k}={v}")
-                    if desc_parts:
-                        parts.append(f"    第{j + 1}位: {','.join(desc_parts)}")
-                if parts:
-                    line_info += "\n" + "\n".join(parts)
-            lines_desc += "\n" + line_info
+        lines_desc = describe_template_from_dict(
+            {
+                "lines": self.lines,
+                "syllables_per_line": self.syllables_per_line,
+                "syllable_constraints": self.get_syllable_constraints(),
+            }
+        )
         if self.rule_description:
             lines_desc += "\n" + self.rule_description
         return lines_desc

@@ -9,6 +9,7 @@
 - qu/gu/su 后接元音时 u 为辅音性（quō、lingua、suāvis），不构成音节。
 """
 
+import re
 import unicodedata
 
 from ..models.syllable import Syllable
@@ -234,8 +235,6 @@ class LatinAnalyzer(SyllableAnalyzer):
         Returns:
             音节列表。
         """
-        import re
-
         words = [w for w in re.split(r"[^A-Za-zāēīōūȳăĕĭŏŭ'-]+", text) if w]
         result: list[Syllable] = []
         m = len(words)

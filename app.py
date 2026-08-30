@@ -107,15 +107,6 @@ def _require_csrf() -> bool:
     return request.headers.get("X-CSRF-Token", "") == _CSRF_TOKEN
 
 
-def load_templates() -> list[dict[str, Any]]:
-    """加载全部模板字典。
-
-    Returns:
-        模板字典列表。
-    """
-    return list_dicts()
-
-
 @app.route("/api/import-status")
 def api_import_status() -> Any:
     """查询词库导入状态。"""
@@ -131,7 +122,7 @@ def index() -> str:
 @app.route("/api/templates")
 def api_templates() -> Any:
     """模板列表接口。"""
-    return jsonify(load_templates())
+    return jsonify(list_dicts())
 
 
 @app.route("/api/config", methods=["GET"])
@@ -373,9 +364,9 @@ def api_create_custom_template() -> Any:
         f"# Copyright (c) 2026 xhdlphzr\n"
         f"# SPDX-License-Identifier: MIT\n"
         f"# Auto-generated custom template: {name}\n\n"
-        f"from . import PoetryTemplate, register\n"
+        f"from . import PoetryTemplate, _make_syl, register\n"
         f"from .zh import (\n"
-        f"    _make_syl, _FREE, _tone as _t,\n"
+        f"    _FREE, _tone as _t,\n"
         f"    _check_sanpingwei, _check_guping,\n"
         f"    _check_rhyme, _check_alternation, _check_lv_alternation,\n"
         f")\n\n\n"
@@ -411,13 +402,13 @@ def api_create_custom_template() -> Any:
     except Exception as e:  # noqa: BLE001 - 用户代码模板注册兜底：任何导入/执行错误回报 500
         return jsonify({"status": "error", "message": f"注册失败: {e}"}), 500
 
-    socketio.emit("templates_updated", {"count": len(load_templates())})
+    socketio.emit("templates_updated", {"count": len(list_dicts())})
     logger.info("自定义模板已创建: %s (%s, %d 行)", name, language, lines)
     return jsonify(
         {
             "status": "ok",
             "message": f"模板'{name}'已创建并注册",
-            "count": len(load_templates()),
+            "count": len(list_dicts()),
         }
     )
 

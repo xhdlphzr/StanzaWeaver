@@ -184,7 +184,7 @@ def test_french_rhyme_key_placeholder_nucleus() -> None:
 def test_french_count_syllables_in_word() -> None:
     """验证单词语节数辅助方法（覆盖 245）。"""
     analyzer = FrenchAnalyzer()
-    assert analyzer._count_syllables_in_word("bon") == 1
+    assert analyzer.count_syllables_in_word("bon") == 1
 
 
 def test_french_syllabify_line_skips_empty_syls() -> None:
