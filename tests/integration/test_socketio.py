@@ -22,7 +22,14 @@ REVISED_LINE = "窗前明月光"
 
 
 def _make_emitter(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Any]]:
-    """make emitter。"""
+    """构造事件收集器，拦截所有 socketio.emit 调用。
+
+    Args:
+        monkeypatch: pytest monkeypatch 实例。
+
+    Returns:
+        收集到的 (event, data) 元组列表。
+    """
     emitted: list[tuple[str, object]] = []
     monkeypatch.setattr(
         socketio,
@@ -33,7 +40,11 @@ def _make_emitter(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Any]]:
 
 
 def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
-    """patch llm。"""
+    """注入桩 LLM 客户端，使 SocketIO 流程完全离线运行。
+
+    Args:
+        monkeypatch: pytest monkeypatch 实例。
+    """
     writer_stub = make_stub(
         stream=[DESC, DRAFT],
         chat=[
@@ -55,8 +66,8 @@ def test_generate_emits_progress_and_done(monkeypatch: pytest.MonkeyPatch) -> No
     client.emit("generate", {"topic": "静夜思", "template_key": "zh_wujue"})
 
     done = None
-    for _ in range(300):
-        time.sleep(0.05)
+    for _ in range(500):
+        time.sleep(0.02)
         for event, data in emitted:
             if event == "done":
                 done = data

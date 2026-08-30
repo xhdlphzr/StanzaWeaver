@@ -19,11 +19,25 @@ class _BaseStub(SyllableAnalyzer):
     language = "xx"
 
     def analyze_word(self, word: str) -> list[Syllable]:
-        """返回空音节列表。"""
+        """返回空音节列表。
+
+        Args:
+            word: 待分析单词。
+
+        Returns:
+            空列表。
+        """
         return []
 
     def count_syllables(self, text: str) -> int:
-        """返回 0。"""
+        """返回 0。
+
+        Args:
+            text: 待计数文本。
+
+        Returns:
+            固定返回 0。
+        """
         return 0
 
 

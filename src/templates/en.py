@@ -147,14 +147,26 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
-        """抑扬格逐位约束：奇数位轻、偶数位重。"""
+        """抑扬格逐位约束：奇数位轻、偶数位重。
+
+        Returns:
+            逐位音节约束表。
+        """
         line = [_l, _h, _l, _h, _l, _h, _l, _h, _l, _h]
         return [line for _ in range(14)]
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：重音下限、ABAB CDCD EFEF GG 韵式、组内 A/B 韵不同。"""
+        """完整检查：重音下限、ABAB CDCD EFEF GG 韵式、组内 A/B 韵不同。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         _check_stress_count(poem, syllables, 4, errors)
 
@@ -211,13 +223,25 @@ class VillanelleTemplate(PoetryTemplate):
     _rhyme_b: ClassVar[list[int]] = [1, 4, 7, 10, 13, 16]
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束（只要求每行 ≥4 重读音节）。"""
+        """无逐位约束（只要求每行 ≥4 重读音节）。
+
+        Returns:
+            逐位音节约束表。
+        """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：重音下限、叠句原文重复、A/B 两韵及互异。"""
+        """完整检查：重音下限、叠句原文重复、A/B 两韵及互异。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         _check_stress_count(poem, syllables, 4, errors)
 
@@ -269,14 +293,26 @@ class HeroicCoupletTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
-        """抑扬格逐位约束。"""
+        """抑扬格逐位约束。
+
+        Returns:
+            逐位音节约束表。
+        """
         line = [_l, _h, _l, _h, _l, _h, _l, _h, _l, _h]
         return [line, line]
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：重音下限 + AA 押韵。"""
+        """完整检查：重音下限 + AA 押韵。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         _check_stress_count(poem, syllables, 4, errors)
         _check_rhyme_group(poem, [0, 1], "AA", errors)

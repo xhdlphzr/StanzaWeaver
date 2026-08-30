@@ -91,7 +91,11 @@ class _ConstraintTemplate(PoetryTemplate):
 
 @pytest.fixture()
 def registry_snapshot() -> Generator[None, None, None]:
-    """测试前后恢复全局 _registry，避免污染其他用例。"""
+    """测试前后恢复全局 _registry，避免污染其他用例。
+
+    Yields:
+        无（恢复操作在 yield 后执行）。
+    """
     from src.templates import _registry
 
     saved: dict[str, PoetryTemplate] = dict(_registry)
@@ -184,6 +188,7 @@ def test_en_check_rhyme_group_out_of_range_index(
     monkeypatch.setattr(en_module._EN_ANALYZER, "rhyme_tails", lambda word: ["AY1 T"])
     errors: list[str] = []
     en_check_rhyme_group(["word"], [0, 99], "A", errors)
+    assert errors == []
 
 
 def test_en_rhyme_key_no_tails_and_rhyme_error(
@@ -202,7 +207,14 @@ def test_en_check_rhyme_group_mismatch(monkeypatch: MonkeyPatch) -> None:
     """组内各行韵尾不一致时应报错（覆盖 en 122-128）。"""
 
     def _fake_tails(word: str) -> list[str]:
-        """mock 的 rhyme_tails：为不同词返回固定韵尾以构造押韵冲突。"""
+        """mock 的 rhyme_tails：为不同词返回固定韵尾以构造押韵冲突。
+
+        Args:
+            word: 待查韵尾的词。
+
+        Returns:
+            韵尾列表。
+        """
         return ["T1"] if word == "aaa" else ["T2"]
 
     monkeypatch.setattr(en_module._EN_ANALYZER, "rhyme_tails", _fake_tails)
@@ -258,6 +270,7 @@ def test_fr_check_rhyme_group_out_of_range_index(
     monkeypatch.setattr(fr_module._FR, "rhyme_key", lambda w: "x")
     errors: list[str] = []
     fr_check_rhyme_group(["mot"], [0, 99], "A", errors)
+    assert errors == []
 
 
 def test_fr_ballade_invalid_syllable_count() -> None:

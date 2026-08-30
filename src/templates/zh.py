@@ -129,6 +129,7 @@ _TONGYUN: dict[str, str] = {
     "ie": "皆",
     "üe": "皆",
     "ve": "皆",
+    "ue": "皆",
     "ai": "开",
     "uai": "开",
     "ei": "微",
@@ -153,8 +154,8 @@ _TONGYUN: dict[str, str] = {
     "eng": "庚",
     "ing": "庚",
     "ueng": "庚",
-    "ong": "庚",
-    "iong": "庚",
+    "ong": "东",
+    "iong": "东",
     "i": "齐",
     "er": "齐",
     "ü": "齐",
@@ -378,13 +379,25 @@ class WujueTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位固定约束（一三不论）。"""
+        """无逐位固定约束（一三不论）。
+
+        Returns:
+            逐位音节约束表。
+        """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）。"""
+        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
@@ -408,13 +421,25 @@ class QijueTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位固定约束（一三五不论）。"""
+        """无逐位固定约束（一三五不论）。
+
+        Returns:
+            逐位音节约束表。
+        """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）。"""
+        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
@@ -434,13 +459,25 @@ class WulvTemplate(PoetryTemplate):
     rule_description = WujueTemplate.rule_description
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位固定约束。"""
+        """无逐位固定约束。
+
+        Returns:
+            逐位音节约束表。
+        """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）。"""
+        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
@@ -460,13 +497,25 @@ class QilvTemplate(PoetryTemplate):
     rule_description = QijueTemplate.rule_description
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位固定约束。"""
+        """无逐位固定约束。
+
+        Returns:
+            逐位音节约束表。
+        """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）。"""
+        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         for i, syls in enumerate(syllables):
             errors.extend(_check_sanpingwei(syls))
@@ -490,7 +539,11 @@ class XiangjianhuanTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """词牌固定平仄谱（"中"=自由）。"""
+        """词牌固定平仄谱（"中"=自由）。
+
+        Returns:
+            逐位音节约束表。
+        """
         _f, _p, _z = _FREE, _tone("平"), _tone("仄")
         return [
             [_f, _p, _f, _z, _p, _p],
@@ -508,6 +561,13 @@ class XiangjianhuanTemplate(PoetryTemplate):
         """押韵检查：上阕三平韵、下阕仄韵换韵、平韵转回且须同部。
 
         另提示上下阕末句（第 3、7 行）末三字全平宜规避（非铁律）。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
         """
         errors: list[str] = []
         for line_idx in (2, 6):

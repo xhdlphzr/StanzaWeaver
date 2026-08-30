@@ -66,7 +66,20 @@ _FR_DIGRAPHS: set[str] = {
 _MUTE_FINALS: set[str] = set("stxp")
 
 # 鼻化元音归并：前部鼻化 -> "an"，后部鼻化 -> "on"。
-_NASAL_FRONT: set[str] = {"an", "en", "in", "un", "ain", "ein", "ien", "oin"}
+_NASAL_FRONT: set[str] = {
+    "an",
+    "en",
+    "in",
+    "un",
+    "ain",
+    "ein",
+    "ien",
+    "oin",
+    "am",
+    "em",
+    "im",
+    "um",
+}
 _NASAL_BACK: set[str] = {"on", "om"}
 
 _APOSTROPHE_RE = re.compile(r"^[a-zA-Zàâäéèêëîïôöùûüÿæœ]*['’]")

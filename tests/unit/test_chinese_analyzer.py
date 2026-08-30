@@ -173,10 +173,10 @@ def test_guping_still_reported() -> None:
     assert any("孤平" in e for e in errors)
 
 
-def test_rhyme_tongyun_ing_ong_pass() -> None:
-    """验证 rhyme tongyun ing ong pass。"""
+def test_rhyme_tongyun_ing_ong_fail() -> None:
+    """验证 rhyme tongyun ing ong fail。"""
     tpl = WujueTemplate()
-    # ing(庚) 与 ong(庚) 同部，应押韵通过
+    # ing(庚) 与 ong(东) 不同部，应判不押韵
     poem = ["", "", "", ""]
     syllables = [
         _mk_line([("仄", "a"), ("仄", "a"), ("平", "a"), ("平", "a"), ("仄", "a")]),
@@ -185,7 +185,7 @@ def test_rhyme_tongyun_ing_ong_pass() -> None:
         _mk_line([("仄", "a"), ("仄", "a"), ("仄", "a"), ("平", "a"), ("平", "ong")]),
     ]
     errors = tpl.validate_full(poem, syllables)
-    assert errors == []
+    assert errors, "ing(庚) 与 ong(东) 不同部，应报押韵错误"
 
 
 def test_rhyme_tongyun_i_u_fail() -> None:

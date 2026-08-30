@@ -124,12 +124,11 @@ class LatinAnalyzer(SyllableAnalyzer):
 
         i = 0
         n = len(word)
+        trailing: list[str] = []
         while i < n:
             ch = word[i]
             lower = ch.lower()
-            # 辅音性 u: qu / gu / su 后接元音时整簇作为「下一音节」的 onset。
-            # 注意：若上一元音音节尚处挂起状态（nucleus 非空），须先关闭它，
-            # 否则 qu/gu/su 会被错误并入上一音节的 onset（如 aqua 误作 qua+a）。
+            # 辅音性 u: qu / gu / su 后接元音时整簇附于 trailing，作为下一音节 onset。
             if lower == "q" or (
                 lower in "gs"
                 and i + 1 < n
@@ -138,12 +137,14 @@ class LatinAnalyzer(SyllableAnalyzer):
                 and word[i + 2] in _VOWELS
             ):
                 if nucleus:
+                    coda = "".join(trailing)
                     _close()
                     onset = ""
                     nucleus = ""
                     coda = ""
                     length_val = ""
-                onset += lower + "u"
+                trailing.append(lower)
+                trailing.append("u")
                 i += 2
                 continue
             if ch in _VOWELS:
@@ -170,7 +171,11 @@ class LatinAnalyzer(SyllableAnalyzer):
                 else:
                     nucleus = vowel_base.lower()
 
-                # 收集后续辅音（coda），遇元音或辅音性 u 停止
+                # 累积的前导辅音成为当前音节 onset
+                onset = "".join(trailing)
+                trailing = []
+
+                # 收集后续辅音，遇元音或辅音性 u 停止
                 j = i + 1
                 cons: list[str] = []
                 while (
@@ -190,32 +195,21 @@ class LatinAnalyzer(SyllableAnalyzer):
                     if word[j] not in " .-":
                         cons.append(word[j].lower())
                     j += 1
-                # muta cum liquida（塞音 + 流音）附于当前音节 onset，不计长音位
-                if len(cons) >= 2 and cons[0] in _STOPS and cons[1] in "lr":
-                    onset += cons[0] + cons[1]
-                    coda += "".join(cons[2:])
-                    eff = 1
-                else:
-                    coda += "".join(cons)
-                    eff = 0
-                    for c in cons:
-                        eff += 2 if c == "x" else 1
+                trailing = cons
+                eff = 0
+                for c in cons:
+                    eff += 2 if c == "x" else 1
                 if not is_long and eff >= 2:
                     is_long = True
                 length_val = "long" if is_long else "short"
                 i = j
             else:
-                onset += lower
+                trailing.append(lower)
                 i += 1
 
         if nucleus:
+            coda = "".join(trailing)
             _close()
-        elif onset:
-            syllables.append(
-                Syllable(
-                    nucleus="?", attributes={"tone": "", "stress": "", "length": ""}
-                )
-            )
 
         return (
             syllables

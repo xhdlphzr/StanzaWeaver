@@ -50,6 +50,7 @@ class _FakeDB:
             **kwargs: 透传的查询参数（此处忽略）。
 
         Returns:
+            预置词条列表。
             固定词条列表。
         """
         return self.words
@@ -91,12 +92,17 @@ def test_config_invalid_json_falls_back(tmp_path: Path) -> None:
 
 
 def test_config_save_writes_file(tmp_path: Path) -> None:
-    """save 写入配置文件（覆盖 65-69）。"""
+    """save 写入配置文件且内容正确（覆盖 65-69）。"""
+    import json as _json
+
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     cfg._data = {"writer": {"model": "x"}}
     cfg._loaded = True
     cfg.save()
-    assert (tmp_path / "c.json").exists()
+    p = tmp_path / "c.json"
+    assert p.exists()
+    saved = _json.loads(p.read_text(encoding="utf-8"))
+    assert saved == {"writer": {"model": "x"}}
 
 
 def test_config_save_chmod_oserror(
@@ -105,7 +111,15 @@ def test_config_save_chmod_oserror(
     """save 时 chmod 失败被吞掉（覆盖 70-71）。"""
 
     def _raise_oserror(*args: Any, **kwargs: Any) -> None:
-        """模拟 chmod 失败。"""
+        """模拟 chmod 失败。
+
+        Args:
+            *args: 透传参数（忽略）。
+            **kwargs: 透传参数（忽略）。
+
+        Raises:
+            OSError: 始终抛出。
+        """
         raise OSError("denied")
 
     cfg = config_module.Config(config_path=tmp_path / "c.json")

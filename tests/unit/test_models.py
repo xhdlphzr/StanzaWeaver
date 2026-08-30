@@ -15,7 +15,19 @@ def _syl(
     stress: str = "",
     length: str = "",
 ) -> Syllable:
-    """syl。"""
+    """构造 Syllable 桩对象。
+
+    Args:
+        onset: 首音。
+        nucleus: 核元音。
+        coda: 尾音。
+        tone: 声调。
+        stress: 重音。
+        length: 音长。
+
+    Returns:
+        预填好的 Syllable 实例。
+    """
     return Syllable(
         onset=onset,
         nucleus=nucleus,

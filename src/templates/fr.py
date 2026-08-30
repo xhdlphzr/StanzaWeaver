@@ -75,13 +75,25 @@ class RondeauTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束。"""
+        """无逐位约束。
+
+        Returns:
+            逐位音节约束表。
+        """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：AABBA AAB AABBA 韵式 + 叠句开头 4 词一致。"""
+        """完整检查：AABBA AAB AABBA 韵式 + 叠句开头 4 词一致。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         rhyme_groups = [
             ([0, 1, 4, 5, 6, 8, 9, 10, 13, 14], "A"),
@@ -115,13 +127,25 @@ class TrioletTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束。"""
+        """无逐位约束。
+
+        Returns:
+            逐位音节约束表。
+        """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：叠句原文重复（1=4=7、2=8）+ ABaAabAB 韵式。"""
+        """完整检查：叠句原文重复（1=4=7、2=8）+ ABaAabAB 韵式。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         if len(poem) >= 8:
             if poem[0].strip() != poem[3].strip():
@@ -155,13 +179,25 @@ class BalladeTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束（音节数在 validate_full 中统一判定）。"""
+        """无逐位约束（音节数在 validate_full 中统一判定）。
+
+        Returns:
+            逐位音节约束表。
+        """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：全诗音节统一（8 或 10）、ababbcbc 韵式、叠句一致。"""
+        """完整检查：全诗音节统一（8 或 10）、ababbcbc 韵式、叠句一致。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         counts = [len(s) for s in syllables if s]
         if counts:

@@ -216,7 +216,11 @@ def test_import_all_runs_to_completion() -> None:
 
 
 def _chinese_text() -> str:
-    """Build a CC-CEDICT snippet covering every parse branch."""
+    """Build a CC-CEDICT snippet covering every parse branch.
+
+    Returns:
+        CC-CEDICT 格式的词典文本。
+    """
     lines = [
         "# this is a comment",
         "",
@@ -245,6 +249,10 @@ def test_import_chinese_success() -> None:
     ):
         imp._import_chinese()
         assert ins.call_count >= 1
+        # 验证至少有一个批次包含正确的 Word 对象
+        first_batch = ins.call_args_list[0][0][0]
+        assert len(first_batch) >= 1
+        assert first_batch[0].language == "zh"
         set_ds.assert_called_once_with("zh", "CC-CEDICT")
 
 
@@ -263,7 +271,11 @@ def test_import_chinese_oserror() -> None:
 
 
 def _english_dict() -> dict[str, list[tuple[str, ...]]]:
-    """Build CMUdict stub data covering every branch."""
+    """Build CMUdict stub data covering every branch.
+
+    Returns:
+        模拟 CMUdict 的字典数据。
+    """
     data: dict[str, list[tuple[str, ...]]] = {
         "hello": [("B", "AE1", "T"), ("HH", "EH1", "L", "OW1")],
         "dup": [("B", "AE1", "T"), ("B", "AE1", "T")],
@@ -277,7 +289,14 @@ def _english_dict() -> dict[str, list[tuple[str, ...]]]:
 
 
 def _patch_nltk(data: dict[str, list[tuple[str, ...]]]) -> Any:
-    """Inject nltk / cmudict stubs; returns a patch context manager."""
+    """Inject nltk / cmudict stubs; returns a patch context manager.
+
+    Args:
+        data: 模拟 CMUdict 的字典数据。
+
+    Returns:
+        mock.patch.dict 上下文管理器。
+    """
     nltk_mod = types.ModuleType("nltk")
     nltk_mod.data = mock.MagicMock()  # type: ignore[attr-defined]
     nltk_mod.data.find.side_effect = LookupError
@@ -307,7 +326,13 @@ def test_import_english_success() -> None:
     ):
         imp._import_english()
         assert ins.call_count >= 1
-        set_pron.assert_called()
+        # 验证至少有一个批次包含正确的 Word 对象
+        first_batch = ins.call_args_list[0][0][0]
+        assert len(first_batch) >= 1
+        assert first_batch[0].language == "en"
+        # 验证 set_en_pron 被调用且包含多发音词
+        pron_calls = {c[0][0]: c[0][1] for c in set_pron.call_args_list}
+        assert "hello" in pron_calls
         set_ds.assert_called_once_with("en", "CMUdict")
 
 
@@ -343,7 +368,14 @@ def test_import_english_no_download() -> None:
 
 
 def _fr_syl(w: str) -> list[Syllable]:
-    """Controlled French syllable splitter stub."""
+    """Controlled French syllable splitter stub.
+
+    Args:
+        w: 待分音节的单词。
+
+    Returns:
+        分音节后的 Syllable 列表。
+    """
     if w == "we":
         return []
     if w == "wf":
@@ -354,7 +386,11 @@ def _fr_syl(w: str) -> list[Syllable]:
 
 
 def _french_text() -> str:
-    """Build a Lexique TSV snippet covering every branch."""
+    """Build a Lexique TSV snippet covering every branch.
+
+    Returns:
+        Lexique382 格式的词典文本。
+    """
     rows = [
         "junk\tortho\tnbsyl\tphon",
         "onlyone",
@@ -419,14 +455,25 @@ def test_import_french_header_only() -> None:
 
 
 def _it_syl(w: str) -> list[Syllable]:
-    """Controlled Italian syllable splitter stub."""
+    """Controlled Italian syllable splitter stub.
+
+    Args:
+        w: 待分音节的单词。
+
+    Returns:
+        分音节后的 Syllable 列表。
+    """
     if w in ("bb", "fbad"):
         return []
     return [_mk_syl("a")]
 
 
 def _italian_text() -> str:
-    """Build a GLAW-IT XML snippet covering every branch."""
+    """Build a GLAW-IT XML snippet covering every branch.
+
+    Returns:
+        GLAW-IT 格式的词典文本。
+    """
     parts = [
         "<txt>pre</txt><title>aa</title><txt>post</txt><title>bb</title>",
         "<title></title>",
@@ -494,14 +541,25 @@ def test_import_italian_oserror() -> None:
 
 
 def _la_analyze(clean: str) -> list[Syllable]:
-    """Controlled Latin analyzer stub."""
+    """Controlled Latin analyzer stub.
+
+    Args:
+        clean: 清理后的拉丁文单词。
+
+    Returns:
+        分析后的 Syllable 列表。
+    """
     if clean == "zzz":
         return []
     return [_mk_syl("a")]
 
 
 def _latin_text() -> str:
-    """Build a Lewis & Short snippet covering every branch."""
+    """Build a Lewis & Short snippet covering every branch.
+
+    Returns:
+        Lewis-Short 格式的词典文本。
+    """
     lines = [
         "",
         "(comment in parens",
