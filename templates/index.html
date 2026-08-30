@@ -318,15 +318,33 @@
         return val;
       }
 
+      function showToast(message, type) {
+        type = type || "info";
+        var container = document.getElementById("toast-container");
+        var toast = document.createElement("div");
+        toast.className = "toast toast-" + type;
+        toast.textContent = message;
+        container.appendChild(toast);
+        requestAnimationFrame(function () {
+          toast.classList.add("toast-show");
+        });
+        setTimeout(function () {
+          toast.classList.remove("toast-show");
+          toast.addEventListener("transitionend", function () {
+            toast.remove();
+          });
+        }, 3000);
+      }
+
       function startGenerate() {
         const topic = document.getElementById("topic").value.trim();
         const templateKey = getSelectedTemplate();
         if (!topic) {
-          alert("请输入主题");
+          showToast("请输入主题", "warning");
           return;
         }
         if (!templateKey) {
-          alert("请选择格律模板");
+          showToast("请选择格律模板", "warning");
           return;
         }
 
@@ -372,7 +390,7 @@
 
       function acceptFinal() {
         document.getElementById("feedback-section").classList.add("hidden");
-        alert("诗歌定稿完成！感谢使用 StanzaWeaver。");
+        showToast("诗歌定稿完成！感谢使用 StanzaWeaver。", "success");
       }
 
       function updateStepDot(stepKey, state) {
@@ -618,7 +636,7 @@
       }
 
       function handleError(data) {
-        alert(data.message || "发生错误");
+        showToast(data.message || "发生错误", "error");
         document.getElementById("btn-generate").disabled = false;
         document.getElementById("btn-feedback").disabled = false;
         isGenerating = false;
@@ -672,7 +690,7 @@
           .then((r) => r.json())
           .then(() => {
             closeConfig();
-            alert("配置已保存");
+            showToast("配置已保存", "success");
           });
       }
 
@@ -818,7 +836,7 @@
       function createTemplate() {
         const name = document.getElementById("tmpl-name").value.trim();
         if (!name) {
-          alert("请输入模板名称");
+          showToast("请输入模板名称", "warning");
           return;
         }
         const language = document.getElementById("tmpl-language").value;
@@ -884,7 +902,7 @@
             return r.json();
           })
           .then(function (resp) {
-            alert(resp.message);
+            showToast(resp.message, resp.status === "ok" ? "success" : "error");
             if (resp.status === "ok") {
               closeTemplateModal();
               loadTemplates();
@@ -892,5 +910,6 @@
           });
       }
     </script>
+    <div id="toast-container"></div>
   </body>
 </html>

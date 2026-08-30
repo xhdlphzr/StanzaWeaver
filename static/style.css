@@ -1079,6 +1079,57 @@ header h1 {
   }
 }
 
+/* ---- Toast 通知 ---- */
+
+#toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  transform: translateX(40px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  pointer-events: auto;
+  max-width: 360px;
+  word-break: break-word;
+}
+
+.toast-show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.toast-success {
+  background: linear-gradient(135deg, #5a8c3c, #6b9e4a);
+}
+
+.toast-error {
+  background: linear-gradient(135deg, #b05040, #c06050);
+}
+
+.toast-warning {
+  background: linear-gradient(135deg, #c09030, #d4a840);
+}
+
+.toast-info {
+  background: linear-gradient(135deg, #6a7b8a, #8a9baa);
+}
+
 /* ---- 滚动条 ---- */
 
 ::-webkit-scrollbar {
