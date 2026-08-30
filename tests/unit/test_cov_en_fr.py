@@ -25,30 +25,49 @@ from src.prosody.french import FrenchAnalyzer
 def test_load_cmudict_body_executes() -> None:
     """验证 `_load_cmudict` 加载体在本次会话中真实执行（覆盖 63-64, 66-67, 70, 72, 74）。
 
-    整体 mock `nltk.corpus.cmudict`，避免 CI 等无词库环境下访问该属性触发
-    真实语料加载（LookupError）；内部强制 `nltk.data.find` 抛 LookupError 以
-    触发 except 下载分支（覆盖 68-69）。测试结束后还原全局状态。
+    直接将 mock 注入 ``nltk.corpus.__dict__``，避免任何对 ``nltk.corpus.cmudict``
+    直接注入 ``sys.modules["nltk.corpus"]`` 的 ``cmudict`` 属性（``nltk.corpus``
+    作为 LazyModule 代理与 import 实际解析的 ``sys.modules`` 实体并非同一对象，
+    必须改动后者才能拦截函数内的 ``from nltk.corpus import cmudict``）；内部强制
+    ``nltk.data.find`` 抛 LookupError 以触发 except 下载分支（覆盖 68-69）。
+    测试结束后还原全局状态。
     """
-    saved_loaded = english_module._cmudict_loaded
-    saved_cache = english_module._ARPABET_TO_PHONEMES
+    import importlib
+    import sys
 
-    english_module._cmudict_loaded = False
-    english_module._ARPABET_TO_PHONEMES = {}
+    importlib.import_module(
+        "nltk.corpus"
+    )  # 确保 sys.modules 中存在真实模块，避免在干净环境下注入落空
+
+    gl = english_module._load_cmudict.__globals__
+    saved_loaded = gl["_cmudict_loaded"]
+    saved_cache = gl["_ARPABET_TO_PHONEMES"]
+    real_corpus = sys.modules["nltk.corpus"]
+    saved_cmu = real_corpus.__dict__.get("cmudict")
+
+    gl["_cmudict_loaded"] = False
+    gl["_ARPABET_TO_PHONEMES"] = {}
 
     fake_dict: dict[str, list[list[str]]] = {"foobar": [["F", "OW1", "B", "AA1", "R"]]}
-    with (
-        mock.patch.object(nltk.corpus, "cmudict") as mock_cmu,
-        mock.patch.object(nltk.data, "find", side_effect=LookupError),
-        mock.patch.object(nltk, "download", return_value=None),
-    ):
-        mock_cmu.dict.return_value = fake_dict
-        english_module._load_cmudict()
-
-    assert english_module._cmudict_loaded is True
-    assert "foobar" in english_module._ARPABET_TO_PHONEMES
-    # 还原全局状态，保证既有用例不受影响
-    english_module._cmudict_loaded = saved_loaded
-    english_module._ARPABET_TO_PHONEMES = saved_cache
+    mock_cmu = mock.MagicMock()
+    mock_cmu.dict.return_value = fake_dict
+    try:
+        real_corpus.__dict__["cmudict"] = mock_cmu
+        with (
+            mock.patch.object(nltk.data, "find", side_effect=LookupError),
+            mock.patch.object(nltk, "download", return_value=None),
+        ):
+            english_module._load_cmudict()
+        assert gl["_cmudict_loaded"] is True
+        assert "foobar" in gl["_ARPABET_TO_PHONEMES"]
+    finally:
+        if saved_cmu is None:
+            real_corpus.__dict__.pop("cmudict", None)
+        else:
+            real_corpus.__dict__["cmudict"] = saved_cmu
+        # 还原全局状态，保证既有用例不受影响
+        gl["_cmudict_loaded"] = saved_loaded
+        gl["_ARPABET_TO_PHONEMES"] = saved_cache
 
 
 def test_load_cmudict_inner_guard_return() -> None:

@@ -197,6 +197,21 @@ def test_import_skip_when_dataset_present() -> None:
         imp._import_latin()
 
 
+def test_import_all_runs_to_completion() -> None:
+    """import_all 在数据集已存在时全部走跳过分支（覆盖 508-517 及各 skip return）。
+
+    直接驱动 ``import_all``，确保其在干净环境下也能完整执行（不经 app 后台
+    线程且不受网络影响），从而覆盖 import_all 函数体本身。
+    """
+    with (
+        mock.patch.object(imp, "_check_dataset", return_value=True),
+        mock.patch.object(imp, "init_db"),
+        mock.patch.object(imp, "insert_words") as ins,
+    ):
+        imp.import_all()
+        assert ins.call_count == 0
+
+
 # ── _import_chinese ──
 
 
