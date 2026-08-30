@@ -2,8 +2,10 @@
 *cache*
 **/build/
 **/dist/
+**/htmlcov/
 *.pyc
 *.pyo
 *.db
+.coverage
 src/knowledge/data/
 src/templates/custom_*.py

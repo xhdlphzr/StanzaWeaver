@@ -29,6 +29,7 @@ def _mk_line(pairs: list[tuple[str, str]]) -> list[Syllable]:
 
 
 def test_count_syllables_counts_cjk_chars() -> None:
+    """验证 count syllables counts cjk chars。"""
     a = ChineseAnalyzer()
     assert a.count_syllables("床前明月光") == 5
     assert a.count_syllables("  静夜思  ") == 3
@@ -36,6 +37,7 @@ def test_count_syllables_counts_cjk_chars() -> None:
 
 
 def test_analyze_word_single_char_parts() -> None:
+    """验证 analyze word single char parts。"""
     a = ChineseAnalyzer()
     # 光 guāng: 声母 g, 韵腹 a, 韵尾 ng, 一声(平)
     syls = a.analyze_word("光")
@@ -48,6 +50,7 @@ def test_analyze_word_single_char_parts() -> None:
 
 
 def test_analyze_word_tone_ping_ze() -> None:
+    """验证 analyze word tone ping ze。"""
     a = ChineseAnalyzer()
     # 去 (qù, 4声) -> 仄
     assert a.analyze_word("去")[0].attributes["tone"] == "仄"
@@ -56,11 +59,13 @@ def test_analyze_word_tone_ping_ze() -> None:
 
 
 def test_tokenize_line_keeps_only_cjk() -> None:
+    """验证 tokenize line keeps only cjk。"""
     a = ChineseAnalyzer()
     assert a.tokenize_line("床前，明月光！") == ["床", "前", "明", "月", "光"]
 
 
 def test_analyze_word_variants_polyphonic() -> None:
+    """验证 analyze word variants polyphonic。"""
     a = ChineseAnalyzer()
     # 中 为多音字：zhōng(平) / zhòng(仄)
     variants = a.analyze_word_variants("中")
@@ -73,12 +78,14 @@ def test_analyze_word_variants_polyphonic() -> None:
 
 
 def test_neutral_tone_maps_to_ping() -> None:
+    """验证 neutral tone maps to ping。"""
     a = ChineseAnalyzer()
     # 的 为轻声，应归为平声
     assert a.analyze_word("的")[0].attributes["tone"] == "平"
 
 
 def test_sanpingwei_flagged_sanzewei_removed() -> None:
+    """验证 sanpingwei flagged sanzewei removed。"""
     tpl = WujueTemplate()
     # 第2行为三平尾；末三字全平应被标记
     poem = ["", "", "", ""]
@@ -95,6 +102,7 @@ def test_sanpingwei_flagged_sanzewei_removed() -> None:
 
 
 def test_sanzewei_no_longer_error() -> None:
+    """验证 sanzewei no longer error。"""
     tpl = WujueTemplate()
     # 末三字全仄的合法五言绝句：不应报三仄尾
     poem = ["", "", "", ""]
@@ -110,9 +118,10 @@ def test_sanzewei_no_longer_error() -> None:
     assert errors == []
 
 
-def test_guping_no_longer_reported() -> None:
+def test_guping_still_reported() -> None:
+    """验证 guping still reported。"""
     tpl = QijueTemplate()
-    # 第4句为疑似孤平句（仄仄仄平仄仄平），不应再报告孤平
+    # 孤平保留判定：第4句为孤平句（仄仄仄仄平，全句仅韵脚一平），应仍报告孤平
     poem = ["", "", "", ""]
     syllables = [
         _mk_line(
@@ -123,7 +132,7 @@ def test_guping_no_longer_reported() -> None:
                 ("平", "a"),
                 ("仄", "a"),
                 ("仄", "a"),
-                ("平", "a"),
+                ("平", "ang"),
             ]
         ),
         _mk_line(
@@ -153,7 +162,7 @@ def test_guping_no_longer_reported() -> None:
                 ("仄", "a"),
                 ("仄", "a"),
                 ("仄", "a"),
-                ("平", "a"),
+                ("仄", "a"),
                 ("仄", "a"),
                 ("仄", "a"),
                 ("平", "ang"),
@@ -161,10 +170,11 @@ def test_guping_no_longer_reported() -> None:
         ),
     ]
     errors = tpl.validate_full(poem, syllables)
-    assert not any("孤平" in e for e in errors)
+    assert any("孤平" in e for e in errors)
 
 
 def test_rhyme_tongyun_ing_ong_pass() -> None:
+    """验证 rhyme tongyun ing ong pass。"""
     tpl = WujueTemplate()
     # ing(庚) 与 ong(庚) 同部，应押韵通过
     poem = ["", "", "", ""]
@@ -179,6 +189,7 @@ def test_rhyme_tongyun_ing_ong_pass() -> None:
 
 
 def test_rhyme_tongyun_i_u_fail() -> None:
+    """验证 rhyme tongyun i u fail。"""
     tpl = WujueTemplate()
     # i(齐) 与 u(姑) 不同部，应判不押韵
     poem = ["", "", "", ""]

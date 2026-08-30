@@ -198,6 +198,11 @@ class PoetryPipeline:
         last_report_time = [0.0]
 
         def on_stream(text: str) -> None:
+            """流式输出回调：接收生成过程中的单个文本片段。
+
+            Args:
+                text: 本次流式推送的文本片段。
+            """
             now = time.monotonic()
             if now - last_report_time[0] >= 0.25 or not text:
                 last_report_time[0] = now
@@ -230,6 +235,11 @@ class PoetryPipeline:
         last_report_time = [0.0]
 
         def on_stream(text: str) -> None:
+            """流式输出回调：接收生成过程中的单个文本片段。
+
+            Args:
+                text: 本次流式推送的文本片段。
+            """
             now = time.monotonic()
             if now - last_report_time[0] >= 0.25 or not text:
                 last_report_time[0] = now
@@ -263,6 +273,11 @@ class PoetryPipeline:
             self._report(state)
 
             def on_step(step_info: dict[str, Any]) -> None:
+                """步骤进度回调：接收单个生成步骤的信息字典。
+
+                Args:
+                    step_info: 含 poem / last_tool / last_result / detail / stream_text 的步骤信息。
+                """
                 state.draft = list(step_info["poem"])
                 state.last_tool = str(step_info["last_tool"])
                 state.last_tool_result = json_dumps_safe(
@@ -276,6 +291,11 @@ class PoetryPipeline:
             last_report_time: list[float] = [0.0]
 
             def on_stream(text: str, _t: list[float] = last_report_time) -> None:
+                """流式输出回调：接收生成过程中的单个文本片段。
+
+                Args:
+                    text: 本次流式推送的文本片段。
+                """
                 # _t 以默认参数绑定当前迭代的节流容器，避免闭包误捕循环变量
                 now = time.monotonic()
                 if now - _t[0] >= 0.25 or not text:

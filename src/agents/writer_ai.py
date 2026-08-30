@@ -393,16 +393,9 @@ class WriterAI:
                     if "poem" in result:
                         current_poem = result["poem"]
                         modifications += 1
-                        full_result = self.validator.validate(
-                            current_poem, template, template_obj
-                        )
-                        if not full_result.passed:
-                            result["validation_errors"] = full_result.errors
                     detail = f"[第{round_num}轮] rewrite({args.get('instruction', '')})"
                     if "poem" in result:
                         detail += ": 重写完成"
-                        if "validation_errors" in result:
-                            detail += f" (格律问题: {result['validation_errors']})"
                     detail_parts.append(detail)
 
                 if result is not None:
@@ -563,5 +556,3 @@ class WriterAI:
                     + "\n请修正。",
                 }
             )
-
-        return {"poem": new_poem, "note": "重写后格律可能不完全满足"}

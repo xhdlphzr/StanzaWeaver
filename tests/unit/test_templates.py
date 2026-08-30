@@ -95,6 +95,7 @@ def _ls(nucleus: str, coda: str = "", length: str = "") -> Syllable:
 # 中文：孤平 / 三平尾（直接单元）                                          #
 # --------------------------------------------------------------------------- #
 def test_check_guping_direct() -> None:
+    """验证 check guping direct。"""
     ping_foot_only_one = _zline(
         [
             ("a", "", "仄"),
@@ -130,6 +131,7 @@ def test_check_guping_direct() -> None:
 
 
 def test_check_sanpingwei_direct() -> None:
+    """验证 check sanpingwei direct。"""
     san = _zline([("a", "", "平"), ("a", "", "平"), ("a", "", "平")])
     assert _check_sanpingwei(san)
     not_san = _zline([("a", "", "平"), ("a", "", "平"), ("a", "", "仄")])
@@ -140,6 +142,7 @@ def test_check_sanpingwei_direct() -> None:
 # 中文：五绝 / 七绝 有效与各项违规                                          #
 # --------------------------------------------------------------------------- #
 def _valid_wujue_syllables() -> list[list[Syllable]]:
+    """valid wujue syllables。"""
     return [
         _zline(
             [
@@ -181,6 +184,7 @@ def _valid_wujue_syllables() -> list[list[Syllable]]:
 
 
 def _valid_qijue_syllables() -> list[list[Syllable]]:
+    """valid qijue syllables。"""
     return [
         _zline(
             [
@@ -230,10 +234,12 @@ def _valid_qijue_syllables() -> list[list[Syllable]]:
 
 
 def test_wujue_valid() -> None:
+    """验证 wujue valid。"""
     assert WujueTemplate().validate_full([""] * 4, _valid_wujue_syllables()) == []
 
 
 def test_wujue_guping_detected() -> None:
+    """验证 wujue guping detected。"""
     syls = _valid_wujue_syllables()
     syls[3] = _zline(
         [
@@ -249,6 +255,7 @@ def test_wujue_guping_detected() -> None:
 
 
 def test_wujue_sanpingwei_detected() -> None:
+    """验证 wujue sanpingwei detected。"""
     syls = _valid_wujue_syllables()
     syls[1] = _zline(
         [
@@ -264,6 +271,7 @@ def test_wujue_sanpingwei_detected() -> None:
 
 
 def test_wujue_rhyme_mismatch() -> None:
+    """验证 wujue rhyme mismatch。"""
     syls = _valid_wujue_syllables()
     syls[3][-1] = _zs("o", "ng", "平")
     errs = WujueTemplate().validate_full([""] * 4, syls)
@@ -271,10 +279,12 @@ def test_wujue_rhyme_mismatch() -> None:
 
 
 def test_qijue_valid() -> None:
+    """验证 qijue valid。"""
     assert QijueTemplate().validate_full([""] * 4, _valid_qijue_syllables()) == []
 
 
 def test_wulv_rhyme_mismatch() -> None:
+    """验证 wulv rhyme mismatch。"""
     syls: list[list[Syllable]] = []
     for k in range(8):
         tone = "平" if k % 2 == 1 else "仄"
@@ -285,6 +295,7 @@ def test_wulv_rhyme_mismatch() -> None:
 
 
 def test_qilv_sanpingwei_detected() -> None:
+    """验证 qilv sanpingwei detected。"""
     syls: list[list[Syllable]] = []
     for k in range(8):
         tone = "平" if k % 2 == 1 else "仄"
@@ -298,7 +309,10 @@ def test_qilv_sanpingwei_detected() -> None:
 # 中文：词牌 相见欢（换韵 / 平韵转回）                                    #
 # --------------------------------------------------------------------------- #
 def _xjh_syllables() -> list[list[Syllable]]:
+    """xjh syllables。"""
+
     def mk(n: int, key: str | None) -> list[Syllable]:
+        """mk。"""
         out: list[Syllable] = []
         for i in range(n):
             if i == n - 1 and key:
@@ -319,10 +333,12 @@ def _xjh_syllables() -> list[list[Syllable]]:
 
 
 def test_xiangjianhuan_valid() -> None:
+    """验证 xiangjianhuan valid。"""
     assert XiangjianhuanTemplate().validate_full([""] * 7, _xjh_syllables()) == []
 
 
 def test_xiangjianhuan_lower_ping_not_returned() -> None:
+    """验证 xiangjianhuan lower ping not returned。"""
     syls = _xjh_syllables()
     syls[6][-1] = _zs("o", "ng", "")
     errs = XiangjianhuanTemplate().validate_full([""] * 7, syls)
@@ -333,6 +349,7 @@ def test_xiangjianhuan_lower_ping_not_returned() -> None:
 # 英语：商籁体 / 维拉内拉 / 英雄双行体                                   #
 # --------------------------------------------------------------------------- #
 def test_sonnet_quatrain_ab_distinct() -> None:
+    """验证 sonnet quatrain ab distinct。"""
     # A 组末行(行3)与 B 组末行(行4)同韵 -> 同一联内 A/B 韵脚应不同
     poem = [
         "x light",
@@ -356,6 +373,7 @@ def test_sonnet_quatrain_ab_distinct() -> None:
 
 
 def test_sonnet_rhyme_mismatch() -> None:
+    """验证 sonnet rhyme mismatch。"""
     poem = [
         "x light",
         "y love",
@@ -378,6 +396,7 @@ def test_sonnet_rhyme_mismatch() -> None:
 
 
 def test_villanelle_refrain_mismatch() -> None:
+    """验证 villanelle refrain mismatch。"""
     base = [
         "a light",
         "b love",
@@ -409,6 +428,7 @@ def test_villanelle_refrain_mismatch() -> None:
 
 
 def test_heroic_couplet_rhyme() -> None:
+    """验证 heroic couplet rhyme。"""
     poem = ["the light of night", "a song of stone"]
     syls = _en_syls(2)
     errs = HeroicCoupletTemplate().validate_full(poem, syls)
@@ -419,6 +439,7 @@ def test_heroic_couplet_rhyme() -> None:
 # 法语：回旋诗 / 三韵叠句 / 叙事歌（叠句 + 音节统一）                  #
 # --------------------------------------------------------------------------- #
 def test_rondeau_refrain_mismatch() -> None:
+    """验证 rondeau refrain mismatch。"""
     poem = [
         "premier vers ici mot",
         "b",
@@ -444,6 +465,7 @@ def test_rondeau_refrain_mismatch() -> None:
 
 
 def test_triolet_refrain_mismatch() -> None:
+    """验证 triolet refrain mismatch。"""
     poem = [
         "refrain un",
         "refrain deux",
@@ -462,6 +484,7 @@ def test_triolet_refrain_mismatch() -> None:
 
 
 def test_ballade_syllable_uniform_mismatch() -> None:
+    """验证 ballade syllable uniform mismatch。"""
     poem = ["a" for _ in range(28)]
     syls = [[_is("a") for _ in range(8)] for _ in range(28)]
     syls[10] = [_is("a") for _ in range(9)]
@@ -470,6 +493,7 @@ def test_ballade_syllable_uniform_mismatch() -> None:
 
 
 def test_ballade_refrain_mismatch() -> None:
+    """验证 ballade refrain mismatch。"""
     poem = ["a" for _ in range(28)]
     syls = [[_is("a") for _ in range(8)] for _ in range(28)]
     poem[15] = "changed refrain"
@@ -483,6 +507,7 @@ def test_ballade_refrain_mismatch() -> None:
 # 意大利语：三行体 / 八行体 / 歌谣                                        #
 # --------------------------------------------------------------------------- #
 def test_terzarima_tenth_stress_missing() -> None:
+    """验证 terzarima tenth stress missing。"""
     line = [_is("a") for _ in range(11)]
     syls = [line for _ in range(14)]
     errs = TerzaRimaTemplate().validate_full([""] * 14, syls)
@@ -490,7 +515,10 @@ def test_terzarima_tenth_stress_missing() -> None:
 
 
 def test_terzarima_rhyme_mismatch() -> None:
+    """验证 terzarima rhyme mismatch。"""
+
     def mk(key: str) -> list[Syllable]:
+        """mk。"""
         out = [_is("a") for _ in range(10)]
         out.append(_is(key))
         return out
@@ -507,7 +535,10 @@ def test_terzarima_rhyme_mismatch() -> None:
 
 
 def test_ottava_rima_tenth_stress_ok_rhyme_mismatch() -> None:
+    """验证 ottava rima tenth stress ok rhyme mismatch。"""
+
     def mk(key: str) -> list[Syllable]:
+        """mk。"""
         out = [_is("a") for _ in range(10)]
         out[9] = _is("a", "", "heavy")
         out.append(_is(key))
@@ -519,9 +550,11 @@ def test_ottava_rima_tenth_stress_ok_rhyme_mismatch() -> None:
 
 
 def test_canzone_constraints() -> None:
+    """验证 canzone constraints。"""
     syls: list[list[Syllable]] = []
 
     def eleven(key: str) -> list[Syllable]:
+        """eleven。"""
         out = [_is("x") for _ in range(11)]
         out[9] = _is("x", "", "heavy")
         out[10] = _is("y")
@@ -529,6 +562,7 @@ def test_canzone_constraints() -> None:
         return out
 
     def seven(key: str) -> list[Syllable]:
+        """seven。"""
         out = [_is("x") for _ in range(7)]
         out[-1] = _is(key, "", "heavy")
         return out
@@ -546,12 +580,14 @@ def test_canzone_constraints() -> None:
 # 拉丁语：六步格 / 哀歌双行体 / 十一音节诗                              #
 # --------------------------------------------------------------------------- #
 def test_hexameter_all_short_reports_error() -> None:
+    """验证 hexameter all short reports error。"""
     syls = [_ls("a", "", "short") for _ in range(14)]
     errs = HexameterTemplate().validate_full(["x"], [syls])
     assert errs
 
 
 def test_distichon_caesura_missing() -> None:
+    """验证 distichon caesura missing。"""
     hexa = [
         _ls("a", "", "long"),
         _ls("a", "", "short"),
@@ -589,6 +625,7 @@ def test_distichon_caesura_missing() -> None:
 
 
 def test_distichon_rhyme_mismatch() -> None:
+    """验证 distichon rhyme mismatch。"""
     hexa = [_ls("a", "ng", "long") for _ in range(14)]
     penta = [_ls("a", "ng", "long") for _ in range(12)]
     hexa[-1] = _ls("a", "ng", "long")
@@ -600,6 +637,7 @@ def test_distichon_rhyme_mismatch() -> None:
 
 
 def test_hendecasyllabus_boundary_missing() -> None:
+    """验证 hendecasyllabus boundary missing。"""
     line = [_ls("a", "", "long") for _ in range(11)]
     line[1] = _ls("a", "", "long")
     line[3] = _ls("a", "", "long")
@@ -612,6 +650,7 @@ def test_hendecasyllabus_boundary_missing() -> None:
 
 
 def test_hendecasyllabus_missing_long() -> None:
+    """验证 hendecasyllabus missing long。"""
     line = [_ls("a", "", "short") for _ in range(11)]
     errs = HendecasyllabusTemplate().validate_full(["a a a a a a a a a a a"], [line])
     assert any("长音节" in e for e in errs)

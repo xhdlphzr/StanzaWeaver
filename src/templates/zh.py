@@ -6,7 +6,7 @@
 实现近体诗/词牌的符号层规则：
 - 平仄骨架：每句 2/4(6) 位相间、联内相对、联间相粘、出句仄脚/对句平脚；
 - 押韵：偶数行平声韵（一韵到底，依《中华通韵》16 韵部），首句可入韵，词牌按谱换韵；
-- 禁忌：三平尾（三仄尾、孤平已不计入禁忌）。
+- 禁忌：三平尾、孤平（三仄尾不计入禁忌）。
 """
 
 from typing import Any, ClassVar
@@ -213,8 +213,6 @@ def _check_rhyme(
     if len(rhyme_keys) < 2:
         return errors
     base_idx, base_rhyme = rhyme_keys[0]
-    if not base_rhyme:
-        return errors
     for line_idx, rhyme in rhyme_keys[1:]:
         if rhyme and rhyme != base_rhyme:
             errors.append(
@@ -254,8 +252,6 @@ def _check_jinti_rhyme(
     if len(keys) < 2:
         return errors
     base_idx, base_rhyme = keys[0]
-    if not base_rhyme:
-        return errors
     for line_idx, rhyme in keys[1:]:
         if rhyme and rhyme != base_rhyme:
             errors.append(

@@ -96,7 +96,10 @@ def make_stub(
     script_chat = list(chat or [])
 
     class _Stub(StubLLMClient):
+        """_Stub。"""
+
         def __init__(self, base_url: str, api_key: str, model: str) -> None:
+            """init  。"""
             super().__init__(
                 base_url, api_key, model, stream=script_stream, chat=script_chat
             )

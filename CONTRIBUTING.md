@@ -8,7 +8,7 @@
 
 Thank you for contributing to **StanzaWeaver** (Weaving Stanzas with Wisdom)! This document explains how to set up the development environment, the mandatory checks before submitting, and how to add new **meter templates** and **languages** to the symbolic layer.
 
-> All new features must pass tests; for logic that cannot be verified offline (e.g., requiring network download of lexicons), at least provide stub‑based unit tests to keep `pytest` green.
+> All new features must pass tests with **100% code coverage on the changed `src` modules**; for logic that cannot be verified offline (e.g., requiring network download of lexicons), at least provide stub‑based unit tests to keep `pytest` green.
 
 ---
 
@@ -91,7 +91,7 @@ ruff check --fix --unsafe-fixes ./
 # 3) Code formatting
 ruff format ./
 
-# 4) Tests
+# 4) Tests (enforces 100% coverage via --cov-fail-under=100 in pytest.ini)
 pytest
 ```
 
@@ -99,7 +99,7 @@ Notes:
 
 - In CI, `ruff` is run as `ruff check ./` (without auto‑fix), so **you must locally clean up with `--fix --unsafe-fixes` and `format`** first, otherwise CI will fail.
 - `mypy` must be used with the virtual environment that matches this project (`python3.14` + project dependencies); a system‑wide `mypy` may produce false‑positive import‑not‑found errors.
-- `pytest` uses `tests/pytest.ini` configuration (`pythonpath = .`, `testpaths = tests`). Tests use the `StubLLMClient` from `tests/helpers.py` – **no real LLM calls / no network**; they can run fully offline.
+- `pytest` uses the `pytest.ini` configuration at the repo root (`pythonpath = .`, `testpaths = tests`, `--cov=src --cov-fail-under=100`). It enforces **100% coverage on `src`**, so every `src` change must be fully covered by tests — `pytest` fails otherwise. Tests use the `StubLLMClient` from `tests/helpers.py` – **no real LLM calls / no network**; they can run fully offline.
 
 ---
 
@@ -168,6 +168,7 @@ class PoetryTemplate(ABC):
 - Add a test file (e.g., `test_<lang>_analyzer.py` in `tests/unit/` if a new language is involved, or a test specific to the new template) that at least covers:
   - A valid poem where `validate_full` returns `[]`.
   - Obvious violations (wrong line count / wrong syllable count / no rhyme) are caught by `validate_full`.
+- **Coverage requirement:** the new tests must bring the changed `src` module (e.g., the new template class) to **100% line coverage**. Run `pytest` and confirm it stays green (the `--cov-fail-under=100` gate rejects any uncovered line).
 - For UI / end‑to‑end scenarios, you can use `helpers.make_stub` in `tests/integration/` to drive the `Pipeline` / SocketIO and verify the full flow.
 
 ---
@@ -241,14 +242,15 @@ Add a `_import_<lang>()` function in `src/knowledge/importer.py` that parses a p
 - `tests/unit/test_<lang>_analyzer.py`: cover typical use cases for `analyze_word` / `count_syllables` / `tokenize_line` (including multisyllabic words, special spellings).
 - If new validation logic is added, add corresponding test cases in `test_meter_validator.py`.
 - If the lexicon importer uses offline built‑in examples, provide assertions that do not require network; if it must download data, replace with a local sample or stub in tests to keep `pytest` offline‑capable.
+- **Coverage requirement:** the new tests must bring the changed `src` modules (analyser, validator, importer, etc.) to **100% line coverage**. Run `pytest` and confirm it stays green.
 
 ---
 
 ## 5. Testing Guidelines
 
-- Run: `pytest` (from the repository root, using `tests/pytest.ini`).
+- Run: `pytest` (from the repository root, using `pytest.ini`). The command already enforces **100% coverage on `src`** via `--cov=src --cov-fail-under=100`, so it fails if any changed line is uncovered.
 - All tests **do not depend on real LLMs / network**: LLMs are replaced by `StubLLMClient` from `tests/helpers.py`.
-- Any new feature (meter template / language / analyser / validator) must have corresponding unit tests; integration changes require end‑to‑end tests under `integration/`.
+- Any new feature (meter template / language / analyser / validator) must have corresponding unit tests that achieve **100% coverage of the touched `src` module**; integration changes require end‑to‑end tests under `integration/`.
 - Before submitting, ensure `mypy --strict ./`, `ruff check --fix --unsafe-fixes ./`, `ruff format ./`, and `pytest` are all green.
 
 ---
@@ -258,7 +260,7 @@ Add a `_import_<lang>()` function in `src/knowledge/importer.py` that parses a p
 - [ ] Code passes `mypy --strict ./`
 - [ ] Code passes `ruff check --fix --unsafe-fixes ./`
 - [ ] Code passes `ruff format ./`
-- [ ] `pytest` is fully green (including new tests)
+- [ ] `pytest` is fully green, including **100% coverage of the changed `src` modules**
 - [ ] New meter templates are registered in both `app.py` and `tests/conftest.py`
 - [ ] New language has its analyser registered, language label added, and corresponding unit tests written
 - [ ] The PR description explains the purpose and verification method of the changes

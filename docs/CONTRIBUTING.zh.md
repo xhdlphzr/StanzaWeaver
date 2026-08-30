@@ -8,7 +8,7 @@
 
 感谢你为 **StanzaWeaver**（以智识，巧织诗）贡献力量！本文件说明如何搭建开发环境、提交前必须通过的检查，以及如何在符号层新增**诗体**与**语言**。
 
-> 所有新增功能都必须通过测试；无法离线验证的逻辑（如需要联网下载词库）至少要提供走桩（stub）的单测，保证 `pytest` 全绿。
+> 所有新增功能都必须通过测试，且被改动的 `src` 模块需达到 **100% 代码覆盖率**；无法离线验证的逻辑（如需要联网下载词库）至少要提供走桩（stub）的单测，保证 `pytest` 全绿。
 
 ---
 
@@ -91,7 +91,7 @@ ruff check --fix --unsafe-fixes ./
 # 3) 代码格式化
 ruff format ./
 
-# 4) 测试
+# 4) 测试（由 pytest.ini 的 --cov-fail-under=100 强制要求 100% 覆盖率）
 pytest
 ```
 
@@ -99,7 +99,7 @@ pytest
 
 - CI 中 `ruff` 以 `ruff check ./`（不自动修改）执行，因此**你本地必须先用上面的 `--fix --unsafe-fixes` 与 `format` 把代码整理干净**，否则 CI 会失败。
 - `mypy` 必须使用本项目配套的虚拟环境版本（`python3.14` + 项目依赖），系统全局 `mypy` 可能出现 import-not-found 的误报。
-- `pytest` 通过 `tests/pytest.ini` 配置（`pythonpath = .`，`testpaths = tests`）。测试使用 `tests/helpers.py` 中的 `StubLLMClient` 走桩，**不调用任何真实 LLM / 不联网**，可离线全量运行。
+- `pytest` 使用仓库根目录的 `pytest.ini` 配置（`pythonpath = .`，`testpaths = tests`，`--cov=src --cov-fail-under=100`）。它**强制 `src` 达到 100% 覆盖率**，因此任何 `src` 改动都必须有测试覆盖，否则 `pytest` 会失败。测试使用 `tests/helpers.py` 中的 `StubLLMClient` 走桩，**不调用任何真实 LLM / 不联网**，可离线全量运行。
 
 ---
 
@@ -166,6 +166,7 @@ class PoetryTemplate(ABC):
 - 在 `tests/unit/` 增加 `test_<lang>_analyzer.py`（若涉及语言）或针对该诗体的校验测试；至少应覆盖：
   - 合法诗作 `validate_full` 返回 `[]`；
   - 明显违规（行数错 / 音节错 / 不押韵）能被 `validate_full` 捕获。
+- **覆盖率要求：** 新增测试须使被改动的 `src` 模块（如新增诗体类）达到 **100% 行覆盖率**。运行 `pytest` 确认其保持全绿（`--cov-fail-under=100` 会拒绝任何未覆盖行）。
 - 如有 UI / 端到端诉求，可在 `tests/integration/` 用 `helpers.make_stub` 驱动 `Pipeline` / SocketIO 验证全流程。
 
 ---
@@ -237,14 +238,15 @@ _ANALYZERS: dict[str, SyllableAnalyzer] = {
 - `tests/unit/test_<lang>_analyzer.py`：覆盖 `analyze_word` / `count_syllables` / `tokenize_line` 的典型用例（含多音节词、特殊拼写）。
 - 若新增约束/校验逻辑，补充 `test_meter_validator.py` 相关用例。
 - 词库导入若为离线内置样例，提供不联网的断言；若必须联网下载，请在测试中以本地样例或走桩替代，保证 `pytest` 离线可过。
+- **覆盖率要求：** 新增测试须使被改动的 `src` 模块（分析器、校验器、导入器等）达到 **100% 行覆盖率**。运行 `pytest` 确认其保持全绿。
 
 ---
 
 ## 5. 测试总则
 
-- 运行：`pytest`（根目录执行，依赖 `tests/pytest.ini`）。
+- 运行：`pytest`（根目录执行，依赖 `pytest.ini`）。该命令已通过 `--cov=src --cov-fail-under=100` **强制要求 `src` 100% 覆盖率**，若有任何改动行未被覆盖即会失败。
 - 全部测试**不依赖真实 LLM / 不联网**：LLM 由 `tests/helpers.py` 的 `StubLLMClient` 替换。
-- 任何新功能（诗体 / 语言 / 分析器 / 校验器）都必须有对应单测；集成改动需有 `integration/` 下的端到端用例。
+- 任何新功能（诗体 / 语言 / 分析器 / 校验器）都必须有对应单测，且使**被改动的 `src` 模块达到 100% 覆盖率**；集成改动需有 `integration/` 下的端到端用例。
 - 提交前确保 `mypy --strict ./`、`ruff check --fix --unsafe-fixes ./`、`ruff format ./`、`pytest` 四项全绿。
 
 ---
@@ -254,7 +256,7 @@ _ANALYZERS: dict[str, SyllableAnalyzer] = {
 - [ ] 代码通过 `mypy --strict ./`
 - [ ] 代码通过 `ruff check --fix --unsafe-fixes ./`
 - [ ] 代码通过 `ruff format ./`
-- [ ] `pytest` 全绿（含新增测试）
+- [ ] `pytest` 全绿，且被改动的 `src` 模块达到 **100% 覆盖率**
 - [ ] 新增诗体已在 `app.py` 与 `tests/conftest.py` 注册
 - [ ] 新增语言已注册分析器、语言标签，并有对应单测
 - [ ] 相关改动已在 PR 描述中说明用途与验证方式

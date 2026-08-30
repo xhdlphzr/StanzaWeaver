@@ -16,39 +16,50 @@ from src.prosody.syllable_counter import (
 
 
 def test_count_syllables_zh() -> None:
+    """验证 count syllables zh。"""
     assert count_syllables("床前明月光", "zh") == 5
 
 
 def test_analyze_line_zh_syllables() -> None:
+    """验证 analyze line zh syllables。"""
     syls = analyze_line("光", "zh")
     assert len(syls) == 1
     assert syls[0].nucleus == "ua"
 
 
 def test_analyze_line_it_sinalefe() -> None:
+    """验证 analyze line it sinalefe。"""
     # poeti e: 跨词元音并读 -> 3 音节
     assert count_syllables("poeti e", "it") == 3
 
 
 def test_analyze_line_la_routes() -> None:
+    """验证 analyze line la routes。"""
     syls = analyze_line("amor", "la")
     assert all(isinstance(s, Syllable) for s in syls)
     assert len(syls) == 2
 
 
 def test_get_analyzer_unknown_language() -> None:
+    """验证 get analyzer unknown language。"""
     with pytest.raises(ValueError):
         get_analyzer("xx")
 
 
 def test_register_analyzer_override() -> None:
+    """验证 register analyzer override。"""
+
     class Dummy(SyllableAnalyzer):
+        """Dummy。"""
+
         language = "dummy"
 
         def analyze_word(self, word: str) -> list[Syllable]:
+            """analyze word。"""
             return []
 
         def count_syllables(self, text: str) -> int:
+            """count syllables。"""
             return 0
 
     register_analyzer("dummy", Dummy())

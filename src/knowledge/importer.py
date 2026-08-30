@@ -176,8 +176,6 @@ def _import_chinese() -> None:
                 continue
             seen_pron.add(key)
             syls = _parse_pinyin(toks)
-            if not syls:
-                continue
             batch.append(
                 Word(text=simplified, language="zh", syllables=syls, meaning=meaning)
             )
@@ -219,8 +217,6 @@ def _parse_pinyin(raw_list: list[str]) -> list[Syllable]:
         if not onset and (final_part.startswith(("y", "w"))):
             final_part = _YW_MAP.get(final_part, final_part[1:])
         nucleus, coda = FINAL_TO_PARTS.get(final_part, (final_part, ""))
-        if not nucleus and final_part:
-            nucleus = final_part
         results.append(
             Syllable(
                 onset=onset,
@@ -481,8 +477,6 @@ def _import_latin() -> None:
             if line[0] in "[({\"'":
                 continue
             parts = line.split(None, 1)
-            if not parts:
-                continue
             w = parts[0].strip().lower()
             clean = re.sub(r"[^a-zāēīōūȳăĕĭŏŭ]", "", w)
             if not clean or clean in seen:

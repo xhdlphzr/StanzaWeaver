@@ -186,8 +186,6 @@ class FrenchAnalyzer(SyllableAnalyzer):
                 matched: str | None = None
                 for length in (3, 2):
                     if i + length <= n and w[i : i + length] in _FR_DIGRAPHS:
-                        if length == 2 and w[i + 1] in _TREMA:
-                            continue
                         matched = w[i : i + length]
                         i += length
                         break

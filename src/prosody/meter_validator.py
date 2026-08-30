@@ -119,10 +119,14 @@ class MeterValidator:
 
         for i in range(min(len(poem), len(syllables_expected))):
             expected_count = syllables_expected[i]
-            if not any(
-                _count_matches(len(v), expected_count) for v in all_syllables[i]
-            ):
-                actual_count = len(all_syllables[i][0])
+            variants = all_syllables[i]
+            if not variants:
+                result.add_error(
+                    f"第{i + 1}行音节数不匹配: 期望 {format_count(expected_count)}, 实际 0"
+                )
+                continue
+            if not any(_count_matches(len(v), expected_count) for v in variants):
+                actual_count = len(variants[0])
                 result.add_error(
                     f"第{i + 1}行音节数不匹配: 期望 {format_count(expected_count)}, 实际 {actual_count}"
                 )
@@ -131,12 +135,15 @@ class MeterValidator:
             min_constraint_lines = min(len(poem), len(constraints))
             for i in range(min_constraint_lines):
                 line_constraints = constraints[i]
+                variants = all_syllables[i]
+                if not variants:
+                    result.add_error(f"第{i + 1}行无音节，无法满足逐位约束")
+                    continue
                 if any(
-                    self._line_matches_variant(v, line_constraints)
-                    for v in all_syllables[i]
+                    self._line_matches_variant(v, line_constraints) for v in variants
                 ):
                     continue
-                syllables = all_syllables[i][0]
+                syllables = variants[0]
                 min_syl = min(len(syllables), len(line_constraints))
                 for j in range(min_syl):
                     if not syllables[j].match_constraint(line_constraints[j]):
