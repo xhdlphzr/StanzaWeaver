@@ -244,7 +244,7 @@ class FrenchAnalyzer(SyllableAnalyzer):
             return ""
         return self._normalize_nucleus(last.nucleus)
 
-    def _count_syllables_in_word(self, word: str) -> int:
+    def count_syllables_in_word(self, word: str) -> int:
         """单词语节数（含二/三合元音合并与词尾静音 e 规则）。
 
         Args:

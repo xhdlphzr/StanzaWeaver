@@ -18,6 +18,7 @@ from src.models.syllable import Syllable
 from src.templates import (
     ConstraintTable,
     PoetryTemplate,
+    _make_syl,
     format_count,
     list_all,
     list_dicts,
@@ -29,7 +30,6 @@ from src.templates.en import (
     ShakespeareSonnetTemplate,
     VillanelleTemplate,
     _en_rhyme_key,
-    _make_syl,
 )
 from src.templates.en import (
     _check_rhyme_group as en_check_rhyme_group,
@@ -38,7 +38,7 @@ from src.templates.en import (
     _check_stress_count as en_check_stress_count,
 )
 from src.templates.en import (
-    _last_word as en_last_word,
+    _en_last_word as en_last_word,
 )
 from src.templates.fr import (
     BalladeTemplate,
@@ -49,7 +49,7 @@ from src.templates.fr import (
     _check_rhyme_group as fr_check_rhyme_group,
 )
 from src.templates.fr import (
-    _last_word as fr_last_word,
+    _fr_last_word as fr_last_word,
 )
 from src.templates.it import (
     CanzoneTemplate,

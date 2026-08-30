@@ -11,13 +11,11 @@
 from typing import Any
 
 from src.models.syllable import Syllable
+from src.templates import _make_syl
 from src.templates.la import (
     DistichonTemplate,
     HendecasyllabusTemplate,
     _validate_hex,
-)
-from src.templates.la import (
-    _make_syl as _la_make_syl,
 )
 from src.templates.zh import (
     XiangjianhuanTemplate,
@@ -27,7 +25,6 @@ from src.templates.zh import (
     _check_jinti_structure,
     _check_lv_alternation,
     _check_rhyme,
-    _make_syl,
     _rhyme_key,
 )
 
@@ -241,9 +238,9 @@ def test_xjh_empty_line_tail() -> None:
 # --------------------------------------------------------------------------- #
 # la.py: _make_syl / _validate_hex                                            #
 # --------------------------------------------------------------------------- #
-def test_la_make_syl_non_dict_attrs() -> None:
+def test_make_syl_non_dict_attrs() -> None:
     """_make_syl 接受非 dict 的 attributes 时回落为空 dict（覆盖第 32 行）。"""
-    result = _la_make_syl(attributes="nondict")
+    result = _make_syl(attributes="nondict")
     assert result["attributes"] == {"tone": "", "stress": "", "length": ""}
 
 

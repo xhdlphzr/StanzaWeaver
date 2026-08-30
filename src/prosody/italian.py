@@ -43,7 +43,7 @@ class ItalianAnalyzer(SyllableAnalyzer):
 
     language = "it"
 
-    def _count_syllables_in_word(self, word: str) -> int:
+    def count_syllables_in_word(self, word: str) -> int:
         """单词语节数（含二合元音合并，重读元音视为元音分裂）。
 
         当候选二合元音 i/u 中任一字符带重音符号（à è é ì ò ó ù）时，

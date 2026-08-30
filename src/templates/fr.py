@@ -7,17 +7,16 @@
 并丢弃词尾静音辅音（s/t/x/p 等）。
 """
 
-import re
 from typing import ClassVar
 
 from ..models.syllable import Syllable
 from ..prosody.french import FrenchAnalyzer
-from . import ConstraintTable, PoetryTemplate, register
+from . import ConstraintTable, PoetryTemplate, _last_word, register
 
 _FR = FrenchAnalyzer()
 
 
-def _last_word(line: str) -> str:
+def _fr_last_word(line: str) -> str:
     """取行末词（去标点、小写）。
 
     Args:
@@ -26,9 +25,7 @@ def _last_word(line: str) -> str:
     Returns:
         行末词；空行返回空串。
     """
-    if not line.strip():
-        return ""
-    return re.sub(r"[^a-zA-Zàâäéèêëîïôöùûüÿœ'-]", "", line.strip().split()[-1]).lower()
+    return _last_word(line, "a-zA-Zàâäéèêëîïôöùûüÿœ'-")
 
 
 def _check_rhyme_group(
@@ -46,7 +43,7 @@ def _check_rhyme_group(
     for idx in indices:
         if idx >= len(poem):
             continue
-        w = _last_word(poem[idx])
+        w = _fr_last_word(poem[idx])
         k = _FR.rhyme_key(w) if w else ""
         if k:
             keys.append((idx, k))

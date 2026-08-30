@@ -420,7 +420,7 @@ def _import_italian() -> None:
                         nucleus="?",
                         attributes={"tone": "", "stress": "", "length": ""},
                     )
-                    for _ in range(max(analyzer._count_syllables_in_word(w), 1))
+                    for _ in range(max(analyzer.count_syllables_in_word(w), 1))
                 ]
             batch.append(Word(text=w, language="it", syllables=syls, meaning=meaning))
             total += 1
@@ -438,7 +438,7 @@ def _import_italian() -> None:
                             nucleus="?",
                             attributes={"tone": "", "stress": "", "length": ""},
                         )
-                        for _ in range(max(analyzer._count_syllables_in_word(w), 1))
+                        for _ in range(max(analyzer.count_syllables_in_word(w), 1))
                     ]
                 batch.append(Word(text=w, language="it", syllables=syls, meaning=""))
                 total += 1

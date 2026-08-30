@@ -22,7 +22,7 @@ _DB_PATH: Path | None = None
 
 
 def set_db_path(path: Path) -> None:
-    """覆盖数据库路径（测试用）。
+    """覆盖数据库路径（主要供测试使用）。
 
     Args:
         path: 新的数据库文件路径。
@@ -63,7 +63,7 @@ def _get_conn() -> sqlite3.Connection:
 
 
 def insert_word(word: Word) -> None:
-    """插入单个词条。
+    """插入单个词条（便捷封装，主要供测试使用）。
 
     Args:
         word: 词条。
@@ -272,7 +272,7 @@ def search_words(
 
 
 def word_count(language: str = "") -> int:
-    """统计词条数量。
+    """统计词条数量（主要供 has_words 与测试使用）。
 
     Args:
         language: 语言代码（空=全部）。
@@ -292,7 +292,7 @@ def word_count(language: str = "") -> int:
 
 
 def has_words(language: str = "") -> bool:
-    """判断词库是否非空。
+    """判断词库是否非空（主要供测试使用）。
 
     Args:
         language: 语言代码（空=全部）。

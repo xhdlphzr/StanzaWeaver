@@ -51,3 +51,21 @@ class SyllableAnalyzer(ABC):
             单元列表；默认按空白切分，中文分析器覆写为逐字。
         """
         return line.split()
+
+    def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
+        """分析一行的全部音节切分变体。
+
+        默认实现逐词分析后拼接为单一变体。子类可覆写以提供
+        多音字/多切分的变体组合（如中文 pypinyin 多音字消歧）。
+
+        Args:
+            line: 一行诗。
+
+        Returns:
+            变体列表，每个变体是该行的音节列表。
+        """
+        words = self.tokenize_line(line)
+        syllables: list[Syllable] = []
+        for w in words:
+            syllables.extend(self.analyze_word(w))
+        return [syllables] if syllables else []

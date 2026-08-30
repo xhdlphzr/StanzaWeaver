@@ -59,7 +59,6 @@ def _build_writer_system(
     Returns:
         系统提示文本。
     """
-    lines_spec = template.get("syllables_per_line", [])
     language = template.get("language", "zh")
 
     prompt_parts = [
@@ -74,31 +73,9 @@ def _build_writer_system(
     if template_obj is not None and hasattr(template_obj, "describe"):
         prompt_parts.append(template_obj.describe())
     else:
-        prompt_parts.append(f"共 {template.get('lines', len(lines_spec))} 行")
-        constraints = template.get("syllable_constraints") or []
-        for i, count in enumerate(lines_spec):
-            line_constraints = constraints[i] if i < len(constraints) else []
-            parts = [f"  第{i + 1}行: {format_count(count)}音节"]
-            if line_constraints:
-                constraint_strs = []
-                for j, c in enumerate(line_constraints):
-                    desc_parts = []
-                    if c.get("onset"):
-                        desc_parts.append(f"声母={c['onset']}")
-                    if c.get("nucleus"):
-                        desc_parts.append(f"韵母={c['nucleus']}")
-                    if c.get("coda"):
-                        desc_parts.append(f"韵尾={c['coda']}")
-                    for k, v in c.get("attributes", {}).items():
-                        if v:
-                            desc_parts.append(f"{k}={v}")
-                    if desc_parts:
-                        constraint_strs.append(
-                            f"    第{j + 1}位: {','.join(desc_parts)}"
-                        )
-                if constraint_strs:
-                    parts.append("\n".join(constraint_strs))
-            prompt_parts.append("  ".join(parts))
+        from ..templates import describe_template_from_dict
+
+        prompt_parts.append(describe_template_from_dict(template))
 
     prompt_parts.append("")
     prompt_parts.append("【当前诗稿】")

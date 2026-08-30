@@ -8,45 +8,20 @@
 （由 EnglishAnalyzer.rhyme_tails 实现）。
 """
 
-import re
 from typing import Any, ClassVar
 
 from ..models.syllable import Syllable
 from ..prosody.english import EnglishAnalyzer
-from . import ConstraintTable, PoetryTemplate, register
+from . import ConstraintTable, PoetryTemplate, _last_word, _make_syl, register
 
 _EN_ANALYZER = EnglishAnalyzer()
-
-
-def _make_syl(**kwargs: Any) -> dict[str, Any]:
-    """构造逐位约束字典。
-
-    Args:
-        **kwargs: 可含 onset/nucleus/coda 及 attributes。
-
-    Returns:
-        约束字典。
-    """
-    attrs = kwargs.pop("attributes", {})
-    if not isinstance(attrs, dict):
-        attrs = {}
-    return {
-        "onset": kwargs.get("onset", ""),
-        "nucleus": kwargs.get("nucleus", ""),
-        "coda": kwargs.get("coda", ""),
-        "attributes": {
-            "tone": attrs.get("tone", ""),
-            "stress": attrs.get("stress", ""),
-            "length": attrs.get("length", ""),
-        },
-    }
 
 
 _l: dict[str, Any] = _make_syl(attributes={"stress": "light"})
 _h: dict[str, Any] = _make_syl(attributes={"stress": "heavy"})
 
 
-def _last_word(line: str) -> str:
+def _en_last_word(line: str) -> str:
     """取行末词（去标点、小写）。
 
     Args:
@@ -55,9 +30,7 @@ def _last_word(line: str) -> str:
     Returns:
         行末词；空行返回空串。
     """
-    if not line.strip():
-        return ""
-    return re.sub(r"[^A-Za-z0-9'-]", "", line.strip().split()[-1]).lower()
+    return _last_word(line, "A-Za-z0-9'-")
 
 
 def _en_rhyme_key(line_text: str) -> tuple[str, ...] | None:
@@ -72,7 +45,7 @@ def _en_rhyme_key(line_text: str) -> tuple[str, ...] | None:
     Returns:
         押韵尾串元组；行末词无重读音节时返回 None（不能作韵脚）。
     """
-    word = _last_word(line_text)
+    word = _en_last_word(line_text)
     if not word:
         return None
     tails = _EN_ANALYZER.rhyme_tails(word)
