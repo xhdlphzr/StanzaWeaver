@@ -3,6 +3,8 @@
 
 """英语音节分析器单元测试（符号层，离线播种 CMUdict）。"""
 
+from unittest import mock
+
 from src.prosody.english import EnglishAnalyzer
 
 
@@ -60,6 +62,11 @@ def test_rhyme_tail_seeded() -> None:
 
 
 def test_count_syllables_offline() -> None:
-    """验证 count syllables offline。"""
+    """验证 count syllables 离线回退（不依赖真实词库 / cmudict）。
+
+    强制发音查询返回空，使分析器走启发式回退，结果纯由正则可确定：
+    "rhythm"（y 计 1）+ "xyz"（y 计 1）= 2。
+    """
     a = EnglishAnalyzer()
-    assert a.count_syllables("rhythm xyz") == 2
+    with mock.patch.object(EnglishAnalyzer, "_get_pronunciations", return_value=[]):
+        assert a.count_syllables("rhythm xyz") == 2

@@ -25,9 +25,9 @@ from src.prosody.french import FrenchAnalyzer
 def test_load_cmudict_body_executes() -> None:
     """验证 `_load_cmudict` 加载体在本次会话中真实执行（覆盖 63-64, 66-67, 70, 72, 74）。
 
-    环境中已离线可用 cmudict，故 `nltk.data.find` 可直接命中、无需下载；
-    仅替换 `cmudict.dict` 的返回以快速跑通加载体，并在内层强制 `find`
-    抛 LookupError 以触发 except 下载分支（覆盖 68-69）。测试结束后还原全局状态。
+    整体 mock `nltk.corpus.cmudict`，避免 CI 等无词库环境下访问该属性触发
+    真实语料加载（LookupError）；内部强制 `nltk.data.find` 抛 LookupError 以
+    触发 except 下载分支（覆盖 68-69）。测试结束后还原全局状态。
     """
     saved_loaded = english_module._cmudict_loaded
     saved_cache = english_module._ARPABET_TO_PHONEMES
@@ -36,12 +36,12 @@ def test_load_cmudict_body_executes() -> None:
     english_module._ARPABET_TO_PHONEMES = {}
 
     fake_dict: dict[str, list[list[str]]] = {"foobar": [["F", "OW1", "B", "AA1", "R"]]}
-    # 先以真实 find 建立 cmudict.dict 补丁，再在内部强制 find 抛 LookupError
     with (
-        mock.patch.object(nltk.corpus.cmudict, "dict", return_value=fake_dict),
+        mock.patch.object(nltk.corpus, "cmudict") as mock_cmu,
         mock.patch.object(nltk.data, "find", side_effect=LookupError),
         mock.patch.object(nltk, "download", return_value=None),
     ):
+        mock_cmu.dict.return_value = fake_dict
         english_module._load_cmudict()
 
     assert english_module._cmudict_loaded is True

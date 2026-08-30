@@ -43,6 +43,12 @@ def vocab_db(tmp_path: Path) -> Path:
     db_file = tmp_path / "vocab.db"
     set_db_path(db_file)
     init_db()
+    # 清空任何可能残留/外部导入的数据，保证测试基于空库（与环境词库无关）
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("DELETE FROM words")
+    conn.execute("DELETE FROM en_pron")
+    conn.commit()
+    conn.close()
     return db_file
 
 
