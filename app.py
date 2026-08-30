@@ -376,7 +376,7 @@ def api_create_custom_template() -> Any:
         f"from . import PoetryTemplate, register\n"
         f"from .zh import (\n"
         f"    _make_syl, _FREE, _tone as _t,\n"
-        f"    _check_sanpingwei, _check_sanzewei, _check_guping,\n"
+        f"    _check_sanpingwei, _check_guping,\n"
         f"    _check_rhyme, _check_alternation, _check_lv_alternation,\n"
         f")\n\n\n"
         f"class {class_name}(PoetryTemplate):\n"
