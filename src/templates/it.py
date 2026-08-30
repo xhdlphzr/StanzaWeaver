@@ -95,13 +95,25 @@ class TerzaRimaTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束。"""
+        """无逐位约束。
+
+        Returns:
+            逐位音节约束表。
+        """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：第10音节重读 + 链式韵式。"""
+        """完整检查：第10音节重读 + 链式韵式。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         _check_tenth_syllable_stress(syllables, errors)
         rhyme_groups = [
@@ -130,13 +142,25 @@ class OttavaRimaTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束。"""
+        """无逐位约束。
+
+        Returns:
+            逐位音节约束表。
+        """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：第10音节重读 + ABABABCC 韵式。"""
+        """完整检查：第10音节重读 + ABABABCC 韵式。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         _check_tenth_syllable_stress(syllables, errors)
         rhyme_groups = [
@@ -178,7 +202,11 @@ class CanzoneTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束。"""
+        """无逐位约束。
+
+        Returns:
+            逐位音节约束表。
+        """
         return None
 
     def validate_full(
@@ -186,6 +214,13 @@ class CanzoneTemplate(PoetryTemplate):
     ) -> list[str]:
         """完整检查：奇数行（11 音节）第 10 重读/第 11 非重读，偶数行与
         第 13 行（7 音节）末音节重读；韵脚 ≤4、连续同韵 ≤2、末三行各异。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
         """
         errors: list[str] = []
         # 奇数行（1,3,5,7,9,11）：11 音节，第 10 音节重读、第 11 不可重读

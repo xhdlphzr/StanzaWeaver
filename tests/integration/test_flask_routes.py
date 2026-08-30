@@ -16,14 +16,22 @@ import app as app_module
 
 @pytest.fixture()
 def client() -> Iterator[FlaskClient]:
-    """client。"""
+    """提供 Flask 测试客户端。
+
+    Yields:
+        配置好 testing 模式的 FlaskClient。
+    """
     app_module.app.testing = True
     with app_module.app.test_client() as c:
         yield c
 
 
 def _csrf() -> dict[str, str]:
-    """csrf。"""
+    """构造 CSRF 请求头。
+
+    Returns:
+        {"X-CSRF-Token": ...} 字典。
+    """
     return {"X-CSRF-Token": app_module._CSRF_TOKEN}
 
 

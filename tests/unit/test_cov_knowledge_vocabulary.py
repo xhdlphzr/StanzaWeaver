@@ -8,13 +8,14 @@
 """
 
 import sqlite3
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
 import pytest
 
-from src.knowledge import embeddings
+from src.knowledge import embeddings, vocabulary
 from src.knowledge.vocabulary import (
     _syl_from_json,
     _syl_matches,
@@ -32,7 +33,7 @@ from src.models.word import Word
 
 
 @pytest.fixture
-def vocab_db(tmp_path: Path) -> Path:
+def vocab_db(tmp_path: Path) -> Iterator[Path]:
     """创建空词库并返回数据库路径。
 
     Returns:
@@ -40,6 +41,7 @@ def vocab_db(tmp_path: Path) -> Path:
     """
     from src.knowledge.vocabulary import init_db
 
+    prev = vocabulary._DB_PATH
     db_file = tmp_path / "vocab.db"
     set_db_path(db_file)
     init_db()
@@ -49,7 +51,8 @@ def vocab_db(tmp_path: Path) -> Path:
     conn.execute("DELETE FROM en_pron")
     conn.commit()
     conn.close()
-    return db_file
+    yield db_file
+    vocabulary._DB_PATH = prev
 
 
 def test_set_db_path_overrides_path(tmp_path: Path) -> None:
@@ -330,6 +333,17 @@ def test_en_pron_roundtrip_and_missing(vocab_db: Path) -> None:
     data = get_en_pron("cat")
     assert data == [["K", "AE", "T"], ["K", "AH", "T"]]
     assert get_en_pron("nonexistent") is None
+
+
+def test_get_en_pron_db_exception_returns_none() -> None:
+    """覆盖 get_en_pron 数据库异常时返回 None（except 分支）。"""
+    from src.knowledge import vocabulary
+
+    def _boom(word: str) -> list[list[str]] | None:
+        raise RuntimeError("db not ready")
+
+    with patch.object(vocabulary, "_get_conn", side_effect=_boom):
+        assert get_en_pron("anyword") is None
 
 
 def test_get_db_path_default(monkeypatch: pytest.MonkeyPatch) -> None:

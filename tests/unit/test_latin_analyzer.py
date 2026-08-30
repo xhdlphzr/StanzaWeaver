@@ -9,7 +9,14 @@ from src.templates.la import DistichonTemplate, HendecasyllabusTemplate
 
 
 def _syls(lengths: list[str]) -> list[Syllable]:
-    """按给定长短构造音节列表。"""
+    """按给定长短构造音节列表。
+
+    Args:
+        lengths: 每个音节的长短标记列表。
+
+    Returns:
+        构造好的 Syllable 列表。
+    """
     return [Syllable(nucleus="a", attributes={"length": l}) for l in lengths]
 
 
@@ -20,13 +27,14 @@ def test_count_syllables_amor() -> None:
 
 
 def test_mutua_cum_liquida_merges() -> None:
-    """验证 mutua cum liquida merges。"""
+    """验证 muta cum liquida merges。"""
     a = LatinAnalyzer()
-    # patris: p+t+r 构成 muta cum liquida，仅算一个辅音位 -> 全作 "a" 的 onset
+    # patris: pa-tris，辅音簇在音节间正确切分
     syls = a.analyze_word("patris")
     assert len(syls) == 2
-    assert syls[0].onset == "ptr"
+    assert syls[0].onset == "p"
     assert syls[0].nucleus == "a"
+    assert syls[1].onset == "tr"
 
 
 def test_diphthong_is_long() -> None:

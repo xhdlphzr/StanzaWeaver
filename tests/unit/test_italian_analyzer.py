@@ -63,7 +63,16 @@ def test_zio_hiatus_two_syllables() -> None:
 
 
 def _mk_line(n: int, stress_idx: int, tail: str) -> list[Syllable]:
-    """构造一行指定音节数、重音位置与韵脚的音节列表。"""
+    """构造一行指定音节数、重音位置与韵脚的音节列表。
+
+    Args:
+        n: 音节数。
+        stress_idx: 重音所在音节索引。
+        tail: 韵脚文本。
+
+    Returns:
+        构造好的 Syllable 列表。
+    """
     syls: list[Syllable] = []
     for i in range(n):
         attrs = {
@@ -82,7 +91,11 @@ def _mk_line(n: int, stress_idx: int, tail: str) -> list[Syllable]:
 
 
 def _mk_canzone() -> list[list[Syllable]]:
-    """构造一首全部合律的歌谣（奇数 11 音节第10重读，偶数/末行 7 音节末重读）。"""
+    """构造一首全部合律的歌谣（奇数 11 音节第10重读，偶数/末行 7 音节末重读）。
+
+    Returns:
+        13 行 Syllable 列表。
+    """
     lines: list[list[Syllable]] = []
     for idx in range(13):
         if idx % 2 == 0:
@@ -97,7 +110,14 @@ def _mk_canzone() -> list[list[Syllable]]:
 
 
 def _validate_canzone(lines: list[list[Syllable]]) -> list[str]:
-    """validate canzone。"""
+    """validate canzone。
+
+    Args:
+        lines: 歌谣的音节行列表。
+
+    Returns:
+        校验错误列表。
+    """
     poem = ["x"] * 13
     return CanzoneTemplate().validate_full(poem, lines)
 

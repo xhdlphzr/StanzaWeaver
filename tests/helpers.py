@@ -50,7 +50,15 @@ class StubLLMClient(LLMClient):
         stream: list[str] | None = None,
         chat: list[ChatResult] | None = None,
     ):
-        """仅记录连接参数，不创建真实 OpenAI 客户端。"""
+        """仅记录连接参数，不创建真实 OpenAI 客户端。
+
+        Args:
+            base_url: API 基础地址。
+            api_key: API 密钥。
+            model: 模型名称。
+            stream: chat_stream 依次返回的文本列表。
+            chat: chat 依次返回的 ChatResult 列表。
+        """
         self.base_url = base_url
         self.api_key = api_key
         self.model = model
@@ -60,7 +68,15 @@ class StubLLMClient(LLMClient):
         self._chat_iter = iter(self.chat_responses)
 
     def chat(self, messages: list[dict[str, Any]], tools: Any = None) -> ChatResult:
-        """按序返回预置的 ChatResult；耗尽后返回空文本。"""
+        """按序返回预置的 ChatResult；耗尽后返回空文本。
+
+        Args:
+            messages: 对话消息列表。
+            tools: 工具定义（桩客户端忽略）。
+
+        Returns:
+            预置的 ChatResult。
+        """
         try:
             return next(self._chat_iter)
         except StopIteration:
@@ -69,7 +85,15 @@ class StubLLMClient(LLMClient):
     def chat_stream(
         self, messages: list[dict[str, Any]], on_chunk: Any = None
     ) -> ChatResult:
-        """按序返回预置文本（触发 on_chunk 回调）。"""
+        """按序返回预置文本（触发 on_chunk 回调）。
+
+        Args:
+            messages: 对话消息列表。
+            on_chunk: 收到文本块时的回调函数。
+
+        Returns:
+            包含累积文本的 ChatResult。
+        """
         try:
             text = next(self._stream_iter)
         except StopIteration:
@@ -96,10 +120,16 @@ def make_stub(
     script_chat = list(chat or [])
 
     class _Stub(StubLLMClient):
-        """_Stub。"""
+        """预置脚本的桩客户端（由 make_stub 动态生成）。"""
 
         def __init__(self, base_url: str, api_key: str, model: str) -> None:
-            """init  。"""
+            """调用父类 __init__ 并注入预置脚本。
+
+            Args:
+                base_url: 服务地址。
+                api_key: API 密钥。
+                model: 模型名称。
+            """
             super().__init__(
                 base_url, api_key, model, stream=script_stream, chat=script_chat
             )

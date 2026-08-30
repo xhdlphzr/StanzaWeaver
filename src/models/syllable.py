@@ -35,7 +35,11 @@ class Syllable:
 
     @property
     def text(self) -> str:
-        """返回音节完整拼写（onset + nucleus + coda）。"""
+        """返回音节完整拼写（onset + nucleus + coda）。
+
+        Returns:
+            拼写字符串。
+        """
         return self.onset + self.nucleus + self.coda
 
     def match_constraint(self, constraint: dict[str, Any]) -> bool:

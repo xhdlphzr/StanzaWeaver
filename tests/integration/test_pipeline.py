@@ -18,7 +18,11 @@ REVISED_LINE = "窗前明月光"
 
 
 def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
-    """patch llm。"""
+    """注入桩 LLM 客户端，使 Pipeline 完全离线运行。
+
+    Args:
+        monkeypatch: pytest monkeypatch 实例。
+    """
     writer_stub = make_stub(
         stream=[DESC, DRAFT],
         chat=[

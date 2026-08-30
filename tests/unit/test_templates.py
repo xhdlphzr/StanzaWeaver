@@ -39,7 +39,16 @@ from src.templates.zh import (
 # 音节构造辅助                                                              #
 # --------------------------------------------------------------------------- #
 def _zs(nucleus: str, coda: str, tone: str) -> Syllable:
-    """构造中文音节（平仄 + 韵腹/韵尾）。"""
+    """构造中文音节（平仄 + 韵腹/韵尾）。
+
+    Args:
+        nucleus: 韵腹。
+        coda: 韵尾。
+        tone: 平仄。
+
+    Returns:
+        构造好的 Syllable 实例。
+    """
     return Syllable(
         onset="",
         nucleus=nucleus,
@@ -49,12 +58,26 @@ def _zs(nucleus: str, coda: str, tone: str) -> Syllable:
 
 
 def _zline(specs: list[tuple[str, str, str]]) -> list[Syllable]:
-    """由 (韵腹, 韵尾, 平仄) 列表构造一行音节。"""
+    """由 (韵腹, 韵尾, 平仄) 列表构造一行音节。
+
+    Args:
+        specs: (韵腹, 韵尾, 平仄) 元组列表。
+
+    Returns:
+        Syllable 列表。
+    """
     return [_zs(n, c, t) for (n, c, t) in specs]
 
 
 def _es(stress: str = "") -> Syllable:
-    """构造英文音节（stress 可为 'heavy'/'light'/''）。"""
+    """构造英文音节（stress 可为 'heavy'/'light'/''）。
+
+    Args:
+        stress: 重音标记。
+
+    Returns:
+        构造好的 Syllable 实例。
+    """
     return Syllable(
         onset="",
         nucleus="a",
@@ -64,7 +87,15 @@ def _es(stress: str = "") -> Syllable:
 
 
 def _en_syls(n_lines: int, n_syl: int = 10) -> list[list[Syllable]]:
-    """构造每行 n_syl 音节、偶数位重的英文音节表（满足重音下限）。"""
+    """构造每行 n_syl 音节、偶数位重的英文音节表（满足重音下限）。
+
+    Args:
+        n_lines: 行数。
+        n_syl: 每行音节数。
+
+    Returns:
+        嵌套的 Syllable 列表。
+    """
     return [
         [_es("heavy" if i % 2 == 0 else "") for i in range(n_syl)]
         for _ in range(n_lines)
@@ -72,7 +103,16 @@ def _en_syls(n_lines: int, n_syl: int = 10) -> list[list[Syllable]]:
 
 
 def _is(nucleus: str, coda: str = "", stress: str = "") -> Syllable:
-    """构造意大利语音节（韵腹/韵尾 + 重音）。"""
+    """构造意大利语音节（韵腹/韵尾 + 重音）。
+
+    Args:
+        nucleus: 韵腹。
+        coda: 韵尾。
+        stress: 重音标记。
+
+    Returns:
+        构造好的 Syllable 实例。
+    """
     return Syllable(
         onset="",
         nucleus=nucleus,
@@ -82,7 +122,16 @@ def _is(nucleus: str, coda: str = "", stress: str = "") -> Syllable:
 
 
 def _ls(nucleus: str, coda: str = "", length: str = "") -> Syllable:
-    """构造拉丁语音节（韵腹/韵尾 + 长短）。"""
+    """构造拉丁语音节（韵腹/韵尾 + 长短）。
+
+    Args:
+        nucleus: 韵腹。
+        coda: 韵尾。
+        length: 长短标记。
+
+    Returns:
+        构造好的 Syllable 实例。
+    """
     return Syllable(
         onset="",
         nucleus=nucleus,
@@ -142,7 +191,11 @@ def test_check_sanpingwei_direct() -> None:
 # 中文：五绝 / 七绝 有效与各项违规                                          #
 # --------------------------------------------------------------------------- #
 def _valid_wujue_syllables() -> list[list[Syllable]]:
-    """valid wujue syllables。"""
+    """五绝有效音节列表。
+
+    Returns:
+        4 行 Syllable 列表。
+    """
     return [
         _zline(
             [
@@ -184,7 +237,11 @@ def _valid_wujue_syllables() -> list[list[Syllable]]:
 
 
 def _valid_qijue_syllables() -> list[list[Syllable]]:
-    """valid qijue syllables。"""
+    """七绝有效音节列表。
+
+    Returns:
+        4 行 Syllable 列表。
+    """
     return [
         _zline(
             [
@@ -309,10 +366,22 @@ def test_qilv_sanpingwei_detected() -> None:
 # 中文：词牌 相见欢（换韵 / 平韵转回）                                    #
 # --------------------------------------------------------------------------- #
 def _xjh_syllables() -> list[list[Syllable]]:
-    """xjh syllables。"""
+    """相见词牌有效音节列表。
+
+    Returns:
+        7 行 Syllable 列表。
+    """
 
     def mk(n: int, key: str | None) -> list[Syllable]:
-        """mk。"""
+        """生成 n 个音节的列表，末尾可替换韵尾。
+
+        Args:
+            n: 音节数量。
+            key: 韵尾标记（None 则不替换）。
+
+        Returns:
+            Syllable 列表。
+        """
         out: list[Syllable] = []
         for i in range(n):
             if i == n - 1 and key:
@@ -518,7 +587,14 @@ def test_terzarima_rhyme_mismatch() -> None:
     """验证 terzarima rhyme mismatch。"""
 
     def mk(key: str) -> list[Syllable]:
-        """mk。"""
+        """生成 11 音节行，末尾韵尾为 key。
+
+        Args:
+            key: 韵尾标记。
+
+        Returns:
+            Syllable 列表。
+        """
         out = [_is("a") for _ in range(10)]
         out.append(_is(key))
         return out
@@ -538,7 +614,14 @@ def test_ottava_rima_tenth_stress_ok_rhyme_mismatch() -> None:
     """验证 ottava rima tenth stress ok rhyme mismatch。"""
 
     def mk(key: str) -> list[Syllable]:
-        """mk。"""
+        """生成 11 音节行，第十位重音，末尾韵尾为 key。
+
+        Args:
+            key: 韵尾标记。
+
+        Returns:
+            Syllable 列表。
+        """
         out = [_is("a") for _ in range(10)]
         out[9] = _is("a", "", "heavy")
         out.append(_is(key))
@@ -554,7 +637,14 @@ def test_canzone_constraints() -> None:
     syls: list[list[Syllable]] = []
 
     def eleven(key: str) -> list[Syllable]:
-        """eleven。"""
+        """生成 11 音节行，第九位重音，末尾韵尾为 key。
+
+        Args:
+            key: 韵尾标记。
+
+        Returns:
+            Syllable 列表。
+        """
         out = [_is("x") for _ in range(11)]
         out[9] = _is("x", "", "heavy")
         out[10] = _is("y")
@@ -562,7 +652,14 @@ def test_canzone_constraints() -> None:
         return out
 
     def seven(key: str) -> list[Syllable]:
-        """seven。"""
+        """生成 7 音节行，末尾韵尾为 key（重音）。
+
+        Args:
+            key: 韵尾标记。
+
+        Returns:
+            Syllable 列表。
+        """
         out = [_is("x") for _ in range(7)]
         out[-1] = _is(key, "", "heavy")
         return out

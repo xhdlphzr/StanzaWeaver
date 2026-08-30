@@ -82,9 +82,13 @@ def test_rerank_model_failure_silent_fallback() -> None:
 
 def test_get_model_loads_once_and_caches() -> None:
     """_get_model 仅在首次调用时加载模型，之后复用缓存（line 24-29）。"""
+    prev = embeddings._MODEL
     with patch("sentence_transformers.SentenceTransformer") as st_mock:
         embeddings._MODEL = None
-        model1 = embeddings._get_model()
-        model2 = embeddings._get_model()
+        try:
+            model1 = embeddings._get_model()
+            model2 = embeddings._get_model()
+        finally:
+            embeddings._MODEL = prev
     assert model1 is model2
     st_mock.assert_called_once_with(embeddings._MODEL_NAME)

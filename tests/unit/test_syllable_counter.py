@@ -50,12 +50,19 @@ def test_register_analyzer_override() -> None:
     """验证 register analyzer override。"""
 
     class Dummy(SyllableAnalyzer):
-        """Dummy。"""
+        """用于测试 register 覆盖的桩分析器。"""
 
         language = "dummy"
 
         def analyze_word(self, word: str) -> list[Syllable]:
-            """analyze word。"""
+            """返回空音节列表。
+
+            Args:
+                word: 待分析单词。
+
+            Returns:
+                空列表。
+            """
             return []
 
         def count_syllables(self, text: str) -> int:

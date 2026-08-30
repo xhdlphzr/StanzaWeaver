@@ -92,6 +92,7 @@ class ItalianAnalyzer(SyllableAnalyzer):
         syls: list[Syllable] = []
         i = 0
         n = len(w)
+        onset = ""
         while i < n:
             if w[i] in _VOWELS:
                 if (
@@ -111,12 +112,18 @@ class ItalianAnalyzer(SyllableAnalyzer):
                     i += 1
                 syls.append(
                     Syllable(
+                        onset=onset,
                         nucleus=nucleus,
                         coda=coda,
                         attributes={"tone": "", "stress": "", "length": ""},
                     )
                 )
+                onset = ""
+            elif w[i] == "q" and i + 1 < n and w[i + 1] == "u":
+                onset += "qu"
+                i += 2
             else:
+                onset += w[i]
                 i += 1
         if not syls:
             return [

@@ -133,13 +133,25 @@ class HexameterTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无固定位置约束（音步可替换，由 validate_full 贪心扫描）。"""
+        """无固定位置约束（音步可替换，由 validate_full 贪心扫描）。
+
+        Returns:
+            逐位音节约束表。
+        """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """逐音步校验六步格结构。"""
+        """逐音步校验六步格结构。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         if syllables and syllables[0]:
             errors.extend(_validate_hex(syllables[0]))
@@ -161,7 +173,11 @@ class DistichonTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无固定位置约束（同六步格）。"""
+        """无固定位置约束（同六步格）。
+
+        Returns:
+            逐位音节约束表。
+        """
         return None
 
     @staticmethod
@@ -195,7 +211,15 @@ class DistichonTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：第 1 行六步格、第 2 行末 6 音节扬抑抑×2、中部 caesura、AA 押韵。"""
+        """完整检查：第 1 行六步格、第 2 行末 6 音节扬抑抑×2、中部 caesura、AA 押韵。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         if not syllables or len(syllables) < 2:
             return errors
@@ -241,7 +265,11 @@ class HendecasyllabusTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
-        """固定音步模式约束（第1音步首音节必长）。"""
+        """固定音步模式约束（第1音步首音节必长）。
+
+        Returns:
+            逐位音节约束表。
+        """
         return [
             [
                 _L,
@@ -261,7 +289,15 @@ class HendecasyllabusTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：固定长音位 + 第 5/6 音节间词边界。"""
+        """完整检查：固定长音位 + 第 5/6 音节间词边界。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
         errors: list[str] = []
         if not syllables or not syllables[0]:
             return errors

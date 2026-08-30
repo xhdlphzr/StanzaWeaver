@@ -9,6 +9,9 @@
 """
 
 import os
+import tempfile
+from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -16,6 +19,7 @@ import pytest
 # 标记测试环境：app 的后台自动导入线程据此跳过（避免污染测试用临时词库）。
 os.environ["STANZA_WEAVER_TEST"] = "1"
 
+from src.knowledge import vocabulary
 from src.prosody import english as english_module
 from src.templates.en import register_english_templates
 from src.templates.fr import register_french_templates
@@ -32,6 +36,17 @@ def _register_all_templates() -> None:
     register_italian_templates()
     register_french_templates()
     register_latin_templates()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _init_session_db() -> Iterator[None]:
+    """会话级：确保词库数据库已初始化（含 en_pron 表），防止 CI 无词库时崩溃。"""
+    prev = vocabulary._DB_PATH
+    tmp = Path(tempfile.mkdtemp(prefix="stanza_weaver_test_"))
+    vocabulary.set_db_path(tmp / "test_vocab.db")
+    vocabulary.init_db()
+    yield
+    vocabulary._DB_PATH = prev
 
 
 @pytest.fixture(autouse=True, scope="session")

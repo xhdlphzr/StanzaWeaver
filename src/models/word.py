@@ -33,7 +33,11 @@ class Word:
 
     @property
     def syllable_count(self) -> int:
-        """返回音节数。"""
+        """返回音节数。
+
+        Returns:
+            syllables 列表长度。
+        """
         return len(self.syllables)
 
     def to_dict(self) -> dict[str, Any]:

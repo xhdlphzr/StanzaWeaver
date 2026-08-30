@@ -133,7 +133,12 @@ def _syl_matches(
 
     Args:
         syl: 音节。
-        onset/nucleus/coda/tone/stress/length: 各维约束。
+        onset: onset 约束（空=不限）。
+        nucleus: nucleus 约束（空=不限）。
+        coda: coda 约束（空=不限）。
+        tone: 声调约束（空=不限）。
+        stress: 重音约束（空=不限）。
+        length: 音长约束（空=不限）。
 
     Returns:
         满足返回 True。
@@ -172,7 +177,12 @@ def search_words(
         language: 语言代码。
         query: 语义查询文本（用于重排，可为空）。
         syllable_count: 音节数约束。
-        onset/nucleus/coda/tone/stress/length: 逐位约束（空=不限）。
+        onset: onset 约束（空=不限）。
+        nucleus: nucleus 约束（空=不限）。
+        coda: coda 约束（空=不限）。
+        tone: 声调约束（空=不限）。
+        stress: 重音约束（空=不限）。
+        length: 音长约束（空=不限）。
         limit: 最大返回数。
 
     Returns:
@@ -316,13 +326,17 @@ def get_en_pron(word: str) -> list[list[str]] | None:
         word: 小写英文词。
 
     Returns:
-        音素列表的列表；词不存在于本地缓存时返回 None（调用方应回退到 CMUdict）。
+        音素列表的列表；词不存在于本地缓存或表尚未创建时返回 None
+        （调用方应回退到 CMUdict）。
     """
-    conn = _get_conn()
-    row = conn.execute(
-        "SELECT phones_json FROM en_pron WHERE word = ?", (word,)
-    ).fetchone()
-    conn.close()
+    try:
+        conn = _get_conn()
+        row = conn.execute(
+            "SELECT phones_json FROM en_pron WHERE word = ?", (word,)
+        ).fetchone()
+        conn.close()
+    except Exception:  # noqa: BLE001 - 数据库未初始化时静默降级
+        return None
     if row is None:
         return None
     data: list[list[str]] = json.loads(row[0])

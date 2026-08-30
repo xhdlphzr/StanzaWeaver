@@ -22,38 +22,81 @@ from src.agents.writer_ai import (
 def _msg(
     content: str = "", tool_calls: Any = None, reasoning: str | None = None
 ) -> Any:
-    """构造 fake 的 OpenAI message 对象。"""
+    """构造 fake 的 OpenAI message 对象。
+
+    Args:
+        content: 消息文本。
+        tool_calls: 工具调用列表。
+        reasoning: 推理内容。
+
+    Returns:
+        模拟 OpenAI message 的 SimpleNamespace 对象。
+    """
     return SimpleNamespace(
         content=content, tool_calls=tool_calls, reasoning_content=reasoning
     )
 
 
 def _resp(message: Any) -> Any:
-    """构造 fake 的 chat.completions.create 返回值（含 choices[0].message）。"""
+    """构造 fake 的 chat.completions.create 返回值（含 choices[0].message）。
+
+    Args:
+        message: 模拟 message 对象。
+
+    Returns:
+        包装后的 ChatResult 对象。
+    """
     return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
 
 def _tc(name: str, args_json: str, tid: str = "1") -> Any:
-    """构造 fake 的 tool_call 对象（arguments 为 JSON 字符串）。"""
+    """构造 fake 的 tool_call 对象（arguments 为 JSON 字符串）。
+
+    Args:
+        name: 工具名称。
+        args_json: JSON 格式的工具参数字符串。
+        tid: 调用 ID。
+
+    Returns:
+        模拟 tool_call 的 SimpleNamespace 对象。
+    """
     return SimpleNamespace(
         id=tid, function=SimpleNamespace(name=name, arguments=args_json)
     )
 
 
 def _chunk(content: str) -> Any:
-    """构造流式 chunk（含 delta.content）。"""
+    """构造流式 chunk（含 delta.content）。
+
+    Args:
+        content: 文本块内容。
+
+    Returns:
+        模拟流式 chunk 的 SimpleNamespace 对象。
+    """
     return SimpleNamespace(
         choices=[SimpleNamespace(delta=SimpleNamespace(content=content))]
     )
 
 
 def _chunk_empty() -> Any:
-    """构造空 delta 的流式 chunk。"""
+    """构造空 delta 的流式 chunk。
+
+    Returns:
+        choices 为空列表的 SimpleNamespace 对象。
+    """
     return SimpleNamespace(choices=[])
 
 
 def _make_llm(base_url: str) -> tuple[LLMClient, MagicMock]:
-    """构造 LLMClient（OpenAI 被 mock），返回 (client, mock_httpx_client)。"""
+    """构造 LLMClient（OpenAI 被 mock），返回 (client, mock_httpx_client)。
+
+    Args:
+        base_url: API 基础地址。
+
+    Returns:
+        (client, mock_httpx_client) 元组。
+    """
     with patch("src.agents.base.OpenAI", MagicMock()):
         c = LLMClient(base_url, "k", "m")
     client = MagicMock()
@@ -82,15 +125,18 @@ def test_is_loopback_false() -> None:
 # LLMClient.__init__ / _raise_with_hint
 # --------------------------------------------------------------------------- #
 def test_init_creates_http_client_for_loopback() -> None:
-    """回环地址下应创建绕过代理的 httpx.Client。"""
-    c, _ = _make_llm("http://127.0.0.1:11434/v1")
-    assert c.model == "m"
+    """回环地址下应创建绕过代理的 httpx.Client（trust_env=False）。"""
+    with patch("httpx.Client") as httpx_cls:
+        httpx_cls.return_value = MagicMock(trust_env=False)
+        _c, _ = _make_llm("http://127.0.0.1:11434/v1")
+        httpx_cls.assert_called_once_with(trust_env=False)
 
 
 def test_init_non_loopback_no_special_client() -> None:
-    """非回环地址下正常初始化（不抛错）。"""
-    c, _ = _make_llm("https://api.openai.com/v1")
-    assert c.model == "m"
+    """非回环地址下正常初始化（不抛错，不创建 trust_env=False 的 client）。"""
+    with patch("httpx.Client") as httpx_cls:
+        _c, _ = _make_llm("https://api.openai.com/v1")
+        httpx_cls.assert_not_called()
 
 
 def test_raise_with_hint_loopback() -> None:
@@ -297,6 +343,11 @@ def test_build_writer_system_with_feedback() -> None:
 # CheckerAI
 # --------------------------------------------------------------------------- #
 def _make_checker() -> tuple[CheckerAI, MagicMock]:
+    """创建 CheckerAI 用于测试（OpenAI 被 mock）。
+
+    Returns:
+        (checker, mock_chat) 元组。
+    """
     with patch("src.agents.base.OpenAI", MagicMock()):
         checker = CheckerAI(
             {"base_url": "http://127.0.0.1:11434/v1", "api_key": "k", "model": "m"}
@@ -368,6 +419,11 @@ def test_checker_exception_fallback() -> None:
 # WriterAI.generate_description
 # --------------------------------------------------------------------------- #
 def _make_writer() -> tuple[WriterAI, MagicMock]:
+    """创建 WriterAI 用于测试（OpenAI 被 mock）。
+
+    Returns:
+        (writer, mock_chat) 元组。
+    """
     with patch("src.agents.base.OpenAI", MagicMock()):
         writer = WriterAI(
             {"base_url": "http://127.0.0.1:11434/v1", "api_key": "k", "model": "m"}
@@ -446,6 +502,15 @@ def test_generate_draft_stream_retry() -> None:
 # WriterAI.refine
 # --------------------------------------------------------------------------- #
 def _refine_seq(writer: WriterAI, seq: list[dict[str, Any]]) -> Any:
+    """生成 refine_line 序列。
+
+    Args:
+        writer: WriterAI 实例。
+        seq: 预置的 chat 返回值序列。
+
+    Returns:
+        配置好的 writer 实例。
+    """
     writer.client.chat.side_effect = list(seq)  # type: ignore[attr-defined]
     return writer
 
@@ -706,6 +771,15 @@ def test_refine_no_progress_guidance() -> None:
     captured: list[list[dict[str, Any]]] = []
 
     def fake_chat(messages: list[dict[str, Any]], tools: Any = None) -> dict[str, Any]:
+        """捕获消息并按序返回预设响应。
+
+        Args:
+            messages: 对话消息列表。
+            tools: 工具定义（忽略）。
+
+        Returns:
+            预设的响应字典。
+        """
         captured.append(messages)
         return seq.pop(0)
 

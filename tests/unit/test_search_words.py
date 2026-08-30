@@ -11,15 +11,22 @@ from src.tools import search_words as search_words_module
 
 
 class _FakeDB:
-    """_FakeDB。"""
+    """词库查询桩：记录调用参数并返回固定结果。"""
 
     def __init__(self) -> None:
-        """init  。"""
+        """初始化桩。"""
         self.calls: list[dict[str, Any]] = []
         self.words = [{"word": "明月", "syllables": 2, "score": 0.9}]
 
     def __call__(self, **kwargs: Any) -> list[dict[str, Any]]:
-        """call  。"""
+        """记录查询参数并返回预置词条。
+
+        Args:
+            **kwargs: 透传的查询参数。
+
+        Returns:
+            预置词条列表。
+        """
         self.calls.append(kwargs)
         return self.words
 
