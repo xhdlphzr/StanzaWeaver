@@ -8,9 +8,13 @@
 - 提供模板字典构建工具。
 """
 
+import os
 from typing import Any
 
 import pytest
+
+# 标记测试环境：app 的后台自动导入线程据此跳过（避免污染测试用临时词库）。
+os.environ["STANZA_WEAVER_TEST"] = "1"
 
 from src.prosody import english as english_module
 from src.templates.en import register_english_templates

@@ -57,7 +57,10 @@ def _auto_import() -> None:
         _vocab_importing = False
 
 
-threading.Thread(target=_auto_import, daemon=True).start()
+# 测试环境下不启动后台自动导入（由 conftest 注入 STANZA_WEAVER_TEST=1），
+# 避免异步线程读取被测试重定向的数据库路径而污染临时词库。
+if os.environ.get("STANZA_WEAVER_TEST") != "1":
+    threading.Thread(target=_auto_import, daemon=True).start()
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
