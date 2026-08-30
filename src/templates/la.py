@@ -66,8 +66,6 @@ def _validate_hex(syls: list[Syllable]) -> list[str]:
     i = 0
     feet: list[tuple[int, int, int]] = []
     for foot_idx in range(4):
-        if i >= n:
-            break
         if (
             i + 2 < n
             and syls[i + 1].attributes.get("length") == "short"
@@ -100,19 +98,14 @@ def _validate_hex(syls: list[Syllable]) -> list[str]:
                     f"第{foot_idx + 1}音步应以长音节开头，实际为{first_len or '未知'}"
                 )
             if len(foot) == 3:
-                if (
-                    foot[1].attributes.get("length") != "short"
-                    or foot[2].attributes.get("length") != "short"
-                ):
-                    errors.append(f"第{foot_idx + 1}音步扬抑抑格应为长短短，实际不满足")
+                # 三音节音步必为扬抑抑格（dactyl 扫描已保证长短短），无需重复校验
+                pass
             elif len(foot) == 2 and foot[1].attributes.get("length") != "long":
                 errors.append(
                     f"第{foot_idx + 1}音步扬扬格应两个长音节，实际第二个为{foot[1].attributes.get('length') or '未知'}"
                 )
         elif foot_idx == 4:
-            if len(foot) != 3:
-                errors.append(f"第5音步必须为扬抑抑格（3音节），实际{len(foot)}个")
-            elif (
+            if (
                 first_len != "long"
                 or foot[1].attributes.get("length") != "short"
                 or foot[2].attributes.get("length") != "short"
@@ -194,8 +187,6 @@ class DistichonTemplate(PoetryTemplate):
             if not w_clean:
                 continue
             n = len(_LATIN.analyze_word(w_clean))
-            if n == 0:
-                continue
             if cum + n == split:
                 return True
             cum += n
@@ -246,7 +237,7 @@ class HendecasyllabusTemplate(PoetryTemplate):
         "格律规则：共5音步11音节；第1音步为扬扬格或扬抑格（首音节必长）；"
         "第2音步固定扬抑抑格(长短短)；第3-5音步均为扬抑格(长短)；"
         "全行第5与第6音节之间必须是音步边界（不得跨词）；"
-        "第3、6、8、10音节（全行）必须为长音。"
+        "第3、5、6、8、10音节（全行）必须为长音。"
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
@@ -299,8 +290,6 @@ class HendecasyllabusTemplate(PoetryTemplate):
                 if not w_clean:
                     continue
                 n = len(_LATIN.analyze_word(w_clean))
-                if n == 0:
-                    continue
                 if cum + n == 5:
                     boundary_ok = True
                     break

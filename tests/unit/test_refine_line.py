@@ -25,6 +25,7 @@ POEM = ["床前明月光", "疑是地上霜", "举头望明月", "低头思故�
 
 
 def test_refine_line_valid() -> None:
+    """验证 refine line valid。"""
     result = refine_line_module.execute_refine_line(
         list(POEM), ZH_TPL, {"line": 0, "new_text": "窗前明月光"}
     )
@@ -34,6 +35,7 @@ def test_refine_line_valid() -> None:
 
 
 def test_refine_line_wrong_syllable_count() -> None:
+    """验证 refine line wrong syllable count。"""
     result = refine_line_module.execute_refine_line(
         list(POEM), ZH_TPL, {"line": 0, "new_text": "窗前明月"}
     )
@@ -42,6 +44,7 @@ def test_refine_line_wrong_syllable_count() -> None:
 
 
 def test_refine_line_out_of_range() -> None:
+    """验证 refine line out of range。"""
     result = refine_line_module.execute_refine_line(
         list(POEM), ZH_TPL, {"line": 10, "new_text": "窗前明月光"}
     )
@@ -50,6 +53,7 @@ def test_refine_line_out_of_range() -> None:
 
 
 def test_refine_line_constraints_mismatch() -> None:
+    """验证 refine line constraints mismatch。"""
     # 去 (仄) 不满足第 1 行第 1 音节平声约束
     result = refine_line_module.execute_refine_line(
         list(POEM), ZH_TPL_CONSTRAINT, {"line": 0, "new_text": "去前明月光"}

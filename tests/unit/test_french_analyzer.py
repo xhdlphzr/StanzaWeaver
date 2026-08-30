@@ -8,24 +8,28 @@ from src.templates.fr import RondeauTemplate
 
 
 def test_count_syllables_parle() -> None:
+    """验证 count syllables parle。"""
     a = FrenchAnalyzer()
     # par-le：词尾 e 为合法末音节核，计入 -> 2 音节
     assert a.count_syllables("parle") == 2
 
 
 def test_rhyme_key_parle() -> None:
+    """验证 rhyme key parle。"""
     a = FrenchAnalyzer()
     # 末音节核为 e（阴韵），丢弃词尾静音辅音
     assert a.rhyme_key("parle") == "e"
 
 
 def test_count_syllables_bonjour() -> None:
+    """验证 count syllables bonjour。"""
     a = FrenchAnalyzer()
     # bon-jour: 2 音节
     assert a.count_syllables("bonjour") == 2
 
 
 def test_digraph_eau() -> None:
+    """验证 digraph eau。"""
     a = FrenchAnalyzer()
     syls = a.analyze_word("eau")
     assert len(syls) == 1
@@ -33,6 +37,7 @@ def test_digraph_eau() -> None:
 
 
 def test_single_nucleus_words() -> None:
+    """验证 single nucleus words。"""
     a = FrenchAnalyzer()
     # FR-1：三合/二合元音视为单一音节核
     assert a.count_syllables("oui") == 1
@@ -46,6 +51,7 @@ def test_single_nucleus_words() -> None:
 
 
 def test_final_mute_e_counted() -> None:
+    """验证 final mute e counted。"""
     a = FrenchAnalyzer()
     # FR-2：词尾 e 作为合法末音节核时必须计入
     assert a.count_syllables("entre") == 2
@@ -56,6 +62,7 @@ def test_final_mute_e_counted() -> None:
 
 
 def test_rhyme_key_nasal_merge() -> None:
+    """验证 rhyme key nasal merge。"""
     a = FrenchAnalyzer()
     # FR-3：鼻化元音归并 + 丢弃词尾静音辅音
     assert a.rhyme_key("an") == a.rhyme_key("en")
@@ -65,6 +72,7 @@ def test_rhyme_key_nasal_merge() -> None:
 
 
 def test_syllabify_line_elision() -> None:
+    """验证 syllabify line elision。"""
     a = FrenchAnalyzer()
     # FR-4：跨词省音，l'eau 计为 1 音节
     assert a.count_syllables("l'eau") == 1
@@ -72,6 +80,7 @@ def test_syllabify_line_elision() -> None:
 
 
 def test_rondeau_accepts_uniform_10() -> None:
+    """验证 rondeau accepts uniform 10。"""
     from src.prosody.meter_validator import MeterValidator
 
     template = RondeauTemplate()

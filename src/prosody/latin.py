@@ -108,6 +108,7 @@ class LatinAnalyzer(SyllableAnalyzer):
         length_val = ""
 
         def _close() -> None:
+            """关闭当前挂起音节并追加到音节列表，随后重置本地的 onset/nucleus/coda/length。"""
             syllables.append(
                 Syllable(
                     onset=onset,
@@ -126,7 +127,9 @@ class LatinAnalyzer(SyllableAnalyzer):
         while i < n:
             ch = word[i]
             lower = ch.lower()
-            # 辅音性 u: qu / gu / su 后接元音时整簇作为当前音节 onset
+            # 辅音性 u: qu / gu / su 后接元音时整簇作为「下一音节」的 onset。
+            # 注意：若上一元音音节尚处挂起状态（nucleus 非空），须先关闭它，
+            # 否则 qu/gu/su 会被错误并入上一音节的 onset（如 aqua 误作 qua+a）。
             if lower == "q" or (
                 lower in "gs"
                 and i + 1 < n
@@ -134,6 +137,12 @@ class LatinAnalyzer(SyllableAnalyzer):
                 and i + 2 < n
                 and word[i + 2] in _VOWELS
             ):
+                if nucleus:
+                    _close()
+                    onset = ""
+                    nucleus = ""
+                    coda = ""
+                    length_val = ""
                 onset += lower + "u"
                 i += 2
                 continue
@@ -196,10 +205,7 @@ class LatinAnalyzer(SyllableAnalyzer):
                 length_val = "long" if is_long else "short"
                 i = j
             else:
-                if nucleus:
-                    coda += lower
-                else:
-                    onset += lower
+                onset += lower
                 i += 1
 
         if nucleus:

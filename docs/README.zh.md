@@ -12,6 +12,7 @@
 [![Repo Size](https://img.shields.io/github/repo-size/xhdlphzr/StanzaWeaver)](https://github.com/xhdlphzr/StanzaWeaver)
 [![Ruff](https://img.shields.io/badge/ruff-passing-brightgreen)](https://github.com/xhdlphzr/StanzaWeaver)
 [![mypy](https://img.shields.io/badge/mypy--strict-passing-brightgreen)](https://github.com/xhdlphzr/StanzaWeaver)
+![Test Coverage](https://img.shields.io/badge/Test%20Coverage-100%25-brightgreen)
 [![Project Status](https://img.shields.io/badge/Project%20Status-Active-brightgreen)](https://github.com/xhdlphzr/StanzaWeaver)
 [![English](https://img.shields.io/badge/English-README-007EC6)](https://github.com/xhdlphzr/StanzaWeaver/blob/master/README.md)
 [![汉语](https://img.shields.io/badge/汉语-README-007EC6)](https://github.com/xhdlphzr/StanzaWeaver/blob/master/docs/README.zh.md)

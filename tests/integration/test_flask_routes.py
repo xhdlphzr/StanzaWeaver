@@ -16,22 +16,26 @@ import app as app_module
 
 @pytest.fixture()
 def client() -> Iterator[FlaskClient]:
+    """client。"""
     app_module.app.testing = True
     with app_module.app.test_client() as c:
         yield c
 
 
 def _csrf() -> dict[str, str]:
+    """csrf。"""
     return {"X-CSRF-Token": app_module._CSRF_TOKEN}
 
 
 def test_index_page(client: FlaskClient) -> None:
+    """验证 index page。"""
     resp = client.get("/")
     assert resp.status_code == 200
     assert "StanzaWeaver" in resp.get_data(as_text=True)
 
 
 def test_templates_endpoint(client: FlaskClient) -> None:
+    """验证 templates endpoint。"""
     resp = client.get("/api/templates")
     assert resp.status_code == 200
     data = resp.get_json()
@@ -41,12 +45,14 @@ def test_templates_endpoint(client: FlaskClient) -> None:
 
 
 def test_import_status_endpoint(client: FlaskClient) -> None:
+    """验证 import status endpoint。"""
     resp = client.get("/api/import-status")
     assert resp.status_code == 200
     assert "importing" in resp.get_json()
 
 
 def test_config_requires_csrf(client: FlaskClient) -> None:
+    """验证 config requires csrf。"""
     assert client.get("/api/config").status_code == 403
     resp = client.get("/api/config", headers=_csrf())
     assert resp.status_code == 200
@@ -55,12 +61,14 @@ def test_config_requires_csrf(client: FlaskClient) -> None:
 
 
 def test_history_get(client: FlaskClient) -> None:
+    """验证 history get。"""
     resp = client.get("/api/history")
     assert resp.status_code == 200
     assert isinstance(resp.get_json(), list)
 
 
 def test_history_post_requires_csrf(client: FlaskClient) -> None:
+    """验证 history post requires csrf。"""
     assert (
         client.post("/api/history", json={"topic": "t", "poem": "p"}).status_code == 403
     )

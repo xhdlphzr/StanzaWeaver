@@ -18,6 +18,7 @@ REVISED_LINE = "窗前明月光"
 
 
 def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    """patch llm。"""
     writer_stub = make_stub(
         stream=[DESC, DRAFT],
         chat=[
@@ -31,6 +32,7 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_pipeline_full_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证 pipeline full run。"""
     _patch_llm(monkeypatch)
     pipeline = PoetryPipeline(
         writer_config={"base_url": "x", "api_key": "x", "model": "x"},
@@ -48,6 +50,7 @@ def test_pipeline_full_run(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_pipeline_continue_with_feedback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证 pipeline continue with feedback。"""
     _patch_llm(monkeypatch)
     pipeline = PoetryPipeline(
         writer_config={"base_url": "x", "api_key": "x", "model": "x"},

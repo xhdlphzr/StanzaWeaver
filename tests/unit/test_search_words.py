@@ -11,16 +11,21 @@ from src.tools import search_words as search_words_module
 
 
 class _FakeDB:
+    """_FakeDB。"""
+
     def __init__(self) -> None:
+        """init  。"""
         self.calls: list[dict[str, Any]] = []
         self.words = [{"word": "明月", "syllables": 2, "score": 0.9}]
 
     def __call__(self, **kwargs: Any) -> list[dict[str, Any]]:
+        """call  。"""
         self.calls.append(kwargs)
         return self.words
 
 
 def test_execute_search_words_passes_args(monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证 execute search words passes args。"""
     fake = _FakeDB()
     monkeypatch.setattr(search_words_module, "db_search", fake)
     tpl = {"language": "zh", "name": "五绝"}
@@ -35,6 +40,7 @@ def test_execute_search_words_passes_args(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_limit_clamping(monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证 limit clamping。"""
     fake = _FakeDB()
     monkeypatch.setattr(search_words_module, "db_search", fake)
     tpl = {"language": "zh"}
@@ -45,6 +51,7 @@ def test_limit_clamping(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_syllable_count_non_int_becomes_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证 syllable count non int becomes none。"""
     fake = _FakeDB()
     monkeypatch.setattr(search_words_module, "db_search", fake)
     tpl = {"language": "zh"}

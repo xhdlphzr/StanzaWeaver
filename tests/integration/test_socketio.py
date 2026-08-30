@@ -22,6 +22,7 @@ REVISED_LINE = "窗前明月光"
 
 
 def _make_emitter(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Any]]:
+    """make emitter。"""
     emitted: list[tuple[str, object]] = []
     monkeypatch.setattr(
         socketio,
@@ -32,6 +33,7 @@ def _make_emitter(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Any]]:
 
 
 def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    """patch llm。"""
     writer_stub = make_stub(
         stream=[DESC, DRAFT],
         chat=[
@@ -45,6 +47,7 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_generate_emits_progress_and_done(monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证 generate emits progress and done。"""
     _patch_llm(monkeypatch)
     emitted = _make_emitter(monkeypatch)
 
@@ -68,6 +71,7 @@ def test_generate_emits_progress_and_done(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_generate_empty_input_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证 generate empty input errors。"""
     emitted = _make_emitter(monkeypatch)
     client = socketio.test_client(app_module.app)
     client.emit("generate", {"topic": "", "template_key": ""})

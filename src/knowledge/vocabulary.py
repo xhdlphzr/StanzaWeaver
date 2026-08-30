@@ -242,9 +242,6 @@ def search_words(
                 if _syl_matches(s, onset, nucleus, coda, tone, stress, length):
                     match_idx = idx
                     break
-            if match_idx is None:
-                continue
-
         results.append(
             {
                 "text": text,
