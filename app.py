@@ -186,7 +186,6 @@ def api_llm_ping() -> Any:
         return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
     _llm_status["writer"] = "checking"
     _llm_status["checker"] = "checking"
-    socketio.emit("llm_status", dict(_llm_status))
     _ping_one_endpoint("writer")
     _ping_one_endpoint("checker")
     socketio.emit("llm_status", dict(_llm_status))
