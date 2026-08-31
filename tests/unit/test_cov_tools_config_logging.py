@@ -178,9 +178,9 @@ def test_config_update(tmp_path: Path) -> None:
 
 
 def test_config_language_default(tmp_path: Path) -> None:
-    """language 属性默认返回 zh。"""
+    """language 属性默认返回 en。"""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
-    assert cfg.language == "zh"
+    assert cfg.language == "en"
 
 
 def test_config_language_zh(tmp_path: Path) -> None:
@@ -200,11 +200,11 @@ def test_config_language_en(tmp_path: Path) -> None:
 
 
 def test_config_language_invalid_fallback(tmp_path: Path) -> None:
-    """language 属性无效值回退 zh（覆盖 137）。"""
+    """language 属性无效值回退 en（覆盖 137）。"""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     cfg._data = {"language": "fr"}
     cfg._loaded = True
-    assert cfg.language == "zh"
+    assert cfg.language == "en"
 
 
 def test_config_language_setter(tmp_path: Path) -> None:
