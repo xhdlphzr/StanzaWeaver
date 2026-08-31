@@ -32,9 +32,15 @@
           <h1>StanzaWeaver</h1>
           <p class="slogan">以智识，巧织诗</p>
         </div>
-        <button id="btn-config" class="btn-icon" title="LLM配置">
-          &#9881;
-        </button>
+        <div class="header-right">
+          <button id="btn-ping" class="btn-ping" title="检查连接">&#8635;</button>
+          <span class="ai-status-label">AI</span>
+          <span id="llm-status-dot" class="llm-dot"></span>
+          <span id="llm-status-text" class="llm-status-text"></span>
+          <button id="btn-config" class="btn-icon" title="LLM配置">
+            &#9881;
+          </button>
+        </div>
       </header>
 
       <main>
@@ -219,6 +225,9 @@
           .getElementById("btn-config")
           .addEventListener("click", openConfig);
         document
+          .getElementById("btn-ping")
+          .addEventListener("click", manualPing);
+        document
           .getElementById("btn-close-config")
           .addEventListener("click", closeConfig);
         document
@@ -294,6 +303,17 @@
               }
             });
         }, 800);
+
+        fetch("/api/llm-status")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            updateLLMStatus(data);
+          });
+        socket.on("llm_status", function (data) {
+          updateLLMStatus(data);
+        });
       });
 
       function loadTemplates() {
@@ -334,6 +354,42 @@
             toast.remove();
           });
         }, 3000);
+      }
+
+      function updateLLMStatus(data) {
+        var dot = document.getElementById("llm-status-dot");
+        var text = document.getElementById("llm-status-text");
+        dot.className = "llm-dot";
+        text.textContent = "";
+        var disabled = false;
+        if (data.writer === "error" || data.checker === "error") {
+          dot.classList.add("llm-dot-error");
+          text.textContent = "连接失败";
+          disabled = true;
+        } else if (data.writer === "ok" && data.checker === "ok") {
+          dot.classList.add("llm-dot-ok");
+        } else if (data.writer === "checking" || data.checker === "checking") {
+          dot.classList.add("llm-dot-checking");
+          disabled = true;
+        } else {
+          disabled = true;
+        }
+        document.getElementById("btn-generate").disabled =
+          disabled || isGenerating;
+        document.getElementById("btn-feedback").disabled = disabled;
+      }
+
+      function manualPing() {
+        var dot = document.getElementById("llm-status-dot");
+        dot.className = "llm-dot";
+        document.getElementById("llm-status-text").textContent = "";
+        fetch("/api/llm-ping", { method: "POST", headers: csrfHeaders() })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            updateLLMStatus(data);
+          });
       }
 
       function startGenerate() {

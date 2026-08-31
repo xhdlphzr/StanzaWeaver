@@ -13,6 +13,7 @@ import json
 import os
 import secrets
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -55,18 +56,60 @@ def _auto_import() -> None:
         logger.error("[StanzaWeaver] 词库导入失败: %s", e)
     finally:
         _vocab_importing = False
+        _llm_ping_event.set()
+
+
+def _ping_one_endpoint(endpoint_name: str) -> None:
+    """探测单个 LLM 端点连通性。
+
+    Args:
+        endpoint_name: 端点名称（"writer" 或 "checker"）。
+    """
+    from src.agents.base import LLMClient
+    from src.config import get_config
+
+    cfg = get_config()
+    ep = getattr(cfg, endpoint_name)
+    if not ep.get("api_key"):
+        _llm_status[endpoint_name] = "unknown"
+        return
+    try:
+        client = LLMClient(
+            base_url=str(ep["base_url"]),
+            api_key=str(ep["api_key"]),
+            model=str(ep["model"]),
+        )
+        client.chat([{"role": "user", "content": "hi"}])
+        _llm_status[endpoint_name] = "ok"
+    except Exception:  # noqa: BLE001 - ping 兜底
+        _llm_status[endpoint_name] = "error"
+
+
+def _auto_ping() -> None:
+    """后台线程：间歇 ping LLM 端点并推送状态到前端。"""
+    time.sleep(5)
+    while True:
+        socketio.emit("llm_status", {"writer": "checking", "checker": "checking"})
+        _ping_one_endpoint("writer")
+        _ping_one_endpoint("checker")
+        socketio.emit("llm_status", dict(_llm_status))
+        _llm_ping_event.wait(timeout=30)
+        _llm_ping_event.clear()
 
 
 # 测试环境下不启动后台自动导入（由 conftest 注入 STANZA_WEAVER_TEST=1），
 # 避免异步线程读取被测试重定向的数据库路径而污染临时词库。
 if os.environ.get("STANZA_WEAVER_TEST") != "1":
     threading.Thread(target=_auto_import, daemon=True).start()
+    threading.Thread(target=_auto_ping, daemon=True).start()
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 _active_states: dict[str, dict[str, Any]] = {}
 _CSRF_TOKEN = secrets.token_hex(16)
+_llm_status: dict[str, str] = {"writer": "unknown", "checker": "unknown"}
+_llm_ping_event = threading.Event()
 
 
 def _register_custom_templates() -> None:
@@ -119,6 +162,35 @@ def api_import_status() -> Any:
         JSON Response，含 importing 布尔字段。
     """
     return jsonify({"importing": _vocab_importing})
+
+
+@app.route("/api/llm-status")
+def api_llm_status() -> Any:
+    """查询 LLM 端点连通状态。
+
+    Returns:
+        JSON Response，含 writer 和 checker 状态
+       （"unknown" / "checking" / "ok" / "error"）。
+    """
+    return jsonify(dict(_llm_status))
+
+
+@app.route("/api/llm-ping", methods=["POST"])
+def api_llm_ping() -> Any:
+    """手动触发 LLM 端点连通性探测。
+
+    Returns:
+        JSON Response，含 writer 和 checker 最新状态。
+    """
+    if not _require_csrf():
+        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+    _llm_status["writer"] = "checking"
+    _llm_status["checker"] = "checking"
+    socketio.emit("llm_status", dict(_llm_status))
+    _ping_one_endpoint("writer")
+    _ping_one_endpoint("checker")
+    socketio.emit("llm_status", dict(_llm_status))
+    return jsonify(dict(_llm_status))
 
 
 @app.route("/")
@@ -197,6 +269,9 @@ def api_save_config() -> Any:
         config.writer["base_url"],
         config.checker["base_url"],
     )
+    _llm_status["writer"] = "unknown"
+    _llm_status["checker"] = "unknown"
+    _llm_ping_event.set()
     return jsonify({"status": "ok"})
 
 

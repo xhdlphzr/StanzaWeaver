@@ -59,6 +59,25 @@ def test_import_status_endpoint(client: FlaskClient) -> None:
     assert "importing" in resp.get_json()
 
 
+def test_llm_status_endpoint(client: FlaskClient) -> None:
+    """验证 LLM 连通状态 endpoint。"""
+    resp = client.get("/api/llm-status")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "writer" in data and "checker" in data
+    assert data["writer"] in ("unknown", "checking", "ok", "error")
+    assert data["checker"] in ("unknown", "checking", "ok", "error")
+
+
+def test_llm_ping_requires_csrf(client: FlaskClient) -> None:
+    """验证手动 ping 需要 CSRF 令牌。"""
+    assert client.post("/api/llm-ping").status_code == 403
+    resp = client.post("/api/llm-ping", headers=_csrf())
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "writer" in data and "checker" in data
+
+
 def test_config_requires_csrf(client: FlaskClient) -> None:
     """验证 config requires csrf。"""
     assert client.get("/api/config").status_code == 403
