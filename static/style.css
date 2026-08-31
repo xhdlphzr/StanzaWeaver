@@ -863,6 +863,7 @@ header h1 {
 
 .modal-wide {
   width: 680px;
+  max-width: 92vw;
 }
 
 .config-row {
