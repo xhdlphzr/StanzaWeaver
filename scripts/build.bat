@@ -1,7 +1,9 @@
+@echo off
+chcp 65001 >nul 2>&1
+
 REM Copyright (c) 2026 xhdlphzr
 REM SPDX-License-Identifier: MIT
 
-@echo off
 rem ============================================================
 rem  build.bat - 构建 StanzaWeaver 的 Docker 镜像
 rem
