@@ -103,7 +103,30 @@ pytest
 
 ---
 
-## 3. 如何新增诗体（模板）
+## 3. 编程规范
+
+### 3.1 算法与架构
+
+1. **验证逻辑正确性** — 提交前审查算法/架构层是否正确。
+2. **100% 测试覆盖率** — `pytest` 必须全量通过，被改动的 `src` 模块需达到 100% 覆盖率。每个新 bug 必须有对应测试用例；审查测试代码是否存在考虑不周的情况。
+3. **接口统一** — 当同一功能存在多个接口时，评估是否可以合并统一。
+
+### 3.2 代码质量
+
+4. **静态检查** — `ruff check` 必须完全通过。优先运行 `ruff check --fix --unsafe-fixes`，需要时再手动修改。
+5. **类型检查** — `mypy --strict` 必须全量通过。优先运行 `mypy --install-types`，需要时再手动修改。
+6. **文档字符串** — 每个函数、类、模块都必须有 Google 风格的 docstring。
+7. **代码格式化** — 每次写完代码后运行 `ruff format`。
+8. **删除冗余代码** — 删除不可达/冗余代码，逻辑保持简洁。
+
+### 3.3 用户体验
+
+9. **功能完整性** — 在软件职能范围之内尽可能满足大部分需求。
+10. **UI 设计** — 追求精致视觉：圆角、英文标题用 Alex Brush、正文用 Noto Serif SC、动画效果（滑动、展开、淡入淡出）。
+
+---
+
+## 4. 如何新增诗体（模板）
 
 诗体（如十四行诗、绝句、俳句）由 `src/templates/` 下的 `PoetryTemplate` 子类定义，并注册到全局模板表。
 
@@ -171,7 +194,7 @@ class PoetryTemplate(ABC):
 
 ---
 
-## 4. 如何新增语言
+## 5. 如何新增语言
 
 语言需要三处配合：① 音节分析器；② 模板表的语言标签；③ 词库导入器（可选但推荐，否则 `search_words` 工具无数据）。
 
@@ -242,7 +265,7 @@ _ANALYZERS: dict[str, SyllableAnalyzer] = {
 
 ---
 
-## 5. 测试总则
+## 6. 测试总则
 
 - 运行：`pytest`（根目录执行，依赖 `pytest.ini`）。该命令已通过 `--cov=src --cov-fail-under=100` **强制要求 `src` 100% 覆盖率**，若有任何改动行未被覆盖即会失败。
 - 全部测试**不依赖真实 LLM / 不联网**：LLM 由 `tests/helpers.py` 的 `StubLLMClient` 替换。
@@ -251,7 +274,7 @@ _ANALYZERS: dict[str, SyllableAnalyzer] = {
 
 ---
 
-## 6. 提交清单（PR Checklist）
+## 7. 提交清单（PR Checklist）
 
 - [ ] 代码通过 `mypy --strict ./`
 - [ ] 代码通过 `ruff check --fix --unsafe-fixes ./`
