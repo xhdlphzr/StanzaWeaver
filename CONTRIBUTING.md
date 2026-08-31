@@ -103,7 +103,30 @@ Notes:
 
 ---
 
-## 3. How to Add a New Meter Template
+## 3. Coding Standards
+
+### 3.1 Algorithm & Architecture
+
+1. **Verify logic correctness** — review the algorithm/architecture layer for correctness before submitting.
+2. **100% test coverage** — `pytest` must pass with 100% coverage on changed `src` modules. Every new bug must have a corresponding test case; review test code for blind spots.
+3. **Interface consolidation** — when multiple interfaces exist for the same functionality, evaluate whether they can be unified.
+
+### 3.2 Code Quality
+
+4. **Linting** — `ruff check` must pass cleanly. Always run `ruff check --fix --unsafe-fixes` first, then fix manually if needed.
+5. **Type checking** — `mypy --strict` must pass on all `src` files. Run `mypy --install-types` first if needed, then fix manually.
+6. **Docstrings** — every function, class, and module must have Google-style docstrings.
+7. **Formatting** — run `ruff format` after every code change.
+8. **Dead code** — remove unreachable/redundant code; keep logic concise.
+
+### 3.3 User Experience
+
+9. **Feature completeness** — within the scope of this software, accommodate the majority of user needs.
+10. **UI design** — aim for polished visuals: rounded corners, Alex Brush for English headings, Noto Serif SC for body text, and smooth animations (slide, expand, fade).
+
+---
+
+## 4. How to Add a New Meter Template
 
 Meter templates (e.g., sonnet, quatrain, haiku) are defined as subclasses of `PoetryTemplate` under `src/templates/` and registered in the global template table.
 
@@ -173,7 +196,7 @@ class PoetryTemplate(ABC):
 
 ---
 
-## 4. How to Add a New Language
+## 5. How to Add a New Language
 
 Adding a language requires three parts: ① a syllable analyser; ② a language label in the template registry; ③ a lexicon importer (optional but recommended, otherwise the `search_words` tool will have no data).
 
@@ -246,7 +269,7 @@ Add a `_import_<lang>()` function in `src/knowledge/importer.py` that parses a p
 
 ---
 
-## 5. Testing Guidelines
+## 6. Testing Guidelines
 
 - Run: `pytest` (from the repository root, using `pytest.ini`). The command already enforces **100% coverage on `src`** via `--cov=src --cov-fail-under=100`, so it fails if any changed line is uncovered.
 - All tests **do not depend on real LLMs / network**: LLMs are replaced by `StubLLMClient` from `tests/helpers.py`.
@@ -255,7 +278,7 @@ Add a `_import_<lang>()` function in `src/knowledge/importer.py` that parses a p
 
 ---
 
-## 6. PR Checklist
+## 7. PR Checklist
 
 - [ ] Code passes `mypy --strict ./`
 - [ ] Code passes `ruff check --fix --unsafe-fixes ./`
