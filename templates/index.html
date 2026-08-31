@@ -18,26 +18,65 @@
       href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css"
     />
     <link rel="stylesheet" href="/static/style.css" />
+    <script>
+      var I18N = {};
+      var CURRENT_LANG = "zh";
+      function t(key, args) {
+        var parts = key.split(".");
+        var val = I18N;
+        for (var i = 0; i < parts.length; i++) {
+          if (val === undefined || val === null) return key;
+          val = val[parts[i]];
+        }
+        if (val === undefined || val === null) return key;
+        if (args) {
+          Object.keys(args).forEach(function (k) {
+            val = val.replace(new RegExp("\\{" + k + "\\}", "g"), args[k]);
+          });
+        }
+        return val;
+      }
+      function applyI18N() {
+        document.querySelectorAll("[data-i18n]").forEach(function (el) {
+          var v = t(el.getAttribute("data-i18n"));
+          if (v !== el.getAttribute("data-i18n")) el.textContent = v;
+        });
+        document
+          .querySelectorAll("[data-i18n-placeholder]")
+          .forEach(function (el) {
+            var v = t(el.getAttribute("data-i18n-placeholder"));
+            if (v !== el.getAttribute("data-i18n-placeholder"))
+              el.placeholder = v;
+          });
+        document
+          .querySelectorAll("[data-i18n-title]")
+          .forEach(function (el) {
+            var v = t(el.getAttribute("data-i18n-title"));
+            if (v !== el.getAttribute("data-i18n-title")) el.title = v;
+          });
+        document.documentElement.lang = t("html.lang");
+      }
+    </script>
   </head>
   <body>
     <div id="app">
       <div id="import-overlay" class="import-overlay">
         <div class="import-overlay-content">
           <div class="import-spinner"></div>
-          <p>导入词库中，请稍候...</p>
+          <p data-i18n="import_overlay">导入词库中，请稍候...</p>
         </div>
       </div>
       <header>
         <div class="header-logo">
           <h1>StanzaWeaver</h1>
-          <p class="slogan">以智识，巧织诗</p>
+          <p class="slogan" data-i18n="header.slogan">以智识，巧织诗</p>
         </div>
         <div class="header-right">
-          <button id="btn-ping" class="btn-ping" title="检查连接">&#8635;</button>
+          <button id="btn-ping" class="btn-ping" data-i18n-title="header.ping_title" title="检查连接">&#8635;</button>
           <span class="ai-status-label">AI</span>
           <span id="llm-status-dot" class="llm-dot"></span>
           <span id="llm-status-text" class="llm-status-text"></span>
-          <button id="btn-config" class="btn-icon" title="LLM配置">
+          <button id="btn-config" class="btn-icon" data-i18n-title="header.config_title" title="LLM配置">
             &#9881;
           </button>
         </div>
@@ -46,38 +85,39 @@
       <main>
         <section class="input-section">
           <div class="field">
-            <label>主题</label>
+            <label data-i18n="topic.label">主题</label>
             <textarea
               id="topic"
+              data-i18n-placeholder="topic.placeholder"
               placeholder="输入你想写的诗歌主题...也可以粘贴一首诗让AI帮忙修改"
             ></textarea>
           </div>
           <div class="field field-inline">
-            <label>格律</label>
+            <label data-i18n="template.label">格律</label>
             <select id="template-select">
-              <option value="">-- 选择模板 --</option>
+              <option value="" data-i18n="template.default_option">-- 选择模板 --</option>
             </select>
-            <button id="btn-custom-template" class="btn-secondary btn-small">
+            <button id="btn-custom-template" class="btn-secondary btn-small" data-i18n="template.custom">
               + 自定义
             </button>
           </div>
           <div class="actions">
-            <button id="btn-generate" class="btn-primary">开始生成</button>
+            <button id="btn-generate" class="btn-primary" data-i18n="generate.button">开始生成</button>
           </div>
         </section>
 
         <section id="progress-section" class="hidden card">
-          <div class="section-header">生成进度</div>
+          <div class="section-header" data-i18n="progress.title">生成进度</div>
           <div id="progress-list"></div>
         </section>
 
         <section id="poem-section" class="hidden card">
           <div class="section-header-row">
-            <span class="section-header">诗稿</span>
-            <button id="btn-copy" class="btn-copy" title="复制诗稿">
+            <span class="section-header" data-i18n="poem.title">诗稿</span>
+            <button id="btn-copy" class="btn-copy" data-i18n-title="poem.copy_title" title="复制诗稿">
               &#128203;
             </button>
-            <button id="btn-history" class="btn-history-link" title="历史记录">
+            <button id="btn-history" class="btn-history-link" data-i18n-title="poem.history_title" title="历史记录">
               &#128220;
             </button>
           </div>
@@ -88,18 +128,19 @@
 
         <section id="feedback-section" class="hidden card">
           <div class="feedback-buttons">
-            <button id="btn-accept" class="btn-accept">定稿</button>
-            <button id="btn-reject" class="btn-reject">不定稿</button>
+            <button id="btn-accept" class="btn-accept" data-i18n="review.accept">定稿</button>
+            <button id="btn-reject" class="btn-reject" data-i18n="review.reject">不定稿</button>
           </div>
           <div id="feedback-input-area" class="hidden">
             <div class="field">
               <input
                 type="text"
                 id="user-feedback"
+                data-i18n-placeholder="feedback.placeholder"
                 placeholder="输入修改意见..."
               />
             </div>
-            <button id="btn-feedback" class="btn-send">发送反馈</button>
+            <button id="btn-feedback" class="btn-send" data-i18n="feedback.button">发送反馈</button>
           </div>
         </section>
       </main>
@@ -107,77 +148,85 @@
 
     <div id="config-modal" class="modal hidden">
       <div class="modal-content">
-        <h2>LLM 配置</h2>
+        <h2 data-i18n="config_modal.title">LLM 配置</h2>
         <div class="config-group">
-          <h3>编写AI</h3>
+          <label><span data-i18n="config_modal.language">语言</span>
+            <select id="cfg-language">
+              <option value="zh" data-i18n="config_modal.lang_zh">汉语</option>
+              <option value="en" data-i18n="config_modal.lang_en">英语</option>
+            </select>
+          </label>
+        </div>
+        <div class="config-group">
           <label>Base URL <input type="text" id="cfg-writer-url" /></label>
           <label>API Key <input type="password" id="cfg-writer-key" /></label>
           <label>Model <input type="text" id="cfg-writer-model" /></label>
         </div>
         <div class="config-group">
-          <h3>检查AI</h3>
+          <h3 data-i18n="config_modal.checker">检查AI</h3>
           <label>Base URL <input type="text" id="cfg-checker-url" /></label>
           <label>API Key <input type="password" id="cfg-checker-key" /></label>
           <label>Model <input type="text" id="cfg-checker-model" /></label>
         </div>
         <div class="modal-actions">
-          <button id="btn-save-config" class="btn-primary">保存</button>
-          <button id="btn-close-config" class="btn-secondary">取消</button>
+          <button id="btn-save-config" class="btn-primary" data-i18n="config_modal.save">保存</button>
+          <button id="btn-close-config" class="btn-secondary" data-i18n="config_modal.cancel">取消</button>
         </div>
       </div>
     </div>
 
     <div id="history-modal" class="modal hidden">
       <div class="modal-content modal-wide">
-        <h2>历史记录</h2>
+        <h2 data-i18n="history_modal.title">历史记录</h2>
         <div id="history-list" class="history-list"></div>
         <div class="modal-actions">
-          <button id="btn-close-history" class="btn-secondary">关闭</button>
+          <button id="btn-close-history" class="btn-secondary" data-i18n="history_modal.close">关闭</button>
         </div>
       </div>
     </div>
 
     <div id="template-modal" class="modal hidden">
       <div class="modal-content modal-wide">
-        <h2>自定义格律模板</h2>
+        <h2 data-i18n="template_modal.title">自定义格律模板</h2>
         <div class="config-group">
           <label
-            >模板名称
-            <input type="text" id="tmpl-name" placeholder="如：浣溪沙"
+            ><span data-i18n="template_modal.name_label">模板名称</span>
+            <input type="text" id="tmpl-name" data-i18n-placeholder="template_modal.name_placeholder" placeholder="如：浣溪沙"
           /></label>
         </div>
         <div class="config-group config-row">
           <label
-            >语言
+            ><span data-i18n="template_modal.language_label">语言</span>
             <select id="tmpl-language">
-              <option value="zh">汉语</option>
-              <option value="en">英语</option>
+              <option value="zh" data-i18n="template_modal.lang_zh">汉语</option>
+              <option value="en" data-i18n="template_modal.lang_en">英语</option>
             </select>
           </label>
           <label
-            >行数
+            ><span data-i18n="template_modal.lines_label">行数</span>
             <input type="number" id="tmpl-lines" value="4" min="1" max="30"
           /></label>
           <label
-            >每行音节
+            ><span data-i18n="template_modal.syllables_label">每行音节</span>
             <input
               type="text"
               id="tmpl-syl-per-line"
               value="7,7,7,7"
+              data-i18n-placeholder="template_modal.syllables_placeholder"
               placeholder="逗号分隔"
           /></label>
         </div>
         <div class="config-group">
-          <div class="section-header" style="margin-top: 8px">每行音节约束</div>
+          <div class="section-header" style="margin-top: 8px" data-i18n="template_modal.constraints_title">每行音节约束</div>
           <div id="tmpl-syllable-table" class="syllable-table"></div>
         </div>
         <div class="config-group">
-          <label>自定义检测代码（Python，可选）</label>
+          <label data-i18n="template_modal.custom_code_label">自定义检测代码（Python，可选）</label>
           <div id="tmpl-code" class="code-editor"></div>
         </div>
         <div class="modal-actions">
-          <button id="btn-create-template" class="btn-primary">生成模板</button>
-          <button id="btn-close-template" class="btn-secondary">取消</button>
+          <button id="btn-create-template" class="btn-primary" data-i18n="template_modal.create">生成模板</button>
+          <button id="btn-close-template" class="btn-secondary" data-i18n="template_modal.cancel">取消</button>
         </div>
       </div>
     </div>
@@ -194,21 +243,36 @@
       let isGenerating = false;
       let lastPoem = [];
       let currentStep = "";
-      const STEP_NAMES = {
-        step1_description: "生成描述",
-        step2_draft: "生成初稿",
-        step3_refine: "炼句优化",
-        step4_check: "终审",
+      var STEP_NAMES = {
+        1: "生成描述",
+        2: "生成初稿",
+        3: "炼句优化",
+        4: "终审",
       };
-      const STEP_ORDER = [
-        "step1_description",
-        "step2_draft",
-        "step3_refine",
-        "step4_check",
-      ];
+      const STEP_ORDER = [1, 2, 3, 4];
 
       document.addEventListener("DOMContentLoaded", () => {
-        loadTemplates();
+        fetch("/api/config", { headers: csrfHeaders() })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (cfg) {
+            CURRENT_LANG = cfg.language || "zh";
+            return fetch("/api/i18n/" + CURRENT_LANG);
+          })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            I18N = data;
+            STEP_NAMES[1] = t("steps.step1_description");
+            STEP_NAMES[2] = t("steps.step2_draft");
+            STEP_NAMES[3] = t("steps.step3_refine");
+            STEP_NAMES[4] = t("steps.step4_check");
+            applyI18N();
+            loadTemplates();
+          });
+
         document
           .getElementById("btn-generate")
           .addEventListener("click", startGenerate);
@@ -321,7 +385,7 @@
           .then((r) => r.json())
           .then((templates) => {
             const select = document.getElementById("template-select");
-            select.innerHTML = '<option value="">-- 选择模板 --</option>';
+            select.innerHTML = '<option value="">' + t("template.default_option") + '</option>';
             templates.forEach((t) => {
               const opt = document.createElement("option");
               opt.value = t.key;
@@ -364,7 +428,7 @@
         var disabled = false;
         if (data.writer === "error" || data.checker === "error") {
           dot.classList.add("llm-dot-error");
-          text.textContent = "连接失败";
+          text.textContent = t("status.connection_failed");
           disabled = true;
         } else if (data.writer === "ok" && data.checker === "ok") {
           dot.classList.add("llm-dot-ok");
@@ -396,11 +460,11 @@
         const topic = document.getElementById("topic").value.trim();
         const templateKey = getSelectedTemplate();
         if (!topic) {
-          showToast("请输入主题", "warning");
+          showToast(t("toast.enter_topic"), "warning");
           return;
         }
         if (!templateKey) {
-          showToast("请选择格律模板", "warning");
+          showToast(t("toast.select_template"), "warning");
           return;
         }
 
@@ -446,7 +510,7 @@
 
       function acceptFinal() {
         document.getElementById("feedback-section").classList.add("hidden");
-        showToast("诗歌定稿完成！感谢使用 StanzaWeaver。", "success");
+        showToast(t("toast.accept_success"), "success");
       }
 
       function updateStepDot(stepKey, state) {
@@ -488,7 +552,7 @@
           const label = document.createElement("div");
           label.className = "step-record-label";
           label.textContent =
-            (d.title || "") + (count > 1 ? "（第" + count + "次）" : "");
+            (d.title || "") + (count > 1 ? t("round", {count: count}) : "");
           rec.appendChild(label);
           const pre = document.createElement("pre");
           pre.textContent = d.content;
@@ -548,11 +612,11 @@
           const ts = document.getElementById("tool-status");
           ts.classList.remove("hidden");
           const toolNames = {
-            search_words: "搜索候选词",
-            refine_line: "修改某行",
-            rewrite: "整体重写",
-            submit: "提交评审",
-            _thinking: "思考",
+            search_words: t("tools.search_words"),
+            refine_line: t("tools.refine_line"),
+            rewrite: t("tools.rewrite"),
+            submit: t("tools.submit"),
+            _thinking: t("tools.thinking"),
           };
           ts.innerHTML =
             '<span class="tool-label">' +
@@ -641,10 +705,10 @@
         checkerInline.classList.remove("hidden");
         if (data.checker_pass) {
           checkerInline.innerHTML =
-            '<div class="checker-pass">&#10004; 终审通过</div>';
+            '<div class="checker-pass">&#10004; ' + t("checker.pass") + '</div>';
         } else {
           checkerInline.innerHTML =
-            '<div class="checker-fail">&#10008; 未通过</div>';
+            '<div class="checker-fail">&#10008; ' + t("checker.fail") + '</div>';
           if (data.checker_suggestions) {
             checkerInline.innerHTML +=
               '<div class="checker-detail">' +
@@ -662,7 +726,7 @@
             STEP_ORDER.forEach((k) => updateStepDot(k, "done"));
           } else {
             STEP_ORDER.forEach((k) => updateStepDot(k, "done"));
-            updateStepDot("step4_check", "failed");
+            updateStepDot(4, "failed");
           }
         }
 
@@ -692,7 +756,7 @@
       }
 
       function handleError(data) {
-        showToast(data.message || "发生错误", "error");
+        showToast(data.message || t("toast.error_default"), "error");
         document.getElementById("btn-generate").disabled = false;
         document.getElementById("btn-feedback").disabled = false;
         isGenerating = false;
@@ -714,6 +778,8 @@
               cfg.checker.api_key;
             document.getElementById("cfg-checker-model").value =
               cfg.checker.model;
+            document.getElementById("cfg-language").value =
+              cfg.language || "zh";
           });
         document.getElementById("config-modal").classList.remove("hidden");
       }
@@ -734,7 +800,9 @@
             api_key: document.getElementById("cfg-checker-key").value,
             model: document.getElementById("cfg-checker-model").value,
           },
+          language: document.getElementById("cfg-language").value,
         };
+        var prevLang = CURRENT_LANG;
         fetch("/api/config", {
           method: "POST",
           headers: Object.assign(
@@ -746,7 +814,11 @@
           .then((r) => r.json())
           .then(() => {
             closeConfig();
-            showToast("配置已保存", "success");
+            if (data.language !== prevLang) {
+              location.reload();
+            } else {
+              showToast(t("toast.config_saved"), "success");
+            }
           });
       }
 
@@ -776,7 +848,7 @@
           .then(function (data) {
             const list = document.getElementById("history-list");
             if (data.length === 0) {
-              list.innerHTML = '<p class="history-empty">暂无记录</p>';
+              list.innerHTML = '<p class="history-empty">' + t("history_modal.empty") + '</p>';
               return;
             }
             list.innerHTML = "";
@@ -868,7 +940,7 @@
           row.className = "syl-row";
           const label = document.createElement("span");
           label.className = "syl-row-label";
-          label.textContent = "第" + (i + 1) + "行";
+          label.textContent = t("line_label", {n: i + 1});
           row.appendChild(label);
           const cnt = sylCounts[i] || 7;
           for (let j = 0; j < cnt; j++) {
@@ -878,10 +950,10 @@
             sel.dataset.pos = j;
             if (lang === "zh") {
               sel.innerHTML =
-                '<option value="">自由</option><option value="平">平</option><option value="仄">仄</option>';
+                '<option value="">' + t("syllable_constraints.free") + '</option><option value="平">' + t("syllable_constraints.light") + '</option><option value="仄">' + t("syllable_constraints.heavy") + '</option>';
             } else {
               sel.innerHTML =
-                '<option value="">自由</option><option value="light">light</option><option value="heavy">heavy</option>';
+                '<option value="">' + t("syllable_constraints.free") + '</option><option value="light">' + t("syllable_constraints.light") + '</option><option value="heavy">' + t("syllable_constraints.heavy") + '</option>';
             }
             row.appendChild(sel);
           }
@@ -892,7 +964,7 @@
       function createTemplate() {
         const name = document.getElementById("tmpl-name").value.trim();
         if (!name) {
-          showToast("请输入模板名称", "warning");
+          showToast(t("toast.empty_name"), "warning");
           return;
         }
         const language = document.getElementById("tmpl-language").value;

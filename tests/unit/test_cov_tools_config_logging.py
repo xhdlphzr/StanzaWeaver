@@ -177,6 +177,43 @@ def test_config_update(tmp_path: Path) -> None:
     assert cfg._data == {"a": 1, "b": 2}
 
 
+def test_config_language_default(tmp_path: Path) -> None:
+    """language 属性默认返回 zh。"""
+    cfg = config_module.Config(config_path=tmp_path / "c.json")
+    assert cfg.language == "zh"
+
+
+def test_config_language_zh(tmp_path: Path) -> None:
+    """language 属性返回 zh。"""
+    cfg = config_module.Config(config_path=tmp_path / "c.json")
+    cfg._data = {"language": "zh"}
+    cfg._loaded = True
+    assert cfg.language == "zh"
+
+
+def test_config_language_en(tmp_path: Path) -> None:
+    """language 属性返回 en。"""
+    cfg = config_module.Config(config_path=tmp_path / "c.json")
+    cfg._data = {"language": "en"}
+    cfg._loaded = True
+    assert cfg.language == "en"
+
+
+def test_config_language_invalid_fallback(tmp_path: Path) -> None:
+    """language 属性无效值回退 zh（覆盖 137）。"""
+    cfg = config_module.Config(config_path=tmp_path / "c.json")
+    cfg._data = {"language": "fr"}
+    cfg._loaded = True
+    assert cfg.language == "zh"
+
+
+def test_config_language_setter(tmp_path: Path) -> None:
+    """language setter 写入数据（覆盖 147-148）。"""
+    cfg = config_module.Config(config_path=tmp_path / "c.json")
+    cfg.language = "en"
+    assert cfg._data["language"] == "en"
+
+
 def test_reset_config(tmp_path: Path) -> None:
     """reset_config 清空全局单例（覆盖 165）。"""
     config_module.get_config()
