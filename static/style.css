@@ -120,6 +120,71 @@ header h1 {
   transform: rotate(30deg);
 }
 
+/* ---- LLM 连通性指示灯 ---- */
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-ping {
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(139, 115, 85, 0.2);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #6b5d4e;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-ping:hover {
+  background: rgba(139, 115, 85, 0.1);
+  border-color: rgba(139, 115, 85, 0.35);
+}
+
+.ai-status-label {
+  font-size: 13px;
+  color: #8b7355;
+  font-weight: 500;
+}
+
+.llm-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #d4c9b5;
+  transition: all 0.4s;
+  flex-shrink: 0;
+}
+
+.llm-dot-ok {
+  background: #5a8a3c;
+  animation: dot-breathing 1.6s ease-in-out infinite;
+}
+
+.llm-dot-error {
+  background: #b3402e;
+  box-shadow: 0 0 0 3px rgba(179, 64, 46, 0.15);
+}
+
+.llm-dot-checking {
+  background: #5a8a3c;
+  animation: dot-breathing 1.6s ease-in-out infinite;
+}
+
+.llm-status-text {
+  font-size: 12px;
+  color: #b3402e;
+  white-space: nowrap;
+}
+
 /* ---- 卡片基础样式 ---- */
 
 .card {
