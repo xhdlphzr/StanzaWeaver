@@ -91,7 +91,11 @@ _register_custom_templates()
 
 @app.before_request
 def _guard_local_access() -> Any:
-    """仅允许本机访问（Host 校验）。"""
+    """仅允许本机访问（Host 校验）。
+
+    Returns:
+        None 表示通过；jsonify Response 表示拒绝（403）。
+    """
     host = request.host or ""
     if not host.startswith(("127.0.0.1", "localhost")):
         return jsonify({"status": "error", "message": "拒绝非本机访问"}), 403
@@ -109,25 +113,44 @@ def _require_csrf() -> bool:
 
 @app.route("/api/import-status")
 def api_import_status() -> Any:
-    """查询词库导入状态。"""
+    """查询词库导入状态。
+
+    Returns:
+        JSON Response，含 importing 布尔字段。
+    """
     return jsonify({"importing": _vocab_importing})
 
 
 @app.route("/")
 def index() -> str:
-    """主页面（注入 CSRF 令牌）。"""
+    """主页面（注入 CSRF 令牌）。
+
+    Returns:
+        渲染后的 HTML 字符串。
+    """
     return render_template("index.html", csrf_token=_CSRF_TOKEN)
 
 
 @app.route("/api/templates")
 def api_templates() -> Any:
-    """模板列表接口。"""
+    """模板列表接口。
+
+    Returns:
+        JSON Response，模板字典列表。
+    """
     return jsonify(list_dicts())
 
 
 @app.route("/api/config", methods=["GET"])
 def api_get_config() -> Any:
-    """读取 LLM 配置。"""
+    """读取 LLM 配置。
+
+    Returns:
+        JSON Response，含 writer 和 checker 端点配置。
+
+    Raises:
+        403: CSRF 令牌校验失败。
+    """
     if not _require_csrf():
         return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
     from src.config import get_config
@@ -143,7 +166,15 @@ def api_get_config() -> Any:
 
 @app.route("/api/config", methods=["POST"])
 def api_save_config() -> Any:
-    """保存 LLM 配置。"""
+    """保存 LLM 配置。
+
+    Returns:
+        JSON Response（成功或错误）。
+
+    Raises:
+        400: 请求格式错误。
+        403: CSRF 令牌校验失败。
+    """
     if not _require_csrf():
         return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
     from src.config import get_config
@@ -171,7 +202,10 @@ def api_save_config() -> Any:
 
 @socketio.on("connect")  # type: ignore[untyped-decorator]
 def handle_connect() -> None:
-    """Socket 连接建立。"""
+    """Socket 连接建立。
+
+    无返回值，无副作用。
+    """
 
 
 def _emit_done(session_id: str, result: Any) -> None:
@@ -292,7 +326,15 @@ def handle_disconnect() -> None:
 
 @app.route("/api/templates/custom", methods=["POST"])
 def api_create_custom_template() -> Any:
-    """创建自定义格律模板（落盘为 src/templates/custom_*.py 并热注册）。"""
+    """创建自定义格律模板（落盘为 src/templates/custom_*.py 并热注册）。
+
+    Returns:
+        JSON Response（成功含模板 key，或错误信息）。
+
+    Raises:
+        400: 请求格式错误或模板代码无效。
+        403: CSRF 令牌校验失败。
+    """
     import importlib
     import re
     from pathlib import Path
@@ -435,7 +477,11 @@ def _init_history_db() -> None:
 
 @app.route("/api/history", methods=["GET"])
 def api_get_history() -> Any:
-    """读取历史记录（最近 50 条）。"""
+    """读取历史记录（最近 50 条）。
+
+    Returns:
+        JSON Response，历史记录列表。
+    """
     import sqlite3
 
     _init_history_db()
@@ -461,7 +507,15 @@ def api_get_history() -> Any:
 
 @app.route("/api/history", methods=["POST"])
 def api_save_history() -> Any:
-    """保存历史记录（定稿后由前端调用）。"""
+    """保存历史记录（定稿后由前端调用）。
+
+    Returns:
+        JSON Response（成功或错误）。
+
+    Raises:
+        400: 请求格式错误。
+        403: CSRF 令牌校验失败。
+    """
     import sqlite3
 
     if not _require_csrf():
@@ -495,9 +549,6 @@ def start_server() -> None:
 
     监听地址/端口可用环境变量 STANZAWEAVER_HOST / STANZAWEAVER_PORT 覆盖
     （Docker 部署时设 STANZAWEAVER_HOST=0.0.0.0 配合端口映射）。
-
-    Returns:
-        None（阻塞运行直到退出）。
     """
     host = os.environ.get("STANZAWEAVER_HOST", "127.0.0.1")
     try:
