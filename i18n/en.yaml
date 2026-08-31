@@ -1,0 +1,103 @@
+html:
+  lang: en
+
+import_overlay: Importing vocabulary, please wait...
+
+header:
+  slogan: Weaving Stanzas with Wisdom
+  ping_title: Check connection
+  config_title: LLM Configuration
+
+topic:
+  label: Topic
+  placeholder: Enter the poem topic... or paste a poem for AI to refine
+
+template:
+  label: Meter
+  default_option: "-- Select template --"
+  custom: "+ Custom"
+
+generate:
+  button: Generate
+
+progress:
+  title: Generation Progress
+
+poem:
+  title: Poem
+  copy_title: Copy poem
+  history_title: History
+
+review:
+  accept: Accept
+  reject: Reject
+
+feedback:
+  placeholder: Enter feedback...
+  button: Send Feedback
+
+config_modal:
+  title: LLM Configuration
+  language: Language
+  lang_zh: Chinese
+  lang_en: English
+  writer: Writer AI
+  checker: Checker AI
+  save: Save
+  cancel: Cancel
+
+history_modal:
+  title: History
+  close: Close
+  empty: No records yet
+
+template_modal:
+  title: Custom Meter Template
+  name_label: Template Name
+  name_placeholder: "e.g. Haunxisha"
+  language_label: Language
+  lang_zh: Chinese
+  lang_en: English
+  lines_label: Lines
+  syllables_label: Syllables per line
+  syllables_placeholder: comma separated
+  constraints_title: Syllable constraints per line
+  custom_code_label: Custom validation code (Python, optional)
+  create: Create Template
+  cancel: Cancel
+
+steps:
+  step1_description: Describe
+  step2_draft: Draft
+  step3_refine: Refine
+  step4_check: Review
+
+tools:
+  search_words: Search words
+  refine_line: Refine line
+  rewrite: Rewrite
+  submit: Submit
+  thinking: Thinking
+
+checker:
+  pass: Approved
+  fail: Not approved
+
+toast:
+  enter_topic: Please enter a topic
+  select_template: Please select a meter template
+  accept_success: Poem finalized! Thank you for using StanzaWeaver.
+  config_saved: Configuration saved
+  empty_name: Please enter a template name
+  error_default: An error occurred
+
+status:
+  connection_failed: Connection failed
+
+round: "(Round {count})"
+line_label: "Line {n}"
+
+syllable_constraints:
+  free: Free
+  light: light
+  heavy: heavy

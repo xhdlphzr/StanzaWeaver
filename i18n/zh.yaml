@@ -1,0 +1,103 @@
+html:
+  lang: zh-CN
+
+import_overlay: 导入词库中，请稍候...
+
+header:
+  slogan: 以智识，巧织诗
+  ping_title: 检查连接
+  config_title: LLM配置
+
+topic:
+  label: 主题
+  placeholder: 输入你想写的诗歌主题...也可以粘贴一首诗让AI帮忙修改
+
+template:
+  label: 格律
+  default_option: "-- 选择模板 --"
+  custom: "+ 自定义"
+
+generate:
+  button: 开始生成
+
+progress:
+  title: 生成进度
+
+poem:
+  title: 诗稿
+  copy_title: 复制诗稿
+  history_title: 历史记录
+
+review:
+  accept: 定稿
+  reject: 不定稿
+
+feedback:
+  placeholder: 输入修改意见...
+  button: 发送反馈
+
+config_modal:
+  title: LLM 配置
+  language: 语言
+  lang_zh: 汉语
+  lang_en: 英语
+  writer: 编写AI
+  checker: 检查AI
+  save: 保存
+  cancel: 取消
+
+history_modal:
+  title: 历史记录
+  close: 关闭
+  empty: 暂无记录
+
+template_modal:
+  title: 自定义格律模板
+  name_label: 模板名称
+  name_placeholder: "如：浣溪沙"
+  language_label: 语言
+  lang_zh: 汉语
+  lang_en: 英语
+  lines_label: 行数
+  syllables_label: 每行音节
+  syllables_placeholder: 逗号分隔
+  constraints_title: 每行音节约束
+  custom_code_label: 自定义检测代码（Python，可选）
+  create: 生成模板
+  cancel: 取消
+
+steps:
+  step1_description: 生成描述
+  step2_draft: 生成初稿
+  step3_refine: 炼句优化
+  step4_check: 终审
+
+tools:
+  search_words: 搜索候选词
+  refine_line: 修改某行
+  rewrite: 整体重写
+  submit: 提交评审
+  thinking: 思考
+
+checker:
+  pass: 终审通过
+  fail: 未通过
+
+toast:
+  enter_topic: 请输入主题
+  select_template: 请选择格律模板
+  accept_success: 诗歌定稿完成！感谢使用 StanzaWeaver。
+  config_saved: 配置已保存
+  empty_name: 请输入模板名称
+  error_default: 发生错误
+
+status:
+  connection_failed: 连接失败
+
+round: "（第{count}次）"
+line_label: "第{n}行"
+
+syllable_constraints:
+  free: 自由
+  light: 平
+  heavy: 仄

@@ -125,6 +125,29 @@ class Config:
         self._data["checker"] = value
 
     @property
+    def language(self) -> str:
+        """界面语言（"zh" 或 "en"，缺省 "zh"）。
+
+        Returns:
+            语言代码。
+        """
+        self._ensure_loaded()
+        lang: str = str(self._data.get("language", "zh"))
+        if lang not in ("zh", "en"):
+            lang = "zh"
+        return lang
+
+    @language.setter
+    def language(self, value: str) -> None:
+        """设置界面语言。
+
+        Args:
+            value: 语言代码（"zh" 或 "en"）。
+        """
+        self._ensure_loaded()
+        self._data["language"] = value
+
+    @property
     def data(self) -> dict[str, Any]:
         """原始配置数据。
 

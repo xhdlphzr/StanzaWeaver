@@ -38,13 +38,13 @@ class PipelineState:
     checker_pass: bool = False
     checker_suggestions: str = ""
     user_feedback: str = ""
-    current_step: str = ""
+    current_step: int = 0
     final_poem: list[str] = field(default_factory=list)
     step_details: list[dict[str, Any]] = field(default_factory=list)
     last_tool: str = ""
     last_tool_result: str = ""
     stream_text: str = ""
-    current_detail_step: str = ""
+    current_detail_step: int = 0
     current_detail: str = ""
 
 
@@ -189,9 +189,9 @@ class PoetryPipeline:
 
     def _run_step1(self, state: PipelineState) -> None:
         """Step 1：生成现代文描述（流式推送）。"""
-        state.current_step = "step1_description"
+        state.current_step = 1
         state.stream_text = ""
-        state.current_detail_step = "step1_description"
+        state.current_detail_step = 1
         state.current_detail = ""
         self._report(state)
 
@@ -218,7 +218,7 @@ class PoetryPipeline:
         state.current_detail = ""
         self._append_detail(
             state,
-            step="step1_description",
+            step=1,
             title="Step 1: 生成现代文描述",
             content=detail,
         )
@@ -226,9 +226,9 @@ class PoetryPipeline:
 
     def _run_step2(self, state: PipelineState) -> None:
         """Step 2：生成初稿（仅校验行数/音节数）。"""
-        state.current_step = "step2_draft"
+        state.current_step = 2
         state.stream_text = ""
-        state.current_detail_step = "step2_draft"
+        state.current_detail_step = 2
         state.current_detail = ""
         self._report(state)
 
@@ -254,7 +254,7 @@ class PoetryPipeline:
         state.stream_text = ""
         self._append_detail(
             state,
-            step="step2_draft",
+            step=2,
             title="Step 2: 生成初稿",
             content=detail,
         )
@@ -269,7 +269,7 @@ class PoetryPipeline:
         checker_feedback = state.user_feedback
 
         while True:
-            state.current_step = "step3_refine"
+            state.current_step = 3
             self._report(state)
 
             def on_step(step_info: dict[str, Any]) -> None:
@@ -283,7 +283,7 @@ class PoetryPipeline:
                 state.last_tool_result = json_dumps_safe(
                     step_info.get("last_result", "")
                 )
-                state.current_detail_step = "step3_refine"
+                state.current_detail_step = 3
                 state.current_detail = str(step_info.get("detail", ""))
                 state.stream_text = str(step_info.get("stream_text", state.stream_text))
                 self._report(state)
@@ -321,7 +321,7 @@ class PoetryPipeline:
             state.refine_rounds += tool_rounds
             self._append_detail(
                 state,
-                step="step3_refine",
+                step=3,
                 title="Step 3: 炼句优化",
                 content=detail,
                 rounds=state.refine_rounds,
@@ -335,7 +335,7 @@ class PoetryPipeline:
                 self._report(state)
                 break
 
-            state.current_step = "step4_check"
+            state.current_step = 4
             state.stream_text = ""
             self._report(state)
 
@@ -353,7 +353,7 @@ class PoetryPipeline:
 
             self._append_detail(
                 state,
-                step="step4_check",
+                step=4,
                 title="Step 4: 检查AI终审",
                 content=f"pass={state.checker_pass}\n{state.checker_suggestions}",
             )

@@ -85,6 +85,36 @@ def test_config_requires_csrf(client: FlaskClient) -> None:
     assert resp.status_code == 200
     data = resp.get_json()
     assert "writer" in data and "checker" in data
+    assert "language" in data
+    assert data["language"] in ("zh", "en")
+
+
+def test_i18n_zh(client: FlaskClient) -> None:
+    """验证中文翻译接口。"""
+    resp = client.get("/api/i18n/zh")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "html" in data
+    assert data["html"]["lang"] == "zh-CN"
+    assert "generate" in data
+
+
+def test_i18n_en(client: FlaskClient) -> None:
+    """验证英文翻译接口。"""
+    resp = client.get("/api/i18n/en")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "html" in data
+    assert data["html"]["lang"] == "en"
+    assert "generate" in data
+
+
+def test_i18n_unknown_fallback(client: FlaskClient) -> None:
+    """验证未知语言回退到中文。"""
+    resp = client.get("/api/i18n/fr")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["html"]["lang"] == "zh-CN"
 
 
 def test_history_get(client: FlaskClient) -> None:
