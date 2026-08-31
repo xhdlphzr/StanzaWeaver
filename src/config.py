@@ -132,9 +132,9 @@ class Config:
             语言代码。
         """
         self._ensure_loaded()
-        lang: str = str(self._data.get("language", "zh"))
+        lang: str = str(self._data.get("language", "en"))
         if lang not in ("zh", "en"):
-            lang = "zh"
+            lang = "en"
         return lang
 
     @language.setter
