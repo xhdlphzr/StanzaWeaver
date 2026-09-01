@@ -9,10 +9,10 @@
 #   - mypy --strict ./         类型检查（零容忍）
 #   - pytest                   单元测试 + 集成测试（桩 LLM，无网络）
 #
-# CD  (持续交付): CI 全部通过后，仅对主分支打包，产物上传为 artifact
-#   - Windows : pyinstaller StanzaWeaver.spec --clean        -> dist/StanzaWeaver/ (onedir)
-#   - macOS   : pyinstaller StanzaWeaver.spec --clean        -> dist/StanzaWeaver/ (onedir)
-#   - Linux   : pyinstaller StanzaWeaver.spec --clean        -> dist/StanzaWeaver/ (onedir)
+# CD  (持续交付): Release 发布时触发，三平台打包并上传分卷 zip 到 Release 附件
+#   - Windows : pyinstaller StanzaWeaver.spec --clean -> zip -s 1g 分卷
+#   - macOS   : pyinstaller StanzaWeaver.spec --clean -> zip -s 1g 分卷
+#   - Linux   : pyinstaller StanzaWeaver.spec --clean -> zip -s 1g 分卷
 #
 # 注: 本地 venv 与 Dockerfile 均使用 Python 3.14，故 CI 统一锁定 3.14。
 
@@ -27,9 +27,11 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  release:
+    types: [published]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   # ------------------------------------------------------------------
@@ -69,13 +71,12 @@ jobs:
         run: pytest
 
   # ------------------------------------------------------------------
-  # CD: 仅主分支，测试通过后跨平台打包（matrix.os）
+  # CD: Release 发布时触发，测试通过后跨平台打包并上传分卷 zip
   # ------------------------------------------------------------------
   build:
     name: Build (${{ matrix.os }})
     needs: ci
-    # 仅主分支触发打包（PR 不发布产物）
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    if: github.event_name == 'release'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -95,33 +96,25 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+
+      - name: Install zip (Windows)
+        if: runner.os == 'Windows'
+        run: choco install zip -y
+
+      - name: Install zip (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y zip
 
       # ---------- Windows / macOS / Linux: PyInstaller 出包（onedir 目录） ----------
       - name: Build with PyInstaller
         run: pyinstaller StanzaWeaver.spec --clean
 
-      # ---------- 上传产物（分别命名以便后续发布；onedir 上传整个目录） ----------
-      - name: Upload Windows artifact
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: StanzaWeaver-Windows
-          path: dist/StanzaWeaver
-          if-no-files-found: error
+      # ---------- 分卷压缩（统一 zip -s 1g） ----------
+      - name: Compress into 1GB volumes
+        run: cd dist && zip -s 1g -r StanzaWeaver-${{ runner.os }}.zip StanzaWeaver/
 
-      - name: Upload macOS artifact
-        if: matrix.os == 'macos-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: StanzaWeaver-macOS
-          path: dist/StanzaWeaver
-          if-no-files-found: error
-
-      - name: Upload Linux artifact
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: StanzaWeaver-Linux
-          path: dist/StanzaWeaver
-          if-no-files-found: error
+      # ---------- 上传到 Release 附件 ----------
+      - name: Upload to Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/StanzaWeaver-${{ runner.os }}.zip* --repo "${{ github.repository }}" --clobber
