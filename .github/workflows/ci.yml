@@ -115,6 +115,7 @@ jobs:
 
       # ---------- 上传到 Release 附件 ----------
       - name: Upload to Release
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.event.release.tag_name }}" dist/StanzaWeaver-${{ runner.os }}.zip* --repo "${{ github.repository }}" --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/StanzaWeaver-${{ runner.os }}.z* --repo "${{ github.repository }}" --clobber
