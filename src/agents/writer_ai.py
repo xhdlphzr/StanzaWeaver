@@ -6,6 +6,9 @@
 炼句循环无轮数上限：AI 反复调用 search_words/refine_line/rewrite
 修改诗句（每次修改后自动跑全部格律校验），直到调用 submit 提交。
 连续多轮无进展时注入引导提示（不中断循环）。
+
+当对话 token 数超过 COMPRESS_THRESHOLD 时自动压缩历史并重开新对话，
+保留结构化摘要（目标/重要细节/工作状态/下一步行动）与当前诗稿。
 """
 
 import json
@@ -14,10 +17,13 @@ from typing import Any
 
 from ..prosody.meter_validator import MeterValidator
 from ..templates import format_count
-from ..tools import WRITER_TOOLS
+from ..tools import SUBMIT_TOOL, WRITER_TOOLS
 from ..tools.refine_line import execute_refine_line
 from ..tools.search_words import execute_search_words
 from .base import LLMClient, Message
+
+CONTEXT_LIMIT = 200_000
+COMPRESS_THRESHOLD = 180_000
 
 ChunkCallback = Callable[[str], None] | None
 StepCallback = Callable[[dict[str, Any]], None] | None
@@ -40,61 +46,101 @@ def _fire_stream(cb: ChunkCallback, text: str) -> None:
             pass
 
 
-def _build_writer_system(
-    description: str,
-    poem: list[str],
-    template: dict[str, Any],
-    template_obj: object = None,
-    feedback: str = "",
-) -> str:
-    """构造编写 AI 的系统提示（含完整格律描述与当前诗稿）。
+def _get_constraints_desc(template: dict[str, Any], template_obj: object = None) -> str:
+    """获取格律约束描述文本。
 
     Args:
-        description: 主题描述。
-        poem: 当前诗稿。
         template: 模板字典。
-        template_obj: 模板对象（提供 describe() 时用完整格律描述）。
+        template_obj: 模板对象。
+
+    Returns:
+        格律描述文本。
+    """
+    if template_obj is not None and hasattr(template_obj, "describe"):
+        return str(template_obj.describe())
+    language = str(template.get("language", "zh"))
+    lines = int(template.get("lines", 4))
+    syllables_per_line = template.get("syllables_per_line", [5] * lines)
+    return (
+        f"- 语言: {language}\n- 行数: {lines}\n"
+        f"- 每行音节数: {', '.join(format_count(c) for c in syllables_per_line)}"
+    )
+
+
+def _build_draft_system(language: str, constraints_desc: str) -> str:
+    """构造 Step 2 初稿生成的系统提示。
+
+    Args:
+        language: 语言代码。
+        constraints_desc: 格律约束描述。
+
+    Returns:
+        系统提示文本。
+    """
+    return (
+        f"你是一位精通{language}诗歌创作的AI诗人。\n"
+        "请根据上面的主题描述，按照以下格律要求创作一首诗。\n"
+        "\n"
+        "【格律要求】\n"
+        f"{constraints_desc}\n"
+        "\n"
+        "创作完成后，调用 submit 工具提交诗稿。系统会自动校验行数和音节数，\n"
+        "不通过会返回具体错误，你需要根据错误调整后重新提交。\n"
+        "\n"
+        "你有以下工具可用: submit(提交诗稿)。"
+    )
+
+
+def _build_refine_system(constraints_desc: str, feedback: str = "") -> str:
+    """构造 Step 3 炼句循环的系统提示。
+
+    Args:
+        constraints_desc: 格律约束描述。
         feedback: 用户/检查 AI 反馈。
 
     Returns:
         系统提示文本。
     """
-    language = template.get("language", "zh")
-
-    prompt_parts = [
-        "你是一位精通多语言诗歌创作的AI诗人。",
-        f"当前任务语言: {language}",
-        "",
-        "【诗歌主题描述】",
-        description,
+    parts = [
+        "请对上面的诗稿进行炼句优化。",
         "",
         "【格律要求】",
+        constraints_desc,
+        "",
     ]
-    if template_obj is not None and hasattr(template_obj, "describe"):
-        prompt_parts.append(template_obj.describe())
-    else:
-        from ..templates import describe_template_from_dict
-
-        prompt_parts.append(describe_template_from_dict(template))
-
-    prompt_parts.append("")
-    prompt_parts.append("【当前诗稿】")
-    for i, line in enumerate(poem):
-        prompt_parts.append(f"  [{i}] {line}")
-    prompt_parts.append("")
-
     if feedback:
-        prompt_parts.append(f"【反馈/建议】\n{feedback}\n")
-
-    prompt_parts.append(
-        "你有以下工具可用: search_words(搜候选词), refine_line(重写某一行), rewrite(整体重写全诗), submit(提交定稿)。"
+        parts.extend(["【反馈/建议】", feedback, ""])
+    parts.extend(
+        [
+            (
+                "你有以下工具可用: search_words(搜候选词), refine_line(重写某一行),"
+                " rewrite(整体重写全诗), submit(提交定稿)。"
+            ),
+            "每次调用 refine_line 或 rewrite 后，系统会自动校验格律，不通过会返回具体错误。",
+            "当你对全诗满意时，调用 submit 提交。",
+        ]
     )
-    prompt_parts.append(
-        "每次调用 refine_line 或 rewrite 后，系统会自动校验格律，不通过会返回具体错误，你需要根据错误调整。"
-    )
-    prompt_parts.append("当你对全诗满意时，调用 submit 提交。")
+    return "\n".join(parts)
 
-    return "\n".join(prompt_parts)
+
+def _extract_poem_from_messages(messages: list[Message]) -> list[str]:
+    """从对话历史中提取最近的诗稿行。
+
+    在 assistant 消息的 content 中查找连续的非空行作为诗稿。
+
+    Args:
+        messages: 对话消息列表。
+
+    Returns:
+        提取的诗行列表。
+    """
+    for msg in reversed(messages):
+        if msg.get("role") == "assistant" and msg.get("content"):
+            text = str(msg["content"])
+            lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+            if lines:
+                return lines
+    return []
 
 
 class WriterAI:
@@ -113,48 +159,137 @@ class WriterAI:
         )
         self.validator = MeterValidator()
 
+    def _compress_messages(
+        self,
+        messages: list[Message],
+        description: str,
+        poem: list[str],
+        template: dict[str, Any],
+        template_obj: object = None,
+    ) -> None:
+        """压缩对话历史：用 LLM 生成结构化摘要，替换当前消息列表。
+
+        摘要包含：目标、重要细节、工作状态、下一步行动，以及当前诗稿。
+
+        Args:
+            messages: 要压缩的消息列表（就地修改）。
+            description: 主题描述。
+            poem: 当前诗稿。
+            template: 模板字典。
+            template_obj: 模板对象。
+        """
+        constraints_desc = _get_constraints_desc(template, template_obj)
+        poem_text = "\n".join(poem) if poem else "（无）"
+        compress_prompt = (
+            "请将以下对话状态压缩为结构化摘要，保留所有关键信息以便继续工作。\n"
+            "\n"
+            "【当前诗稿】\n"
+            f"{poem_text}\n"
+            "\n"
+            "【格律约束】\n"
+            f"{constraints_desc}\n"
+            "\n"
+            "请按以下格式输出摘要:\n"
+            "【目标】当前任务的核心目标\n"
+            "【重要细节】关键信息、格律约束、已做出的重要决策\n"
+            "【工作状态】\n"
+            "  已完成: ...\n"
+            "  进行中: ...\n"
+            "  被阻塞: ...\n"
+            "【下一步行动】建议的下一步具体操作"
+        )
+        summary_response = self.client.chat(
+            [
+                {"role": "system", "content": "你是一位诗歌创作助手，请压缩对话状态。"},
+                {"role": "user", "content": compress_prompt},
+            ]
+        )
+        summary_text = str(summary_response.get("content", "")).strip()
+        messages.clear()
+        messages.append(
+            {
+                "role": "system",
+                "content": (
+                    "以下是之前对话的压缩摘要，新对话从这里继续：\n\n"
+                    f"{summary_text}\n\n"
+                    "请根据以上摘要继续工作。当前诗稿如下："
+                ),
+            }
+        )
+        messages.append({"role": "user", "content": f"当前诗稿:\n{poem_text}"})
+
+    def _check_and_compress(
+        self,
+        messages: list[Message],
+        description: str,
+        poem: list[str],
+        template: dict[str, Any],
+        template_obj: object = None,
+    ) -> None:
+        """检查 token 数，超过阈值时自动压缩对话历史。
+
+        Args:
+            messages: 消息列表。
+            description: 主题描述。
+            poem: 当前诗稿。
+            template: 模板字典。
+            template_obj: 模板对象。
+        """
+        token_count = self.client.count_tokens(messages)
+        if token_count >= COMPRESS_THRESHOLD:
+            self._compress_messages(messages, description, poem, template, template_obj)
+
     def generate_description(
-        self, topic: str, on_stream: ChunkCallback = None
+        self,
+        topic: str,
+        messages: list[Message],
+        on_stream: ChunkCallback = None,
     ) -> tuple[str, str]:
         """生成主题的现代文描述（Step 1）。
 
         Args:
             topic: 用户主题。
+            messages: 共享对话消息列表（会被追加）。
             on_stream: 流式回调。
 
         Returns:
             (描述文本, 日志文本)。
         """
-        messages: list[Message] = [
+        messages.append(
             {
                 "role": "system",
-                "content": "你是一位诗歌创作助手。根据用户给出的主题，写一段100字以内的现代文描述，包含意象、情感、内容概要。直接输出描述文本，不要加任何前缀。",
-            },
-            {"role": "user", "content": f"主题: {topic}"},
-        ]
+                "content": (
+                    "你是一位诗歌创作助手。根据用户给出的主题，写一段100字以内的"
+                    "现代文描述，包含意象、情感、内容概要。直接输出描述文本，不要加任何前缀。"
+                ),
+            }
+        )
+        messages.append({"role": "user", "content": f"主题: {topic}"})
         if on_stream:
             response = self.client.chat_stream(messages, on_chunk=on_stream)
         else:
             response = self.client.chat(messages)
         desc = str(response["content"]).strip()
-        detail = f"{desc}"
-        return desc, detail
+        messages.append(LLMClient.assistant_to_message(response))
+        return desc, desc
 
     def generate_draft(
         self,
         description: str,
         template: dict[str, Any],
+        messages: list[Message],
         template_obj: object = None,
         max_attempts: int = 0,
         on_stream: ChunkCallback = None,
     ) -> tuple[list[str], str]:
-        """生成初稿（Step 2，仅校验行数与音节数，无尝试次数上限）。
+        """生成初稿（Step 2，通过 submit 工具提交，无尝试次数上限）。
 
         Args:
             description: 主题描述。
             template: 模板字典。
+            messages: 共享对话消息列表（会被追加）。
             template_obj: 模板对象。
-            max_attempts: 已废弃，保留仅为接口兼容（初稿生成无上限）。
+            max_attempts: 已废弃，保留仅为接口兼容。
             on_stream: 流式回调。
 
         Returns:
@@ -162,33 +297,15 @@ class WriterAI:
         """
         language = str(template.get("language", "zh"))
         lines = int(template.get("lines", 4))
-        syllables_per_line = template.get("syllables_per_line", [5] * lines)
 
-        constraints_desc = ""
-        if template_obj is not None and hasattr(template_obj, "describe"):
-            constraints_desc = template_obj.describe()
-        else:
-            constraints_desc = (
-                f"- 语言: {language}\n- 行数: {lines}\n"
-                f"- 每行音节数: {', '.join(format_count(c) for c in syllables_per_line)}"
-            )
-
-        sys_prompt = f"""你是一位精通{language}诗歌创作的AI诗人。
-请根据以下主题描述和格律要求，创作一首诗。
-
-【主题描述】
-{description}
-
-【格律要求】
-{constraints_desc}
-
-请直接输出诗歌，每行一句，不要加序号、标题或其他任何文字。
-只输出纯诗文本，每行用换行分隔。"""
-
-        messages: list[Message] = [
-            {"role": "system", "content": sys_prompt},
-            {"role": "user", "content": "请按以上格律要求生成诗稿。"},
-        ]
+        constraints_desc = _get_constraints_desc(template, template_obj)
+        messages.append(
+            {
+                "role": "system",
+                "content": _build_draft_system(language, constraints_desc),
+            }
+        )
+        messages.append({"role": "user", "content": "请创作诗稿。"})
 
         detail_parts: list[str] = []
         poem: list[str] = []
@@ -196,43 +313,92 @@ class WriterAI:
         while True:
             attempt += 1
             if on_stream and attempt == 1:
-                response = self.client.chat_stream(messages, on_chunk=on_stream)
-            else:
-                response = self.client.chat(messages)
+                _fire_stream(on_stream, "[初稿] 思考中...")
+            self._check_and_compress(
+                messages, description, poem, template, template_obj
+            )
+            response = self.client.chat(messages, tools=[SUBMIT_TOOL])
+
+            if response["tool_calls"]:
+                for tc in response["tool_calls"]:
+                    if tc["name"] == "submit":
+                        text = str(response.get("content", "")).strip()
+                        if text:
+                            poem = [ln.strip() for ln in text.split("\n") if ln.strip()]
+                        else:
+                            # AI 没有在 content 中输出诗稿，从历史中解析
+                            poem = _extract_poem_from_messages(messages)
+
+                        if len(poem) != lines:
+                            result: dict[str, Any] = {
+                                "error": f"输出行数为{len(poem)}，期望{lines}行"
+                            }
+                        else:
+                            count_result = self.validator.validate_count_only(
+                                poem, template
+                            )
+                            if count_result.passed:
+                                result = {"status": "passed", "poem": poem}
+                            else:
+                                result = {"error": "; ".join(count_result.errors)}
+
+                        messages.append(LLMClient.assistant_to_message(response))
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": str(tc["id"]),
+                                "content": json.dumps(result, ensure_ascii=False),
+                            }
+                        )
+                        detail_parts.append(f"submit: {result}")
+
+                        if result.get("status") == "passed":
+                            if on_stream:
+                                _fire_stream(on_stream, "[初稿] 完成")
+                            return poem, "\n\n".join(detail_parts)
+                        continue
+
+                continue
+
+            # AI 没调 submit，解析文本内容
             text = str(response["content"]).strip()
-            detail_parts.append(f"尝试 {attempt}:\n{text}")
-            poem = [line.strip() for line in text.split("\n") if line.strip()]
+            detail_parts.append(f"生成:\n{text}")
+            poem = [ln.strip() for ln in text.split("\n") if ln.strip()]
+            messages.append(LLMClient.assistant_to_message(response))
 
             if len(poem) != lines:
-                messages.append(LLMClient.assistant_to_message(response))
                 messages.append(
                     {
                         "role": "user",
-                        "content": f"输出行数为{len(poem)}行，期望{lines}行。请重新输出恰好{lines}行。",
+                        "content": f"输出行数为{len(poem)}行，期望{lines}行。请重新输出并调用 submit 提交。",
                     }
                 )
                 continue
 
-            result = self.validator.validate_count_only(poem, template)
-            if result.passed:
-                return poem, "\n\n".join(detail_parts)
-
-            detail_parts.append(f"校验未通过: {'; '.join(result.errors)}")
-            messages.append(LLMClient.assistant_to_message(response))
-            messages.append(
-                {
-                    "role": "user",
-                    "content": "格律校验未通过:\n"
-                    + "\n".join(result.errors)
-                    + "\n请修正后重新输出。",
-                }
-            )
+            count_result = self.validator.validate_count_only(poem, template)
+            if count_result.passed:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "诗稿已通过校验，请调用 submit 工具提交。",
+                    }
+                )
+            else:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "格律校验未通过:\n"
+                        + "\n".join(count_result.errors)
+                        + "\n请修正后重新输出并调用 submit 提交。",
+                    }
+                )
 
     def refine(
         self,
         description: str,
         poem: list[str],
         template: dict[str, Any],
+        messages: list[Message],
         template_obj: object = None,
         feedback: str = "",
         on_step: StepCallback = None,
@@ -245,6 +411,7 @@ class WriterAI:
             description: 主题描述。
             poem: 当前诗稿。
             template: 模板字典。
+            messages: 共享对话消息列表（会被追加）。
             template_obj: 模板对象。
             feedback: 用户/检查 AI 反馈。
             on_step: 每次工具执行后的回调。
@@ -255,17 +422,22 @@ class WriterAI:
             (诗稿, 是否提交, 工具历史, 日志, 执行轮数)。
         """
         current_poem = list(poem)
-        system_prompt = _build_writer_system(
-            description, current_poem, template, template_obj, feedback
+        constraints_desc = _get_constraints_desc(template, template_obj)
+        messages.append(
+            {
+                "role": "system",
+                "content": _build_refine_system(constraints_desc, feedback),
+            }
         )
-
-        messages: list[Message] = [
-            {"role": "system", "content": system_prompt},
+        messages.append(
             {
                 "role": "user",
-                "content": "请开始炼句优化。先用 search_words 搜候选词，然后必须至少调用一次 refine_line 或 rewrite 修改诗句，才能调用 submit 提交。",
-            },
-        ]
+                "content": (
+                    "请开始炼句优化。先用 search_words 搜候选词，然后必须至少调用一次"
+                    " refine_line 或 rewrite 修改诗句，才能调用 submit 提交。"
+                ),
+            }
+        )
 
         submitted = False
         history: list[dict[str, Any]] = []
@@ -283,6 +455,9 @@ class WriterAI:
                 on_stream("")
                 _fire_stream(on_stream, f"[第{round_num}轮] 思考中...")
 
+            self._check_and_compress(
+                messages, description, current_poem, template, template_obj
+            )
             response = self.client.chat(messages, tools=WRITER_TOOLS)
 
             if not response["tool_calls"]:
@@ -410,11 +585,6 @@ class WriterAI:
                 }
                 for tc in response["tool_calls"]
             )
-
-            system_prompt = _build_writer_system(
-                description, current_poem, template, template_obj, feedback
-            )
-            messages[0] = {"role": "system", "content": system_prompt}
 
             # 空转引导: 连续多轮未成功修改也未提交时，提示 AI 继续推进(不中断循环)
             changed = tuple(current_poem) != last_poem_key

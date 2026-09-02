@@ -15,6 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..agents.base import Message
 from ..agents.checker_ai import CheckerAI
 from ..agents.writer_ai import WriterAI
 from ..config import get_config
@@ -46,6 +47,7 @@ class PipelineState:
     stream_text: str = ""
     current_detail_step: int = 0
     current_detail: str = ""
+    messages: list[Message] = field(default_factory=list)
 
 
 class PoetryPipeline:
@@ -174,7 +176,9 @@ class PoetryPipeline:
             state.user_feedback = user_feedback
             self._detail_seq = len(state.step_details)
             self._load_template(state.template_key)
-            self._run_refine_loop(state)
+            messages = list(state.messages)
+            self._run_refine_loop(state, messages)
+            state.messages = messages
             return state
 
         template_dict = self._load_template(template_key)
@@ -182,12 +186,14 @@ class PoetryPipeline:
             topic=topic, template_key=template_key, template=template_dict
         )
         self._detail_seq = 0
-        self._run_step1(state)
-        self._run_step2(state)
-        self._run_refine_loop(state)
+        messages = []
+        self._run_step1(state, messages)
+        self._run_step2(state, messages)
+        self._run_refine_loop(state, messages)
+        state.messages = messages
         return state
 
-    def _run_step1(self, state: PipelineState) -> None:
+    def _run_step1(self, state: PipelineState, messages: list[Message]) -> None:
         """Step 1：生成现代文描述（流式推送）。"""
         state.current_step = 1
         state.stream_text = ""
@@ -211,7 +217,7 @@ class PoetryPipeline:
                 self._report(state)
 
         description, detail = self._get_writer().generate_description(
-            state.topic, on_stream=on_stream
+            state.topic, messages, on_stream=on_stream
         )
         state.description = description
         state.stream_text = ""
@@ -224,8 +230,8 @@ class PoetryPipeline:
         )
         self._report(state)
 
-    def _run_step2(self, state: PipelineState) -> None:
-        """Step 2：生成初稿（仅校验行数/音节数）。"""
+    def _run_step2(self, state: PipelineState, messages: list[Message]) -> None:
+        """Step 2：生成初稿（通过 submit 工具提交）。"""
         state.current_step = 2
         state.stream_text = ""
         state.current_detail_step = 2
@@ -248,7 +254,11 @@ class PoetryPipeline:
                 self._report(state)
 
         draft, detail = self._get_writer().generate_draft(
-            state.description, state.template, self._template_obj, on_stream=on_stream
+            state.description,
+            state.template,
+            messages,
+            self._template_obj,
+            on_stream=on_stream,
         )
         state.draft = draft
         state.stream_text = ""
@@ -260,7 +270,7 @@ class PoetryPipeline:
         )
         self._report(state)
 
-    def _run_refine_loop(self, state: PipelineState) -> None:
+    def _run_refine_loop(self, state: PipelineState, messages: list[Message]) -> None:
         """Step 3→4 打回循环：炼句直到终审通过（无轮数上限）。
 
         炼句本身（writer.refine）无轮数上限，本外层循环在检查 AI 不通过时
@@ -309,6 +319,7 @@ class PoetryPipeline:
                 description=state.description,
                 poem=state.draft,
                 template=state.template,
+                messages=messages,
                 template_obj=self._template_obj,
                 feedback=checker_feedback,
                 on_step=on_step,

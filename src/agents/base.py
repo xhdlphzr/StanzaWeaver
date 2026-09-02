@@ -15,6 +15,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import httpx
+import tiktoken
 from openai import OpenAI
 
 _LOCAL_HINTS = (
@@ -159,6 +160,33 @@ class LLMClient:
                 if on_chunk:
                     on_chunk(full_content)
         return {"role": "assistant", "content": full_content, "tool_calls": []}
+
+    def count_tokens(self, messages: list[Message]) -> int:
+        """估算消息列表的 token 数量。
+
+        使用 tiktoken 编码器统计所有消息内容的 token 数。
+
+        Args:
+            messages: 消息列表。
+
+        Returns:
+            估算的 token 总数。
+        """
+        try:
+            encoding = tiktoken.encoding_for_model(self.model)
+        except KeyError:
+            encoding = tiktoken.get_encoding("cl100k_base")
+        total = 0
+        for msg in messages:
+            content = msg.get("content")
+            if content:
+                total += len(encoding.encode(str(content)))
+            tool_calls = msg.get("tool_calls")
+            if tool_calls:
+                for tc in tool_calls:
+                    total += len(encoding.encode(json.dumps(tc, ensure_ascii=False)))
+            total += 4
+        return total
 
     @staticmethod
     def assistant_to_message(response: ChatResult) -> Message:
