@@ -29,12 +29,9 @@ def _build_checker_system(
     Returns:
         系统提示文本。
     """
-    language = str(template.get("language", "zh"))
-    lines = int(template.get("lines", len(poem)))
-
     parallelism_note = ""
     dim_count = 2
-    if language == "zh" and lines >= 8:
+    if template.get("name") in ("五言律诗", "七言律诗"):
         parallelism_note = """
 3. **对仗检查**: 检查颔联（第3-4行）和颈联（第5-6行）是否存在词性、结构上的对仗关系。句式结构应两两对应（如: 名词对名词、动词对动词、偏正对偏正）。若对仗明显不当或缺失，务必指出具体问题。"""
         dim_count = 3

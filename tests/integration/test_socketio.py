@@ -48,8 +48,24 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     writer_stub = make_stub(
         stream=[DESC, DRAFT],
         chat=[
+            # Step 2: generate_draft submit（content 含诗稿）
+            {
+                "role": "assistant",
+                "content": DRAFT,
+                "tool_calls": [
+                    {"id": "call_submit", "name": "submit", "arguments": {}}
+                ],
+            },
+            # Step 3: refine 第一轮 refine_line
             tool_call("refine_line", {"line": 0, "new_text": REVISED_LINE}),
-            tool_call("submit", {}),
+            # Step 3: refine submit（content 含修改后诗稿）
+            {
+                "role": "assistant",
+                "content": REVISED_LINE + "\n" + "\n".join(DRAFT.split("\n")[1:]),
+                "tool_calls": [
+                    {"id": "call_submit2", "name": "submit", "arguments": {}}
+                ],
+            },
         ],
     )
     checker_stub = make_stub(chat=[tool_call("submit", {"pass": True})])

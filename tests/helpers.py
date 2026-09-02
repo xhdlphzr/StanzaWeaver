@@ -102,6 +102,17 @@ class StubLLMClient(LLMClient):
             on_chunk(text)
         return {"role": "assistant", "content": text, "tool_calls": []}
 
+    def count_tokens(self, messages: list[dict[str, Any]]) -> int:
+        """返回低 token 数以避免压缩触发（桩实现）。
+
+        Args:
+            messages: 消息列表（未使用）。
+
+        Returns:
+            固定返回 0（不触发压缩）。
+        """
+        return 0
+
 
 def make_stub(
     stream: list[str] | None = None,

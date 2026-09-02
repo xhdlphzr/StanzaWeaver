@@ -14,7 +14,8 @@ from src.agents.base import LLMClient, _is_loopback
 from src.agents.checker_ai import CheckerAI, _build_checker_system
 from src.agents.writer_ai import (
     WriterAI,
-    _build_writer_system,
+    _build_draft_system,
+    _build_refine_system,
     _fire_stream,
 )
 
@@ -231,6 +232,42 @@ def test_chat_stream_raises() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# LLMClient.count_tokens
+# --------------------------------------------------------------------------- #
+def test_count_tokens_basic() -> None:
+    """count_tokens 返回正整数。"""
+    c, _ = _make_llm("https://api.openai.com/v1")
+    msgs = [
+        {"role": "user", "content": "hello"},
+        {"role": "assistant", "content": "world"},
+    ]
+    tokens = c.count_tokens(msgs)
+    assert isinstance(tokens, int)
+    assert tokens > 0
+
+
+def test_count_tokens_with_tool_calls() -> None:
+    """含 tool_calls 的消息也计入 token。"""
+    c, _ = _make_llm("https://api.openai.com/v1")
+    msgs = [
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{"id": "1", "name": "submit", "arguments": {"pass": True}}],
+        }
+    ]
+    tokens = c.count_tokens(msgs)
+    assert tokens > 0
+
+
+def test_count_tokens_empty() -> None:
+    """空消息列表返回少量 token（仅 overhead）。"""
+    c, _ = _make_llm("https://api.openai.com/v1")
+    tokens = c.count_tokens([])
+    assert tokens == 0
+
+
+# --------------------------------------------------------------------------- #
 # LLMClient.assistant_to_message
 # --------------------------------------------------------------------------- #
 def test_assistant_to_message_full() -> None:
@@ -275,8 +312,10 @@ def test_fire_stream_swallows_exception() -> None:
 # _build_checker_system
 # --------------------------------------------------------------------------- #
 def test_build_checker_system_parallelism() -> None:
-    """中文且 >=8 行时应包含对仗检查说明。"""
-    text = _build_checker_system("主题", ["a", "b"], {"language": "zh", "lines": 8})
+    """五言律诗/七言律诗模板应包含对仗检查说明。"""
+    text = _build_checker_system(
+        "主题", ["a", "b"], {"name": "五言律诗", "language": "zh", "lines": 8}
+    )
     assert "对仗" in text
 
 
@@ -287,55 +326,24 @@ def test_build_checker_system_no_parallelism() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# _build_writer_system
+# _build_draft_system / _build_refine_system
 # --------------------------------------------------------------------------- #
-def test_build_writer_system_with_template_obj() -> None:
-    """提供含 describe 的模板对象时拼入完整格律描述。"""
-    obj = SimpleNamespace(describe=lambda: "格律描述")
-    text = _build_writer_system("主题", ["a"], {}, obj)
-    assert "格律描述" in text
+def test_build_draft_system_basic() -> None:
+    """_build_draft_system 包含语言和格律描述。"""
+    text = _build_draft_system("zh", "语言: zh\n行数: 4")
+    assert "zh" in text
+    assert "语言: zh\n行数: 4" in text
 
 
-def test_build_writer_system_with_constraints() -> None:
-    """无模板对象时按 syllable_constraints 逐位拼装约束文本。"""
-    template = {
-        "language": "zh",
-        "lines": 2,
-        "syllables_per_line": [5, 5],
-        "syllable_constraints": [[{"onset": "zh", "nucleus": "a"}]],
-    }
-    text = _build_writer_system("主题", ["a", "b"], template)
-    assert "声母=zh" in text
-    assert "韵母=a" in text
+def test_build_refine_system_basic() -> None:
+    """_build_refine_system 包含格律描述。"""
+    text = _build_refine_system("语言: zh\n行数: 4")
+    assert "语言: zh\n行数: 4" in text
 
 
-def test_build_writer_system_with_coda_and_attributes() -> None:
-    """syllable_constraints 含 coda 与 attributes 时拼装对应文本。"""
-    template = {
-        "language": "zh",
-        "lines": 1,
-        "syllables_per_line": [5],
-        "syllable_constraints": [
-            [
-                {
-                    "onset": "zh",
-                    "nucleus": "a",
-                    "coda": "ng",
-                    "attributes": {"tone": "平"},
-                }
-            ]
-        ],
-    }
-    text = _build_writer_system("主题", ["a"], template)
-    assert "韵尾=ng" in text
-    assert "tone=平" in text
-
-
-def test_build_writer_system_with_feedback() -> None:
-    """带 feedback 时拼装反馈段落。"""
-    text = _build_writer_system(
-        "主题", ["a"], {"language": "zh", "lines": 1}, feedback="请更婉约"
-    )
+def test_build_refine_system_with_feedback() -> None:
+    """_build_refine_system 带 feedback 时拼装反馈段落。"""
+    text = _build_refine_system("语言: zh\n行数: 4", feedback="请更婉约")
     assert "请更婉约" in text
 
 
@@ -429,6 +437,7 @@ def _make_writer() -> tuple[WriterAI, MagicMock]:
             {"base_url": "http://127.0.0.1:11434/v1", "api_key": "k", "model": "m"}
         )
     chat = MagicMock()
+    chat.count_tokens.return_value = 0
     object.__setattr__(writer, "client", cast(Any, chat))
     return writer, chat
 
@@ -437,7 +446,8 @@ def test_generate_description_stream() -> None:
     """带 on_stream 时走 chat_stream。"""
     writer, chat = _make_writer()
     chat.chat_stream.return_value = {"content": "描述文本", "tool_calls": []}
-    desc, detail = writer.generate_description("主题", on_stream=lambda t: None)
+    msgs: list[dict[str, Any]] = []
+    desc, detail = writer.generate_description("主题", msgs, on_stream=lambda t: None)
     assert desc == "描述文本"
     assert detail == "描述文本"
 
@@ -446,7 +456,8 @@ def test_generate_description_plain() -> None:
     """无 on_stream 时走普通 chat。"""
     writer, chat = _make_writer()
     chat.chat.return_value = {"content": "描述文本", "tool_calls": []}
-    desc, _ = writer.generate_description("主题")
+    msgs: list[dict[str, Any]] = []
+    desc, _ = writer.generate_description("主题", msgs)
     assert desc == "描述文本"
 
 
@@ -458,20 +469,31 @@ def test_generate_draft_template_obj_describe() -> None:
     from src.templates.zh import WujueTemplate
 
     writer, chat = _make_writer()
-    chat.chat.return_value = {"content": "一二三四五\n六七八九十", "tool_calls": []}
+    chat.chat.return_value = {
+        "content": "一二三四五\n六七八九十",
+        "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+    }
+    msgs: list[dict[str, Any]] = []
     poem, _ = writer.generate_draft(
-        "主题", {"language": "zh", "lines": 2}, WujueTemplate()
+        "主题", {"language": "zh", "lines": 2}, msgs, WujueTemplate()
     )
     assert len(poem) == 2
 
 
-def test_generate_draft_retry_wrong_lines_then_syllables() -> None:
-    """行数不对→重试；音节数不对→重试；最终通过。"""
+def test_generate_draft_submit_wrong_lines_then_retry() -> None:
+    """submit 时行数不对→提示重试；最终通过。"""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
-        {"content": "一行", "tool_calls": []},
-        {"content": "一二三四五\n一二三四", "tool_calls": []},
-        {"content": "一二三四五\n六七八九十", "tool_calls": []},
+        # 第一次 submit: 行数不对
+        {
+            "content": "一行",
+            "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+        },
+        # 第二次 submit: 正确
+        {
+            "content": "一二三四五\n六七八九十",
+            "tool_calls": [{"id": "2", "name": "submit", "arguments": {}}],
+        },
     ]
     template = {
         "language": "zh",
@@ -479,23 +501,31 @@ def test_generate_draft_retry_wrong_lines_then_syllables() -> None:
         "syllables_per_line": [5, 5],
         "syllable_constraints": None,
     }
-    poem, _ = writer.generate_draft("主题", template)
+    msgs: list[dict[str, Any]] = []
+    poem, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
 
 
 def test_generate_draft_stream_retry() -> None:
-    """首轮走 chat_stream，其后走 chat，最终通过。"""
+    """on_stream 回调被触发。"""
     writer, chat = _make_writer()
-    chat.chat_stream.return_value = {"content": "一行", "tool_calls": []}
-    chat.chat.return_value = {"content": "一二三四五\n六七八九十", "tool_calls": []}
+    chat.chat.return_value = {
+        "content": "一二三四五\n六七八九十",
+        "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+    }
     template = {
         "language": "zh",
         "lines": 2,
         "syllables_per_line": [5, 5],
         "syllable_constraints": None,
     }
-    poem, _ = writer.generate_draft("主题", template, on_stream=lambda t: None)
+    fired: list[str] = []
+    msgs: list[dict[str, Any]] = []
+    poem, _ = writer.generate_draft(
+        "主题", template, msgs, on_stream=lambda t: fired.append(t)
+    )
     assert len(poem) == 2
+    assert any("思考中" in f for f in fired)
 
 
 # --------------------------------------------------------------------------- #
@@ -543,8 +573,9 @@ def test_refine_no_tool_calls_then_submit() -> None:
                 },
             ],
         )
+        msgs: list[dict[str, Any]] = []
         _, submitted, _, _, _ = writer.refine(
-            "主题", ["原"], {"language": "zh", "lines": 1}
+            "主题", ["原"], {"language": "zh", "lines": 1}, msgs
         )
     assert submitted is True
 
@@ -582,8 +613,9 @@ def test_refine_submit_before_modification_rejected() -> None:
                 },
             ],
         )
+        msgs: list[dict[str, Any]] = []
         _, submitted, history, _, _ = writer.refine(
-            "主题", ["原"], {"language": "zh", "lines": 1}
+            "主题", ["原"], {"language": "zh", "lines": 1}, msgs
         )
     assert submitted is True
     assert any(h["result"] == "rejected_no_changes" for h in history)
@@ -632,8 +664,13 @@ def test_refine_search_words_branch() -> None:
                 },
             ],
         )
+        msgs: list[dict[str, Any]] = []
         _, _, history, _, _ = writer.refine(
-            "主题", ["原"], {"language": "zh", "lines": 1}, on_step=lambda _d: None
+            "主题",
+            ["原"],
+            {"language": "zh", "lines": 1},
+            msgs,
+            on_step=lambda _d: None,
         )
     assert any(h["tool"] == "search_words" for h in history)
 
@@ -679,8 +716,9 @@ def test_refine_refine_line_error_branch() -> None:
                 },
             ],
         )
+        msgs: list[dict[str, Any]] = []
         _, _, _, detail, _ = writer.refine(
-            "主题", ["原"], {"language": "zh", "lines": 1}
+            "主题", ["原"], {"language": "zh", "lines": 1}, msgs
         )
     assert "失败" in detail
 
@@ -725,8 +763,9 @@ def test_refine_rewrite_branch() -> None:
                 },
             ],
         )
+        msgs: list[dict[str, Any]] = []
         _, _, history, _, _ = writer.refine(
-            "主题", ["原"], {"language": "zh", "lines": 1}
+            "主题", ["原"], {"language": "zh", "lines": 1}, msgs
         )
     assert any(h["tool"] == "rewrite" for h in history)
 
@@ -793,8 +832,9 @@ def test_refine_no_progress_guidance() -> None:
         ),
     ):
         writer.client.chat = fake_chat  # type: ignore[method-assign]
+        msgs: list[dict[str, Any]] = []
         _, submitted, _, _, _ = writer.refine(
-            "主题", ["原"], template, on_stream=lambda _t: None
+            "主题", ["原"], template, msgs, on_stream=lambda _t: None
         )
     assert submitted is True
     joined = "\n".join(str(m.get("content", "")) for msgs in captured for m in msgs)
@@ -878,3 +918,171 @@ def test_handle_rewrite_validation_fail_then_pass() -> None:
     }
     res = writer._handle_rewrite("主题", ["原"], template)
     assert "poem" in res
+
+
+# --------------------------------------------------------------------------- #
+# Token compression
+# --------------------------------------------------------------------------- #
+def test_check_and_compress_no_op_below_threshold() -> None:
+    """token 数低于阈值时不压缩。"""
+    writer, chat = _make_writer()
+    chat.count_tokens.return_value = 100
+    msgs: list[dict[str, Any]] = [{"role": "user", "content": "test"}]
+    writer._check_and_compress(msgs, "desc", ["poem"], {"language": "zh", "lines": 1})
+    assert len(msgs) == 1
+
+
+def test_check_and_compress_triggers_at_threshold() -> None:
+    """token 数达到阈值时触发压缩。"""
+    from src.agents.writer_ai import COMPRESS_THRESHOLD
+
+    writer, chat = _make_writer()
+    chat.count_tokens.return_value = COMPRESS_THRESHOLD
+    chat.chat.return_value = {"content": "压缩摘要", "tool_calls": []}
+    msgs: list[dict[str, Any]] = [{"role": "user", "content": "old message"}]
+    writer._check_and_compress(msgs, "desc", ["诗稿"], {"language": "zh", "lines": 1})
+    assert len(msgs) == 2
+    assert "压缩摘要" in str(msgs[0]["content"])
+    assert "诗稿" in str(msgs[1]["content"])
+
+
+# --------------------------------------------------------------------------- #
+# Coverage gaps: _extract_poem_from_messages, generate_draft branches
+# --------------------------------------------------------------------------- #
+def test_extract_poem_from_messages_finds_assistant() -> None:
+    """从 assistant 消息中提取诗行。"""
+    from src.agents.writer_ai import _extract_poem_from_messages
+
+    msgs: list[dict[str, Any]] = [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "行一\n行二\n行三"},
+    ]
+    result = _extract_poem_from_messages(msgs)
+    assert result == ["行一", "行二", "行三"]
+
+
+def test_extract_poem_from_messages_empty() -> None:
+    """无 assistant 消息时返回空列表。"""
+    from src.agents.writer_ai import _extract_poem_from_messages
+
+    msgs: list[dict[str, Any]] = [{"role": "user", "content": "hi"}]
+    result = _extract_poem_from_messages(msgs)
+    assert result == []
+
+
+def test_generate_draft_submit_empty_content_fallback() -> None:
+    """submit 时 content 为空，从历史消息提取诗稿。"""
+    writer, chat = _make_writer()
+    chat.chat.side_effect = [
+        # 第一次: AI 返回空 content + submit tool call
+        {
+            "content": "",
+            "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+        },
+    ]
+    template = {
+        "language": "zh",
+        "lines": 2,
+        "syllables_per_line": [5, 5],
+        "syllable_constraints": None,
+    }
+    msgs: list[dict[str, Any]] = []
+    # 先手动写入一条 assistant 消息供回退提取
+    msgs.append({"role": "assistant", "content": "一二三四五\n六七八九十"})
+    poem, _ = writer.generate_draft("主题", template, msgs)
+    assert len(poem) == 2
+
+
+def test_generate_draft_submit_syllable_fail_then_pass() -> None:
+    """submit 行数正确但音节错→重试；第二次通过。"""
+    writer, chat = _make_writer()
+    chat.chat.side_effect = [
+        # 第一次: 行数正确但音节错
+        {
+            "content": "一二三四\n五六七八",
+            "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+        },
+        # 第二次: 正确
+        {
+            "content": "一二三四五\n六七八九十",
+            "tool_calls": [{"id": "2", "name": "submit", "arguments": {}}],
+        },
+    ]
+    template = {
+        "language": "zh",
+        "lines": 2,
+        "syllables_per_line": [5, 5],
+        "syllable_constraints": None,
+    }
+    msgs: list[dict[str, Any]] = []
+    poem, _ = writer.generate_draft("主题", template, msgs)
+    assert len(poem) == 2
+
+
+def test_generate_draft_no_tool_calls_retry() -> None:
+    """AI 不调工具→重试；第二次调 submit 通过。"""
+    writer, chat = _make_writer()
+    chat.chat.side_effect = [
+        # 第一次: 无 tool_calls
+        {"content": "一二三四五\n六七八九十", "tool_calls": []},
+        # 第二次: submit
+        {
+            "content": "一二三四五\n六七八九十",
+            "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+        },
+    ]
+    template = {
+        "language": "zh",
+        "lines": 2,
+        "syllables_per_line": [5, 5],
+        "syllable_constraints": None,
+    }
+    msgs: list[dict[str, Any]] = []
+    poem, _ = writer.generate_draft("主题", template, msgs)
+    assert len(poem) == 2
+
+
+def test_generate_draft_no_tool_calls_wrong_lines_retry() -> None:
+    """AI 不调工具且行数错→提示重试；第二次通过。"""
+    writer, chat = _make_writer()
+    chat.chat.side_effect = [
+        # 第一次: 行数错
+        {"content": "一二三四五", "tool_calls": []},
+        # 第二次: 正确 submit
+        {
+            "content": "一二三四五\n六七八九十",
+            "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+        },
+    ]
+    template = {
+        "language": "zh",
+        "lines": 2,
+        "syllables_per_line": [5, 5],
+        "syllable_constraints": None,
+    }
+    msgs: list[dict[str, Any]] = []
+    poem, _ = writer.generate_draft("主题", template, msgs)
+    assert len(poem) == 2
+
+
+def test_generate_draft_no_tool_calls_syllable_fail_retry() -> None:
+    """AI 不调工具但音节错→提示重试；第二次通过。"""
+    writer, chat = _make_writer()
+    chat.chat.side_effect = [
+        # 第一次: 行数对但音节错
+        {"content": "一二三四\n五六七八", "tool_calls": []},
+        # 第二次: 正确 submit
+        {
+            "content": "一二三四五\n六七八九十",
+            "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+        },
+    ]
+    template = {
+        "language": "zh",
+        "lines": 2,
+        "syllables_per_line": [5, 5],
+        "syllable_constraints": None,
+    }
+    msgs: list[dict[str, Any]] = []
+    poem, _ = writer.generate_draft("主题", template, msgs)
+    assert len(poem) == 2

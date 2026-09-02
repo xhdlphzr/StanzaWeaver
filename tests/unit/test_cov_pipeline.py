@@ -48,12 +48,16 @@ class _FakeWriter(WriterAI):
         self.feedback_log: list[str] = []
 
     def generate_description(
-        self, topic: str, on_stream: ChunkCallback = None
+        self,
+        topic: str,
+        messages: list[dict[str, Any]],
+        on_stream: ChunkCallback = None,
     ) -> tuple[str, str]:
         """返回固定描述（Step 1）。
 
         Args:
             topic: 主题（未使用）。
+            messages: 共享消息列表（未使用）。
             on_stream: 流式回调（未使用）。
 
         Returns:
@@ -66,6 +70,7 @@ class _FakeWriter(WriterAI):
         self,
         description: str,
         template: dict[str, Any],
+        messages: list[dict[str, Any]],
         template_obj: Any = None,
         max_attempts: int = 0,
         on_stream: ChunkCallback = None,
@@ -75,6 +80,7 @@ class _FakeWriter(WriterAI):
         Args:
             description: 主题描述（未使用）。
             template: 模板字典（未使用）。
+            messages: 共享消息列表（未使用）。
             template_obj: 模板对象（未使用）。
             max_attempts: 已废弃参数（接口兼容，未使用）。
             on_stream: 流式回调（未使用）。
@@ -90,6 +96,7 @@ class _FakeWriter(WriterAI):
         description: str,
         poem: list[str],
         template: dict[str, Any],
+        messages: list[dict[str, Any]],
         template_obj: Any = None,
         feedback: str = "",
         on_step: StepCallback = None,
@@ -102,6 +109,7 @@ class _FakeWriter(WriterAI):
             description: 主题描述（未使用）。
             poem: 当前诗稿（未使用）。
             template: 模板字典（未使用）。
+            messages: 共享消息列表（未使用）。
             template_obj: 模板对象（未使用）。
             feedback: 检查 AI/用户反馈（未使用）。
             on_step: 每步回调。
@@ -229,7 +237,8 @@ def test_refine_unsubmitted_fallback() -> None:
     pipeline = _make_pipeline(writer, checker)
     state = _make_state()
 
-    pipeline._run_refine_loop(state)
+    messages: list[dict[str, Any]] = []
+    pipeline._run_refine_loop(state, messages)
 
     assert state.checker_pass is False
     assert "炼句未完成提交" in state.checker_suggestions
@@ -250,7 +259,8 @@ def test_refine_checker_exception() -> None:
 
     events: list[dict[str, Any]] = []
     pipeline._on_progress = lambda e: events.append(e)
-    pipeline._run_refine_loop(state)
+    messages2: list[dict[str, Any]] = []
+    pipeline._run_refine_loop(state, messages2)
 
     assert state.checker_pass is True
     assert state.final_poem == ["窗前明月光", "疑是地上霜"]
@@ -274,7 +284,8 @@ def test_refine_checker_false_then_true() -> None:
     pipeline = _make_pipeline(writer, checker)
     state = _make_state()
 
-    pipeline._run_refine_loop(state)
+    messages3: list[dict[str, Any]] = []
+    pipeline._run_refine_loop(state, messages3)
 
     assert state.checker_pass is True
     assert state.final_poem == ["窗前明月光", "疑是地上霜"]
