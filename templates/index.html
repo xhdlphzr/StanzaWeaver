@@ -697,7 +697,24 @@
         document.getElementById("btn-feedback").disabled = false;
 
         const poem = data.final_poem || data.draft || [];
-        updatePoemDisplay(poem);
+        const display = document.getElementById("poem-display");
+        display.innerHTML = "";
+
+        if (data.title) {
+          const titleDiv = document.createElement("div");
+          titleDiv.className = "poem-title";
+          titleDiv.textContent = data.title;
+          display.appendChild(titleDiv);
+        }
+
+        if (data.formatted_poem) {
+          const pre = document.createElement("pre");
+          pre.className = "poem-formatted";
+          pre.textContent = data.formatted_poem;
+          display.appendChild(pre);
+        } else {
+          updatePoemDisplay(poem);
+        }
 
         document.getElementById("tool-status").classList.add("hidden");
 
@@ -735,7 +752,7 @@
         document.getElementById("user-feedback").value = "";
 
         if (data.checker_pass) {
-          const poemText = poem.join("\n");
+          const poemText = data.formatted_poem || poem.join("\n");
           const topic = document.getElementById("topic").value;
           const tmplName =
             document.getElementById("template-select").selectedOptions[0]

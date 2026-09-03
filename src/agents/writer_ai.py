@@ -281,7 +281,7 @@ class WriterAI:
         template_obj: object = None,
         max_attempts: int = 0,
         on_stream: ChunkCallback = None,
-    ) -> tuple[list[str], str]:
+    ) -> tuple[list[str], str, str]:
         """生成初稿（Step 2，通过 submit 工具提交，无尝试次数上限）。
 
         Args:
@@ -293,7 +293,7 @@ class WriterAI:
             on_stream: 流式回调。
 
         Returns:
-            (诗稿, 日志文本)。
+            (诗稿, 标题, 日志文本)。
         """
         language = str(template.get("language", "zh"))
         lines = int(template.get("lines", 4))
@@ -309,6 +309,7 @@ class WriterAI:
 
         detail_parts: list[str] = []
         poem: list[str] = []
+        title: str = ""
         attempt = 0
         while True:
             attempt += 1
@@ -322,6 +323,7 @@ class WriterAI:
             if response["tool_calls"]:
                 for tc in response["tool_calls"]:
                     if tc["name"] == "submit":
+                        title = str(tc["arguments"].get("title", "")).strip()
                         text = str(response.get("content", "")).strip()
                         if text:
                             poem = [ln.strip() for ln in text.split("\n") if ln.strip()]
@@ -329,16 +331,22 @@ class WriterAI:
                             # AI 没有在 content 中输出诗稿，从历史中解析
                             poem = _extract_poem_from_messages(messages)
 
-                        if len(poem) != lines:
+                        if not title:
                             result: dict[str, Any] = {
-                                "error": f"输出行数为{len(poem)}，期望{lines}行"
+                                "error": "标题不能为空，请提供诗稿标题"
                             }
+                        elif len(poem) != lines:
+                            result = {"error": f"输出行数为{len(poem)}，期望{lines}行"}
                         else:
                             count_result = self.validator.validate_count_only(
                                 poem, template
                             )
                             if count_result.passed:
-                                result = {"status": "passed", "poem": poem}
+                                result = {
+                                    "status": "passed",
+                                    "poem": poem,
+                                    "title": title,
+                                }
                             else:
                                 result = {"error": "; ".join(count_result.errors)}
 
@@ -355,7 +363,7 @@ class WriterAI:
                         if result.get("status") == "passed":
                             if on_stream:
                                 _fire_stream(on_stream, "[初稿] 完成")
-                            return poem, "\n\n".join(detail_parts)
+                            return poem, title, "\n\n".join(detail_parts)
                         continue
 
                 continue

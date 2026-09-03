@@ -162,6 +162,20 @@ class PoetryTemplate(ABC):
             lines_desc += "\n" + self.rule_description
         return lines_desc
 
+    def format_poem(self, poem: list[str]) -> str:
+        """将无标点诗行格式化为可展示文本。
+
+        子类可覆写以实现诗体专属格式（如标点、缩进、分段）。
+        AI 生成的原始诗稿无标点、句间换行，本方法负责加上标点与排版。
+
+        Args:
+            poem: 无标点的诗行列表（每句一行）。
+
+        Returns:
+            格式化后的展示文本。
+        """
+        return "\n".join(poem)
+
 
 _registry: dict[str, PoetryTemplate] = {}
 

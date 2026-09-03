@@ -80,7 +80,16 @@ SUBMIT_TOOL: dict[str, Any] = {
     "function": {
         "name": "submit",
         "description": "提交当前诗稿。编写AI调用此工具将定稿送交检查AI终审。",
-        "parameters": {"type": "object", "properties": {}, "required": []},
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "诗稿标题，简短精炼，不超过10个字",
+                },
+            },
+            "required": ["title"],
+        },
     },
 }
 

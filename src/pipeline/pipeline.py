@@ -3,7 +3,7 @@
 
 """四步生成流水线与打回循环。
 
-Step 1 描述生成 → Step 2 初稿（仅验音节）→ Step 3 炼句循环
+Step 1 描述生成 → Step 2 初稿（含标题，仅验音节）→ Step 3 炼句循环
 （ReAct 工具，改完自动全量格律校验）→ Step 4 检查 AI 句意终审。
 终审不通过自动打回 Step 3 继续炼句（无轮数上限，持续打回直到终审通过）；
 用户"不定稿"反馈走 continue_with_feedback 续跑。
@@ -48,6 +48,8 @@ class PipelineState:
     current_detail_step: int = 0
     current_detail: str = ""
     messages: list[Message] = field(default_factory=list)
+    title: str = ""
+    formatted_poem: str = ""
 
 
 class PoetryPipeline:
@@ -231,7 +233,7 @@ class PoetryPipeline:
         self._report(state)
 
     def _run_step2(self, state: PipelineState, messages: list[Message]) -> None:
-        """Step 2：生成初稿（通过 submit 工具提交）。"""
+        """Step 2：生成初稿（通过 submit 工具提交，同时取标题）。"""
         state.current_step = 2
         state.stream_text = ""
         state.current_detail_step = 2
@@ -253,7 +255,7 @@ class PoetryPipeline:
                 state.current_detail = text
                 self._report(state)
 
-        draft, detail = self._get_writer().generate_draft(
+        draft, title, detail = self._get_writer().generate_draft(
             state.description,
             state.template,
             messages,
@@ -261,6 +263,7 @@ class PoetryPipeline:
             on_stream=on_stream,
         )
         state.draft = draft
+        state.title = title
         state.stream_text = ""
         self._append_detail(
             state,
@@ -371,13 +374,33 @@ class PoetryPipeline:
             self._report(state)
 
             if state.checker_pass:
-                state.final_poem = state.draft
+                state.final_poem = (
+                    [state.title] + state.draft if state.title else list(state.draft)
+                )
+                if self._template_obj is not None and hasattr(
+                    self._template_obj, "format_poem"
+                ):
+                    state.formatted_poem = str(
+                        self._template_obj.format_poem(state.final_poem)
+                    )
+                else:
+                    state.formatted_poem = "\n".join(state.final_poem)
                 break
 
             checker_feedback = state.checker_suggestions
 
         if not state.checker_pass and not state.final_poem:
-            state.final_poem = state.draft
+            state.final_poem = (
+                [state.title] + state.draft if state.title else list(state.draft)
+            )
+            if self._template_obj is not None and hasattr(
+                self._template_obj, "format_poem"
+            ):
+                state.formatted_poem = str(
+                    self._template_obj.format_poem(state.final_poem)
+                )
+            else:
+                state.formatted_poem = "\n".join(state.final_poem)
 
     def continue_with_feedback(
         self,

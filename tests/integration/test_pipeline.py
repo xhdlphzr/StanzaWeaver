@@ -31,7 +31,11 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
                 "role": "assistant",
                 "content": DRAFT,
                 "tool_calls": [
-                    {"id": "call_submit", "name": "submit", "arguments": {}}
+                    {
+                        "id": "call_submit",
+                        "name": "submit",
+                        "arguments": {"title": "静夜思"},
+                    }
                 ],
             },
             # Step 3: refine 第一轮 refine_line
@@ -41,7 +45,11 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
                 "role": "assistant",
                 "content": REVISED_LINE + "\n" + "\n".join(DRAFT.split("\n")[1:]),
                 "tool_calls": [
-                    {"id": "call_submit2", "name": "submit", "arguments": {}}
+                    {
+                        "id": "call_submit2",
+                        "name": "submit",
+                        "arguments": {"title": "静夜思"},
+                    }
                 ],
             },
         ],
@@ -61,7 +69,8 @@ def test_pipeline_full_run(monkeypatch: pytest.MonkeyPatch) -> None:
     state = pipeline.run("静夜思", "zh_wujue")
 
     assert state.checker_pass is True
-    assert state.final_poem == state.draft
+    assert state.title == "静夜思"
+    assert state.final_poem == ["静夜思"] + state.draft
     # 炼句确实修改了首行
     assert state.draft[0] == REVISED_LINE
     # 炼句循环至少执行了「修改 + 提交」两步
