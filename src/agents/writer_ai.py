@@ -27,7 +27,7 @@ COMPRESS_THRESHOLD = 180_000
 
 ChunkCallback = Callable[[str], None] | None
 StepCallback = Callable[[dict[str, Any]], None] | None
-RefineResult = tuple[list[str], bool, list[dict[str, Any]], str, int]
+RefineResult = tuple[list[str], list[dict[str, Any]], str, int]
 
 
 def _fire_stream(cb: ChunkCallback, text: str) -> None:
@@ -244,7 +244,7 @@ class WriterAI:
         topic: str,
         messages: list[Message],
         on_stream: ChunkCallback = None,
-    ) -> tuple[str, str]:
+    ) -> str:
         """生成主题的现代文描述（Step 1）。
 
         Args:
@@ -253,7 +253,7 @@ class WriterAI:
             on_stream: 流式回调。
 
         Returns:
-            (描述文本, 日志文本)。
+            描述文本。
         """
         messages.append(
             {
@@ -271,7 +271,7 @@ class WriterAI:
             response = self.client.chat(messages)
         desc = str(response["content"]).strip()
         messages.append(LLMClient.assistant_to_message(response))
-        return desc, desc
+        return desc
 
     def generate_draft(
         self,
@@ -413,7 +413,7 @@ class WriterAI:
         on_stream: ChunkCallback = None,
         start_round: int = 0,
     ) -> RefineResult:
-        """ReAct 炼句循环（Step 3，无轮数上限，直到 submit 成功）。
+        """ReAct 炼句循环（Step 3，无轮数上限，直到格律校验通过）。
 
         Args:
             description: 主题描述。
@@ -427,7 +427,7 @@ class WriterAI:
             start_round: 起始轮号（打回续轮用）。
 
         Returns:
-            (诗稿, 是否提交, 工具历史, 日志, 执行轮数)。
+            (诗稿, 工具历史, 日志, 执行轮数)。
         """
         current_poem = list(poem)
         constraints_desc = _get_constraints_desc(template, template_obj)
@@ -441,16 +441,14 @@ class WriterAI:
             {
                 "role": "user",
                 "content": (
-                    "请开始炼句优化。先用 search_words 搜候选词，然后必须至少调用一次"
-                    " refine_line 或 rewrite 修改诗句，才能调用 submit 提交。"
+                    "请开始炼句优化。先用 search_words 搜候选词，然后用"
+                    " refine_line 或 rewrite 修改诗句，满意后调用 submit 提交。"
                 ),
             }
         )
 
-        submitted = False
         history: list[dict[str, Any]] = []
         detail_parts: list[str] = []
-        modifications = 0
         executed_rounds = 0
         round_idx = 0
         last_poem_key = tuple(current_poem)
@@ -491,29 +489,16 @@ class WriterAI:
                 )
 
             results_by_id: dict[str, dict[str, Any]] = {}
+            poem_changed = False
+            submit_called = False
             for tool_call in response["tool_calls"]:
                 name = str(tool_call["name"])
                 args = tool_call["arguments"]
 
                 if name == "submit":
-                    if modifications < 1:
-                        detail_parts.append(
-                            f"[第{round_num}轮] submit: 拒绝 - 尚未进行任何修改，必须先调用 refine_line 或 rewrite"
-                        )
-                        results_by_id[tool_call["id"]] = {
-                            "error": "不允许直接提交。你必须至少调用一次 refine_line 或 rewrite 成功修改诗句后，才能调用 submit。"
-                        }
-                        history.append(
-                            {
-                                "tool": "submit",
-                                "arguments": args,
-                                "result": "rejected_no_changes",
-                            }
-                        )
-                        continue
-                    submitted = True
                     history.append({"tool": "submit", "result": "submitted"})
                     detail_parts.append(f"[第{round_num}轮] submit: 提交定稿")
+                    submit_called = True
                     break
 
                 result: dict[str, Any] | None = None
@@ -527,7 +512,7 @@ class WriterAI:
                     result = execute_refine_line(current_poem, template, args)
                     if "poem" in result:
                         current_poem = result["poem"]
-                        modifications += 1
+                        poem_changed = True
                         full_result = self.validator.validate(
                             current_poem, template, template_obj
                         )
@@ -552,7 +537,7 @@ class WriterAI:
                     )
                     if "poem" in result:
                         current_poem = result["poem"]
-                        modifications += 1
+                        poem_changed = True
                     detail = f"[第{round_num}轮] rewrite({args.get('instruction', '')})"
                     if "poem" in result:
                         detail += ": 重写完成"
@@ -578,8 +563,14 @@ class WriterAI:
                             }
                         )
 
-            if submitted:
+            if submit_called:
                 break
+
+            if poem_changed:
+                check = self.validator.validate(current_poem, template, template_obj)
+                if check.passed:
+                    detail_parts.append(f"[第{round_num}轮] 格律校验通过，优化结束")
+                    break
 
             messages.append(LLMClient.assistant_to_message(response))
             messages.extend(
@@ -609,7 +600,6 @@ class WriterAI:
 
         return (
             current_poem,
-            submitted,
             history,
             "\n".join(detail_parts) if detail_parts else "",
             executed_rounds,
