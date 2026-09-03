@@ -382,6 +382,13 @@ class WujueTemplate(PoetryTemplate):
         errors.extend(_check_jinti_rhyme(syllables, [1, 3], "押韵(二四行)"))
         return errors
 
+    def format_poem(self, poem: list[str]) -> str:
+        """绝句格式：一句一行，句末加句号。"""
+        title = poem[0] if poem else ""
+        content = poem[1:] if len(poem) > 1 else poem
+        lines = [f"{line}。" for line in content]
+        return title + "\n" + "\n".join(lines) if title else "\n".join(lines)
+
 
 class QijueTemplate(PoetryTemplate):
     """七言绝句：4 行 7 字，二四六字定平仄，偶句平声韵。"""
@@ -424,6 +431,13 @@ class QijueTemplate(PoetryTemplate):
         errors.extend(_check_jinti_rhyme(syllables, [1, 3], "押韵(二四行)"))
         return errors
 
+    def format_poem(self, poem: list[str]) -> str:
+        """绝句格式：一句一行，句末加句号。"""
+        title = poem[0] if poem else ""
+        content = poem[1:] if len(poem) > 1 else poem
+        lines = [f"{line}。" for line in content]
+        return title + "\n" + "\n".join(lines) if title else "\n".join(lines)
+
 
 class WulvTemplate(PoetryTemplate):
     """五言律诗：8 行 5 字，四联，偶句平声韵（对仗由检查 AI 负责）。"""
@@ -462,6 +476,20 @@ class WulvTemplate(PoetryTemplate):
         errors.extend(_check_jinti_rhyme(syllables, [1, 3, 5, 7], "押韵(二四六八行)"))
         return errors
 
+    def format_poem(self, poem: list[str]) -> str:
+        """律诗格式：一联一行，联间逗号，末联句号。"""
+        title = poem[0] if poem else ""
+        content = poem[1:] if len(poem) > 1 else poem
+        coupled: list[str] = []
+        for i in range(0, len(content) - 1, 2):
+            coupled.append(f"{content[i]}，{content[i + 1]}")
+        if len(content) % 2 == 1:
+            coupled.append(content[-1])
+        if coupled:
+            coupled[-1] = coupled[-1].rstrip("，") + "。"
+        lines = "\n".join(coupled)
+        return title + "\n" + lines if title else lines
+
 
 class QilvTemplate(PoetryTemplate):
     """七言律诗：8 行 7 字，四联，偶句平声韵（对仗由检查 AI 负责）。"""
@@ -499,6 +527,20 @@ class QilvTemplate(PoetryTemplate):
         errors.extend(_check_jinti_structure(syllables))
         errors.extend(_check_jinti_rhyme(syllables, [1, 3, 5, 7], "押韵(二四六八行)"))
         return errors
+
+    def format_poem(self, poem: list[str]) -> str:
+        """律诗格式：一联一行，联间逗号，末联句号。"""
+        title = poem[0] if poem else ""
+        content = poem[1:] if len(poem) > 1 else poem
+        coupled: list[str] = []
+        for i in range(0, len(content) - 1, 2):
+            coupled.append(f"{content[i]}，{content[i + 1]}")
+        if len(content) % 2 == 1:
+            coupled.append(content[-1])
+        if coupled:
+            coupled[-1] = coupled[-1].rstrip("，") + "。"
+        lines = "\n".join(coupled)
+        return title + "\n" + lines if title else lines
 
 
 class XiangjianhuanTemplate(PoetryTemplate):
@@ -579,6 +621,17 @@ class XiangjianhuanTemplate(PoetryTemplate):
         if upper and lower_ze and lower_ze == upper:
             errors.append(f"下阕仄韵应与平韵不同部（换韵）: 均为'{lower_ze}'")
         return errors
+
+    def format_poem(self, poem: list[str]) -> str:
+        """相见欢格式：开头Tab，阙间Tab，阕内无换行（CSS wrap）。"""
+        title = poem[0] if poem else ""
+        content = poem[1:] if len(poem) > 1 else poem
+        upper = "".join(content[:3]) if len(content) >= 3 else "".join(content)
+        lower = "".join(content[3:]) if len(content) > 3 else ""
+        text = "\t" + upper
+        if lower:
+            text += "\t" + lower
+        return title + "\n" + text if title else text
 
 
 def register_chinese_templates() -> None:

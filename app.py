@@ -323,6 +323,8 @@ def _emit_done(session_id: str, result: Any) -> None:
         {
             "draft": result.draft,
             "final_poem": result.final_poem,
+            "title": result.title,
+            "formatted_poem": result.formatted_poem,
             "checker_pass": result.checker_pass,
             "checker_suggestions": result.checker_suggestions,
             "step_details": result.step_details,

@@ -74,7 +74,7 @@ class _FakeWriter(WriterAI):
         template_obj: Any = None,
         max_attempts: int = 0,
         on_stream: ChunkCallback = None,
-    ) -> tuple[list[str], str]:
+    ) -> tuple[list[str], str, str]:
         """返回固定初稿（Step 2）。
 
         Args:
@@ -86,10 +86,10 @@ class _FakeWriter(WriterAI):
             on_stream: 流式回调（未使用）。
 
         Returns:
-            (诗稿, 日志文本)。
+            (诗稿, 标题, 日志文本)。
         """
         self.generate_draft_calls += 1
-        return ["床前明月光", "疑是地上霜"], "初稿详情"
+        return ["床前明月光", "疑是地上霜"], "测试标题", "初稿详情"
 
     def refine(
         self,
@@ -180,6 +180,7 @@ def _make_state() -> PipelineState:
         template={"lines": 4, "language": "zh", "syllables_per_line": [5, 5, 5, 5]},
         description="现代文描述",
         draft=["床前明月光", "疑是地上霜"],
+        title="测试标题",
     )
 
 
@@ -215,7 +216,8 @@ def test_run_full_with_fakes() -> None:
     state = pipeline.run("静夜思", "zh_wujue")
 
     assert state.checker_pass is True
-    assert state.final_poem == ["窗前明月光", "疑是地上霜"]
+    assert state.title == "测试标题"
+    assert state.final_poem == ["测试标题", "窗前明月光", "疑是地上霜"]
     assert writer.generate_description_calls == 1
     assert writer.generate_draft_calls == 1
 
@@ -242,7 +244,7 @@ def test_refine_unsubmitted_fallback() -> None:
 
     assert state.checker_pass is False
     assert "炼句未完成提交" in state.checker_suggestions
-    assert state.final_poem == ["床前明月光", "疑是地上霜"]
+    assert state.final_poem == ["测试标题", "床前明月光", "疑是地上霜"]
 
 
 def test_refine_checker_exception() -> None:
@@ -263,7 +265,7 @@ def test_refine_checker_exception() -> None:
     pipeline._run_refine_loop(state, messages2)
 
     assert state.checker_pass is True
-    assert state.final_poem == ["窗前明月光", "疑是地上霜"]
+    assert state.final_poem == ["测试标题", "窗前明月光", "疑是地上霜"]
     assert any("检查AI异常: boom" in ev["checker_suggestions"] for ev in events)
 
 
@@ -288,7 +290,7 @@ def test_refine_checker_false_then_true() -> None:
     pipeline._run_refine_loop(state, messages3)
 
     assert state.checker_pass is True
-    assert state.final_poem == ["窗前明月光", "疑是地上霜"]
+    assert state.final_poem == ["测试标题", "窗前明月光", "疑是地上霜"]
     assert writer.feedback_log[1] == "请更婉约"
 
 
@@ -323,3 +325,26 @@ def test_describe_unsubmitted_all_branches() -> None:
     assert "refine_line" in msg
     assert "最近日志" in msg
     assert "log8" in msg
+
+
+def test_fallback_formatted_poem_with_template_obj() -> None:
+    """checker_pass=False 且 _template_obj 有 format_poem 时走 411 分支。"""
+    writer = _FakeWriter(
+        [
+            (
+                ["窗前明月光", "疑是地上霜"],
+                False,
+                [{"tool": "submit", "arguments": {}, "result": "rejected_no_changes"}],
+                "日志",
+                1,
+            ),
+        ]
+    )
+    checker = _FakeChecker([{"pass": True}])
+    pipeline = _make_pipeline(writer, checker)
+
+    state = pipeline.run("静夜思", "zh_wujue")
+
+    assert state.checker_pass is False
+    assert state.formatted_poem != ""
+    assert "窗前明月光" in state.formatted_poem

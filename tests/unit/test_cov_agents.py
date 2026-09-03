@@ -471,10 +471,12 @@ def test_generate_draft_template_obj_describe() -> None:
     writer, chat = _make_writer()
     chat.chat.return_value = {
         "content": "一二三四五\n六七八九十",
-        "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+        "tool_calls": [
+            {"id": "1", "name": "submit", "arguments": {"title": "测试标题"}}
+        ],
     }
     msgs: list[dict[str, Any]] = []
-    poem, _ = writer.generate_draft(
+    poem, _title, _ = writer.generate_draft(
         "主题", {"language": "zh", "lines": 2}, msgs, WujueTemplate()
     )
     assert len(poem) == 2
@@ -487,12 +489,16 @@ def test_generate_draft_submit_wrong_lines_then_retry() -> None:
         # 第一次 submit: 行数不对
         {
             "content": "一行",
-            "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+            "tool_calls": [
+                {"id": "1", "name": "submit", "arguments": {"title": "标题"}}
+            ],
         },
         # 第二次 submit: 正确
         {
             "content": "一二三四五\n六七八九十",
-            "tool_calls": [{"id": "2", "name": "submit", "arguments": {}}],
+            "tool_calls": [
+                {"id": "2", "name": "submit", "arguments": {"title": "测试标题"}}
+            ],
         },
     ]
     template = {
@@ -502,7 +508,7 @@ def test_generate_draft_submit_wrong_lines_then_retry() -> None:
         "syllable_constraints": None,
     }
     msgs: list[dict[str, Any]] = []
-    poem, _ = writer.generate_draft("主题", template, msgs)
+    poem, _title, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
 
 
@@ -511,7 +517,9 @@ def test_generate_draft_stream_retry() -> None:
     writer, chat = _make_writer()
     chat.chat.return_value = {
         "content": "一二三四五\n六七八九十",
-        "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+        "tool_calls": [
+            {"id": "1", "name": "submit", "arguments": {"title": "测试标题"}}
+        ],
     }
     template = {
         "language": "zh",
@@ -521,7 +529,7 @@ def test_generate_draft_stream_retry() -> None:
     }
     fired: list[str] = []
     msgs: list[dict[str, Any]] = []
-    poem, _ = writer.generate_draft(
+    poem, _title, _ = writer.generate_draft(
         "主题", template, msgs, on_stream=lambda t: fired.append(t)
     )
     assert len(poem) == 2
@@ -977,7 +985,9 @@ def test_generate_draft_submit_empty_content_fallback() -> None:
         # 第一次: AI 返回空 content + submit tool call
         {
             "content": "",
-            "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+            "tool_calls": [
+                {"id": "1", "name": "submit", "arguments": {"title": "测试标题"}}
+            ],
         },
     ]
     template = {
@@ -989,7 +999,7 @@ def test_generate_draft_submit_empty_content_fallback() -> None:
     msgs: list[dict[str, Any]] = []
     # 先手动写入一条 assistant 消息供回退提取
     msgs.append({"role": "assistant", "content": "一二三四五\n六七八九十"})
-    poem, _ = writer.generate_draft("主题", template, msgs)
+    poem, _title, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
 
 
@@ -1000,12 +1010,16 @@ def test_generate_draft_submit_syllable_fail_then_pass() -> None:
         # 第一次: 行数正确但音节错
         {
             "content": "一二三四\n五六七八",
-            "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+            "tool_calls": [
+                {"id": "1", "name": "submit", "arguments": {"title": "标题"}}
+            ],
         },
         # 第二次: 正确
         {
             "content": "一二三四五\n六七八九十",
-            "tool_calls": [{"id": "2", "name": "submit", "arguments": {}}],
+            "tool_calls": [
+                {"id": "2", "name": "submit", "arguments": {"title": "测试标题"}}
+            ],
         },
     ]
     template = {
@@ -1015,7 +1029,7 @@ def test_generate_draft_submit_syllable_fail_then_pass() -> None:
         "syllable_constraints": None,
     }
     msgs: list[dict[str, Any]] = []
-    poem, _ = writer.generate_draft("主题", template, msgs)
+    poem, _title, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
 
 
@@ -1028,7 +1042,9 @@ def test_generate_draft_no_tool_calls_retry() -> None:
         # 第二次: submit
         {
             "content": "一二三四五\n六七八九十",
-            "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+            "tool_calls": [
+                {"id": "1", "name": "submit", "arguments": {"title": "测试标题"}}
+            ],
         },
     ]
     template = {
@@ -1038,7 +1054,7 @@ def test_generate_draft_no_tool_calls_retry() -> None:
         "syllable_constraints": None,
     }
     msgs: list[dict[str, Any]] = []
-    poem, _ = writer.generate_draft("主题", template, msgs)
+    poem, _title, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
 
 
@@ -1051,7 +1067,9 @@ def test_generate_draft_no_tool_calls_wrong_lines_retry() -> None:
         # 第二次: 正确 submit
         {
             "content": "一二三四五\n六七八九十",
-            "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+            "tool_calls": [
+                {"id": "1", "name": "submit", "arguments": {"title": "测试标题"}}
+            ],
         },
     ]
     template = {
@@ -1061,7 +1079,7 @@ def test_generate_draft_no_tool_calls_wrong_lines_retry() -> None:
         "syllable_constraints": None,
     }
     msgs: list[dict[str, Any]] = []
-    poem, _ = writer.generate_draft("主题", template, msgs)
+    poem, _title, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
 
 
@@ -1074,7 +1092,9 @@ def test_generate_draft_no_tool_calls_syllable_fail_retry() -> None:
         # 第二次: 正确 submit
         {
             "content": "一二三四五\n六七八九十",
-            "tool_calls": [{"id": "1", "name": "submit", "arguments": {}}],
+            "tool_calls": [
+                {"id": "1", "name": "submit", "arguments": {"title": "测试标题"}}
+            ],
         },
     ]
     template = {
@@ -1084,5 +1104,126 @@ def test_generate_draft_no_tool_calls_syllable_fail_retry() -> None:
         "syllable_constraints": None,
     }
     msgs: list[dict[str, Any]] = []
-    poem, _ = writer.generate_draft("主题", template, msgs)
+    poem, _title, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
+
+
+def test_generate_draft_empty_title_retry() -> None:
+    """submit 时 title 为空→提示重试；第二次通过。"""
+    writer, chat = _make_writer()
+    chat.chat.side_effect = [
+        # 第一次: 空 title
+        {
+            "content": "一二三四五\n六七八九十",
+            "tool_calls": [{"id": "1", "name": "submit", "arguments": {"title": ""}}],
+        },
+        # 第二次: 正确
+        {
+            "content": "一二三四五\n六七八九十",
+            "tool_calls": [
+                {"id": "2", "name": "submit", "arguments": {"title": "测试标题"}}
+            ],
+        },
+    ]
+    template = {
+        "language": "zh",
+        "lines": 2,
+        "syllables_per_line": [5, 5],
+        "syllable_constraints": None,
+    }
+    msgs: list[dict[str, Any]] = []
+    poem, title, _ = writer.generate_draft("主题", template, msgs)
+    assert len(poem) == 2
+    assert title == "测试标题"
+
+
+# --------------------------------------------------------------------------- #
+# format_poem (Chinese templates)
+# --------------------------------------------------------------------------- #
+def test_format_poem_wujue() -> None:
+    """五言绝句格式：一句一行，句末句号。"""
+    from src.templates.zh import WujueTemplate
+
+    t = WujueTemplate()
+    result = t.format_poem(
+        ["静夜思", "白日依山尽", "黄河入海流", "欲穷千里目", "更上一层楼"]
+    )
+    assert result.startswith("静夜思\n")
+    assert "白日依山尽。" in result
+    assert "更上一层楼。" in result
+
+
+def test_format_poem_qijue() -> None:
+    """七言绝句格式：一句一行，句末句号。"""
+    from src.templates.zh import QijueTemplate
+
+    t = QijueTemplate()
+    result = t.format_poem(["登鹳雀楼", "白日依山尽黄河入海流", "欲穷千里目更上一层楼"])
+    assert result.startswith("登鹳雀楼\n")
+    assert "。" in result
+
+
+def test_format_poem_wulv() -> None:
+    """五言律诗格式：一联一行，联间逗号，末联句号。"""
+    from src.templates.zh import WulvTemplate
+
+    t = WulvTemplate()
+    lines = ["标题", "句1", "句2", "句3", "句4", "句5", "句6", "句7", "句8"]
+    result = t.format_poem(lines)
+    assert result.startswith("标题\n")
+    assert "句1，句2" in result
+    assert "句7，句8。" in result
+
+
+def test_format_poem_xiangjianhuan() -> None:
+    """相见欢格式：开头Tab，阙间Tab，阕内无换行。"""
+    from src.templates.zh import XiangjianhuanTemplate
+
+    t = XiangjianhuanTemplate()
+    lines = ["标题", "上1", "上2", "上3", "下1", "下2", "下3", "下4"]
+    result = t.format_poem(lines)
+    assert result.startswith("标题\n\t")
+    assert "\t" in result.split("\n")[1]
+
+
+def test_format_poem_qilv() -> None:
+    """七言律诗格式：一联一行，联间逗号，末联句号。"""
+    from src.templates.zh import QilvTemplate
+
+    t = QilvTemplate()
+    lines = ["标题", "句1", "句2", "句3", "句4", "句5", "句6", "句7", "句8"]
+    result = t.format_poem(lines)
+    assert result.startswith("标题\n")
+    assert "句1，句2" in result
+    assert "句7，句8。" in result
+
+
+def test_format_poem_qilv_odd_content() -> None:
+    """七言律诗奇数内容行触发 odd-content 分支。"""
+    from src.templates.zh import QilvTemplate
+
+    t = QilvTemplate()
+    lines = ["标题", "句1", "句2", "句3"]
+    result = t.format_poem(lines)
+    assert result.startswith("标题\n")
+    assert "句3。" in result
+
+
+def test_format_poem_wulv_odd_content() -> None:
+    """五言律诗奇数内容行触发 odd-content 分支。"""
+    from src.templates.zh import WulvTemplate
+
+    t = WulvTemplate()
+    lines = ["标题", "句1", "句2", "句3"]
+    result = t.format_poem(lines)
+    assert result.startswith("标题\n")
+    assert "句3。" in result
+
+
+def test_format_poem_base() -> None:
+    """基类 format_poem 默认用换行连接。"""
+    from src.templates.en import ShakespeareSonnetTemplate
+
+    t = ShakespeareSonnetTemplate()
+    result = t.format_poem(["title", "line1", "line2"])
+    assert result == "title\nline1\nline2"

@@ -53,7 +53,11 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
                 "role": "assistant",
                 "content": DRAFT,
                 "tool_calls": [
-                    {"id": "call_submit", "name": "submit", "arguments": {}}
+                    {
+                        "id": "call_submit",
+                        "name": "submit",
+                        "arguments": {"title": "静夜思"},
+                    }
                 ],
             },
             # Step 3: refine 第一轮 refine_line
@@ -63,7 +67,11 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
                 "role": "assistant",
                 "content": REVISED_LINE + "\n" + "\n".join(DRAFT.split("\n")[1:]),
                 "tool_calls": [
-                    {"id": "call_submit2", "name": "submit", "arguments": {}}
+                    {
+                        "id": "call_submit2",
+                        "name": "submit",
+                        "arguments": {"title": "静夜思"},
+                    }
                 ],
             },
         ],
@@ -94,7 +102,8 @@ def test_generate_emits_progress_and_done(monkeypatch: pytest.MonkeyPatch) -> No
     assert "progress" in events
     assert done is not None
     assert done["checker_pass"] is True
-    assert done["final_poem"][0] == REVISED_LINE
+    assert done["title"] == "静夜思"
+    assert done["final_poem"][1] == REVISED_LINE
 
 
 def test_generate_empty_input_errors(monkeypatch: pytest.MonkeyPatch) -> None:
