@@ -40,9 +40,10 @@ def execute_refine_line(
         return {"error": result.errors}
 
     old_text = poem[line_idx]
-    poem[line_idx] = new_text
+    new_poem = list(poem)
+    new_poem[line_idx] = new_text
     return {
-        "poem": list(poem),
+        "poem": new_poem,
         "changed_line": line_idx,
         "old_text": old_text,
         "new_text": new_text,
