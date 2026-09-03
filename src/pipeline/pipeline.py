@@ -218,7 +218,7 @@ class PoetryPipeline:
                 state.current_detail = text
                 self._report(state)
 
-        description, detail = self._get_writer().generate_description(
+        description = self._get_writer().generate_description(
             state.topic, messages, on_stream=on_stream
         )
         state.description = description
@@ -228,7 +228,7 @@ class PoetryPipeline:
             state,
             step=1,
             title="Step 1: 生成现代文描述",
-            content=detail,
+            content=description,
         )
         self._report(state)
 
@@ -318,7 +318,7 @@ class PoetryPipeline:
                     state.last_tool_result = text
                     self._report(state)
 
-            poem, submitted, history, detail, tool_rounds = self._get_writer().refine(
+            poem, history, detail, tool_rounds = self._get_writer().refine(
                 description=state.description,
                 poem=state.draft,
                 template=state.template,
@@ -342,10 +342,9 @@ class PoetryPipeline:
             )
             state.current_detail = ""
 
-            # 防御分支: 无轮数上限后 refine() 仅在提交成功时返回，此处理论不可达
-            if not submitted:
+            if tool_rounds < 1:
                 state.checker_pass = False
-                state.checker_suggestions = _describe_unsubmitted(history, detail)
+                state.checker_suggestions = "未执行任何优化轮次"
                 self._report(state)
                 break
 
@@ -447,38 +446,4 @@ def json_dumps_safe(obj: Any, default: str = "") -> str:
         return str(obj)
 
 
-def _describe_unsubmitted(history: list[dict[str, Any]], detail: str) -> str:
-    """生成"炼句未完成提交"的诊断说明。
 
-    Args:
-        history: 炼句工具历史。
-        detail: 炼句日志。
-
-    Returns:
-        诊断文本（含统计与最近日志）。
-    """
-    rejected = 0
-    failed = 0
-    for h in history:
-        result = h.get("result")
-        if h.get("tool") == "submit" and result == "rejected_no_changes":
-            rejected += 1
-        if isinstance(result, dict) and result.get("error"):
-            failed += 1
-    tool_calls = [
-        str(h.get("tool")) for h in history if h.get("tool") not in ("submit", "")
-    ]
-    stats: list[str] = []
-    if not tool_calls:
-        stats.append("AI未调用任何工具(可能模型不支持工具调用)")
-    else:
-        if rejected:
-            stats.append(f"submit被拒{rejected}次(须先成功修改一行)")
-        if failed:
-            stats.append(f"工具调用失败{failed}次(多为格律未通过)")
-        stats.append(f"已执行工具: {'、'.join(dict.fromkeys(tool_calls))}")
-    tail_lines = detail.strip().splitlines()[-6:] if detail else []
-    msg = "炼句未完成提交: " + "；".join(stats)
-    if tail_lines:
-        msg += "\n最近日志:\n" + "\n".join(tail_lines)
-    return msg

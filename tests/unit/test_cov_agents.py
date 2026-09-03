@@ -447,9 +447,8 @@ def test_generate_description_stream() -> None:
     writer, chat = _make_writer()
     chat.chat_stream.return_value = {"content": "描述文本", "tool_calls": []}
     msgs: list[dict[str, Any]] = []
-    desc, detail = writer.generate_description("主题", msgs, on_stream=lambda t: None)
+    desc = writer.generate_description("主题", msgs, on_stream=lambda t: None)
     assert desc == "描述文本"
-    assert detail == "描述文本"
 
 
 def test_generate_description_plain() -> None:
@@ -457,7 +456,7 @@ def test_generate_description_plain() -> None:
     writer, chat = _make_writer()
     chat.chat.return_value = {"content": "描述文本", "tool_calls": []}
     msgs: list[dict[str, Any]] = []
-    desc, _ = writer.generate_description("主题", msgs)
+    desc = writer.generate_description("主题", msgs)
     assert desc == "描述文本"
 
 
@@ -582,51 +581,32 @@ def test_refine_no_tool_calls_then_submit() -> None:
             ],
         )
         msgs: list[dict[str, Any]] = []
-        _, submitted, _, _, _ = writer.refine(
+        _, _, _, _ = writer.refine(
             "主题", ["原"], {"language": "zh", "lines": 1}, msgs
         )
-    assert submitted is True
 
 
-def test_refine_submit_before_modification_rejected() -> None:
-    """尚未修改即 submit 应被拒绝，之后修改再 submit 才通过。"""
+def test_refine_submit_without_modification_allowed() -> None:
+    """未修改直接 submit 现在被允许（不再强制修改后才能提交）。"""
     writer, _ = _make_writer()
-    with patch(
-        "src.agents.writer_ai.execute_refine_line", return_value={"poem": ["改"]}
-    ):
-        _refine_seq(
-            writer,
-            [
-                {
-                    "content": "",
-                    "tool_calls": [
-                        {"id": "1", "name": "submit", "arguments": {"pass": True}}
-                    ],
-                },
-                {
-                    "content": "",
-                    "tool_calls": [
-                        {
-                            "id": "2",
-                            "name": "refine_line",
-                            "arguments": {"line": 0, "new_text": "改"},
-                        }
-                    ],
-                },
-                {
-                    "content": "",
-                    "tool_calls": [
-                        {"id": "3", "name": "submit", "arguments": {"pass": True}}
-                    ],
-                },
-            ],
-        )
-        msgs: list[dict[str, Any]] = []
-        _, submitted, history, _, _ = writer.refine(
-            "主题", ["原"], {"language": "zh", "lines": 1}, msgs
-        )
-    assert submitted is True
-    assert any(h["result"] == "rejected_no_changes" for h in history)
+    _refine_seq(
+        writer,
+        [
+            {
+                "content": "",
+                "tool_calls": [
+                    {"id": "1", "name": "submit", "arguments": {"pass": True}}
+                ],
+            },
+        ],
+    )
+    msgs: list[dict[str, Any]] = []
+    poem, history, _, rounds = writer.refine(
+        "主题", ["原"], {"language": "zh", "lines": 1}, msgs
+    )
+    assert poem == ["原"]
+    assert rounds == 1
+    assert any(h["tool"] == "submit" for h in history)
 
 
 def test_refine_search_words_branch() -> None:
@@ -673,7 +653,7 @@ def test_refine_search_words_branch() -> None:
             ],
         )
         msgs: list[dict[str, Any]] = []
-        _, _, history, _, _ = writer.refine(
+        _, history, _, _ = writer.refine(
             "主题",
             ["原"],
             {"language": "zh", "lines": 1},
@@ -725,7 +705,7 @@ def test_refine_refine_line_error_branch() -> None:
             ],
         )
         msgs: list[dict[str, Any]] = []
-        _, _, _, detail, _ = writer.refine(
+        _, _, detail, _ = writer.refine(
             "主题", ["原"], {"language": "zh", "lines": 1}, msgs
         )
     assert "失败" in detail
@@ -772,7 +752,7 @@ def test_refine_rewrite_branch() -> None:
             ],
         )
         msgs: list[dict[str, Any]] = []
-        _, _, history, _, _ = writer.refine(
+        _, history, _, _ = writer.refine(
             "主题", ["原"], {"language": "zh", "lines": 1}, msgs
         )
     assert any(h["tool"] == "rewrite" for h in history)
@@ -841,10 +821,10 @@ def test_refine_no_progress_guidance() -> None:
     ):
         writer.client.chat = fake_chat  # type: ignore[method-assign]
         msgs: list[dict[str, Any]] = []
-        _, submitted, _, _, _ = writer.refine(
+        _, _, _, rounds = writer.refine(
             "主题", ["原"], template, msgs, on_stream=lambda _t: None
         )
-    assert submitted is True
+    assert rounds >= 1
     joined = "\n".join(str(m.get("content", "")) for msgs in captured for m in msgs)
     assert "连续多轮" in joined
 
