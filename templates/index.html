@@ -840,15 +840,20 @@
       }
 
       function copyPoem() {
-        const lines = document.querySelectorAll(".poem-line");
-        const text = Array.from(lines)
-          .map(function (el) {
-            return el.textContent;
-          })
-          .join("\n");
+        var parts = [];
+        var titleEl = document.querySelector(".poem-title");
+        if (titleEl) parts.push(titleEl.textContent);
+        var formatted = document.querySelector(".poem-formatted");
+        if (formatted) {
+          parts.push(formatted.textContent);
+        } else {
+          var lines = document.querySelectorAll(".poem-line");
+          lines.forEach(function (el) { parts.push(el.textContent); });
+        }
+        var text = parts.join("\n");
         if (!text) return;
         navigator.clipboard.writeText(text).then(function () {
-          const btn = document.getElementById("btn-copy");
+          var btn = document.getElementById("btn-copy");
           btn.textContent = "\u2714";
           setTimeout(function () {
             btn.textContent = "\uD83D\uDCCB";
