@@ -567,13 +567,9 @@ class WriterAI:
                 break
 
             if poem_changed:
-                check = self.validator.validate(
-                    current_poem, template, template_obj
-                )
+                check = self.validator.validate(current_poem, template, template_obj)
                 if check.passed:
-                    detail_parts.append(
-                        f"[第{round_num}轮] 格律校验通过，优化结束"
-                    )
+                    detail_parts.append(f"[第{round_num}轮] 格律校验通过，优化结束")
                     break
 
             messages.append(LLMClient.assistant_to_message(response))

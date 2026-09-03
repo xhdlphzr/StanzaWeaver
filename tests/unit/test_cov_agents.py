@@ -581,9 +581,7 @@ def test_refine_no_tool_calls_then_submit() -> None:
             ],
         )
         msgs: list[dict[str, Any]] = []
-        _, _, _, _ = writer.refine(
-            "主题", ["原"], {"language": "zh", "lines": 1}, msgs
-        )
+        _, _, _, _ = writer.refine("主题", ["原"], {"language": "zh", "lines": 1}, msgs)
 
 
 def test_refine_submit_without_modification_allowed() -> None:

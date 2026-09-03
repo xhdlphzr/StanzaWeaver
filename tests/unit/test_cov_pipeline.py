@@ -292,6 +292,24 @@ def test_refine_zero_rounds_fallback() -> None:
     assert state.final_poem == ["测试标题", "床前明月光", "疑是地上霜"]
 
 
+def test_run_zero_rounds_triggers_format_fallback() -> None:
+    """run() 中 refine 返回 tool_rounds=0 时触发 line 391-402 的 format_poem 兜底。"""
+    writer = _FakeWriter(
+        [
+            (["床前明月光", "疑是地上霜"], [], "炼句日志末尾", 0),
+        ]
+    )
+    checker = _FakeChecker([])
+    pipeline = _make_pipeline(writer, checker)
+
+    state = pipeline.run("静夜思", "zh_wujue")
+
+    assert state.checker_pass is False
+    assert state.final_poem == ["测试标题", "床前明月光", "疑是地上霜"]
+    assert state.formatted_poem != ""
+    assert "床前明月光" in state.formatted_poem
+
+
 def test_fallback_formatted_poem_with_template_obj() -> None:
     """checker_pass=False 且 _template_obj 有 format_poem 时走分支。"""
     writer = _FakeWriter(
@@ -310,10 +328,12 @@ def test_fallback_formatted_poem_with_template_obj() -> None:
             ),
         ]
     )
-    checker = _FakeChecker([
-        {"pass": False, "suggestions": "不够婉约"},
-        {"pass": True, "suggestions": "ok"},
-    ])
+    checker = _FakeChecker(
+        [
+            {"pass": False, "suggestions": "不够婉约"},
+            {"pass": True, "suggestions": "ok"},
+        ]
+    )
     pipeline = _make_pipeline(writer, checker)
 
     state = pipeline.run("静夜思", "zh_wujue")
