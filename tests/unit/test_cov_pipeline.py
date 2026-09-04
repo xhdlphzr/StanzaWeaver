@@ -13,6 +13,8 @@
 
 from typing import Any
 
+import pytest
+
 from src.agents.checker_ai import CheckerAI
 from src.agents.writer_ai import (
     ChunkCallback,
@@ -25,6 +27,7 @@ from src.pipeline.pipeline import (
     PoetryPipeline,
     json_dumps_safe,
 )
+from src.templates import get as get_template
 
 RefinePlan = list[RefineResult]
 CheckPlan = list[dict[str, Any] | Exception]
@@ -341,3 +344,83 @@ def test_fallback_formatted_poem_with_template_obj() -> None:
     assert state.checker_pass is True
     assert state.formatted_poem != ""
     assert "窗前明月光" in state.formatted_poem
+
+
+# --------------------------------------------------------------------------- #
+# P2-6: _load_template 无效 key
+# --------------------------------------------------------------------------- #
+def test_load_template_invalid_key() -> None:
+    """无效模板键应抛出 KeyError。"""
+    with pytest.raises(KeyError):
+        get_template("nonexistent_key_xyz")
+
+
+# --------------------------------------------------------------------------- #
+# P2-7: checker_pass=True + _template_obj=None → else 分支
+# --------------------------------------------------------------------------- #
+def test_checker_pass_no_template_obj_uses_newline_join() -> None:
+    """checker_pass=True 且 _template_obj=None 时走 else 分支（换行拼接）。"""
+    writer = _FakeWriter(
+        [
+            (["床前明月光", "疑是地上霜"], [], "日志", 1),
+        ]
+    )
+    checker = _FakeChecker([{"pass": True}])
+    pipeline = _make_pipeline(writer, checker)
+    pipeline._template_obj = None
+
+    state = _make_state()
+    messages: list[dict[str, Any]] = []
+    pipeline._run_refine_loop(state, messages)
+
+    assert state.checker_pass is True
+    assert state.formatted_poem == "测试标题\n床前明月光\n疑是地上霜"
+
+
+# --------------------------------------------------------------------------- #
+# P2-8: state.title 为空时 final_poem 不含标题
+# --------------------------------------------------------------------------- #
+def test_empty_title_excluded_from_final_poem() -> None:
+    """state.title 为空时 final_poem 不包含标题行。"""
+    writer = _FakeWriter(
+        [
+            (["床前明月光", "疑是地上霜"], [], "日志", 1),
+        ]
+    )
+    checker = _FakeChecker([{"pass": True}])
+    pipeline = _make_pipeline(writer, checker)
+
+    state = PipelineState(
+        topic="静夜思",
+        template_key="zh_wujue",
+        template={"lines": 4, "language": "zh", "syllables_per_line": [5, 5, 5, 5]},
+        description="现代文描述",
+        draft=["床前明月光", "疑是地上霜"],
+        title="",
+    )
+    messages: list[dict[str, Any]] = []
+    pipeline._run_refine_loop(state, messages)
+
+    assert state.title == ""
+    assert state.final_poem == ["床前明月光", "疑是地上霜"]
+
+
+# --------------------------------------------------------------------------- #
+# P2-9: json_dumps_safe 的 ValueError / RecursionError 分支
+# --------------------------------------------------------------------------- #
+def test_json_dumps_safe_value_error() -> None:
+    """循环引用触发 ValueError 分支。"""
+    a: Any = [1]
+    a.append(a)
+    result = json_dumps_safe(a)
+    assert isinstance(result, str)
+    assert "1" in result
+
+
+def test_json_dumps_safe_recursion_error() -> None:
+    """超深嵌套触发 RecursionError 分支。"""
+    deep: Any = "x"
+    for _ in range(2000):
+        deep = [deep]
+    result = json_dumps_safe(deep)
+    assert isinstance(result, str)

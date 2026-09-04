@@ -267,6 +267,15 @@ def test_count_tokens_empty() -> None:
     assert tokens == 0
 
 
+def test_count_tokens_unknown_model_fallback() -> None:
+    """未知模型名触发 KeyError 分支，回退到 cl100k_base。"""
+    c, _ = _make_llm("https://api.openai.com/v1")
+    c.model = "totally_unknown_model_xyz"
+    msgs = [{"role": "user", "content": "hello"}]
+    tokens = c.count_tokens(msgs)
+    assert tokens > 0
+
+
 # --------------------------------------------------------------------------- #
 # LLMClient.assistant_to_message
 # --------------------------------------------------------------------------- #
@@ -1205,3 +1214,39 @@ def test_format_poem_base() -> None:
     t = ShakespeareSonnetTemplate()
     result = t.format_poem(["title", "line1", "line2"])
     assert result == "title\nline1\nline2"
+
+
+def test_format_poem_en_haiku() -> None:
+    """英文模板使用基类 format_poem（换行连接）。"""
+    from src.templates.en import VillanelleTemplate
+
+    t = VillanelleTemplate()
+    result = t.format_poem(["spring", "cherry", "blossoms"])
+    assert result == "spring\ncherry\nblossoms"
+
+
+def test_format_poem_fr_haiku() -> None:
+    """法语模板使用基类 format_poem（换行连接）。"""
+    from src.templates.fr import RondeauTemplate
+
+    t = RondeauTemplate()
+    result = t.format_poem(["printemps", "cerisier", "fleurs"])
+    assert result == "printemps\ncerisier\nfleurs"
+
+
+def test_format_poem_it_haiku() -> None:
+    """意大利语模板使用基类 format_poem（换行连接）。"""
+    from src.templates.it import TerzaRimaTemplate
+
+    t = TerzaRimaTemplate()
+    result = t.format_poem(["primavera", "ciliegio", "fiori"])
+    assert result == "primavera\nciliegio\nfiori"
+
+
+def test_format_poem_la_elegy() -> None:
+    """拉丁语模板使用基类 format_poem（换行连接）。"""
+    from src.templates.la import HexameterTemplate
+
+    t = HexameterTemplate()
+    result = t.format_poem(["arma", "virumque", "cano"])
+    assert result == "arma\nvirumque\ncano"
