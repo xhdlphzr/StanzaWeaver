@@ -48,12 +48,10 @@
             if (v !== el.getAttribute("data-i18n-placeholder"))
               el.placeholder = v;
           });
-        document
-          .querySelectorAll("[data-i18n-title]")
-          .forEach(function (el) {
-            var v = t(el.getAttribute("data-i18n-title"));
-            if (v !== el.getAttribute("data-i18n-title")) el.title = v;
-          });
+        document.querySelectorAll("[data-i18n-title]").forEach(function (el) {
+          var v = t(el.getAttribute("data-i18n-title"));
+          if (v !== el.getAttribute("data-i18n-title")) el.title = v;
+        });
         document.documentElement.lang = t("html.lang");
       }
     </script>
@@ -72,11 +70,23 @@
           <p class="slogan" data-i18n="header.slogan">以智识，巧织诗</p>
         </div>
         <div class="header-right">
-          <button id="btn-ping" class="btn-ping" data-i18n-title="header.ping_title" title="检查连接">&#8635;</button>
+          <button
+            id="btn-ping"
+            class="btn-ping"
+            data-i18n-title="header.ping_title"
+            title="检查连接"
+          >
+            &#8635;
+          </button>
           <span class="ai-status-label">AI</span>
           <span id="llm-status-dot" class="llm-dot"></span>
           <span id="llm-status-text" class="llm-status-text"></span>
-          <button id="btn-config" class="btn-icon" data-i18n-title="header.config_title" title="LLM配置">
+          <button
+            id="btn-config"
+            class="btn-icon"
+            data-i18n-title="header.config_title"
+            title="LLM配置"
+          >
             &#9881;
           </button>
         </div>
@@ -95,14 +105,27 @@
           <div class="field field-inline">
             <label data-i18n="template.label">格律</label>
             <select id="template-select">
-              <option value="" data-i18n="template.default_option">-- 选择模板 --</option>
+              <option value="" data-i18n="template.default_option">
+                -- 选择模板 --
+              </option>
             </select>
-            <button id="btn-custom-template" class="btn-secondary btn-small" data-i18n="template.custom">
+            <button
+              id="btn-custom-template"
+              class="btn-secondary btn-small"
+              data-i18n="template.custom"
+            >
               + 自定义
             </button>
           </div>
           <div class="actions">
-            <button id="btn-generate" class="btn-primary" disabled data-i18n="generate.button">开始生成</button>
+            <button
+              id="btn-generate"
+              class="btn-primary"
+              disabled
+              data-i18n="generate.button"
+            >
+              开始生成
+            </button>
           </div>
         </section>
 
@@ -114,10 +137,20 @@
         <section id="poem-section" class="hidden card">
           <div class="section-header-row">
             <span class="section-header" data-i18n="poem.title">诗稿</span>
-            <button id="btn-copy" class="btn-copy" data-i18n-title="poem.copy_title" title="复制诗稿">
+            <button
+              id="btn-copy"
+              class="btn-copy"
+              data-i18n-title="poem.copy_title"
+              title="复制诗稿"
+            >
               &#128203;
             </button>
-            <button id="btn-history" class="btn-history-link" data-i18n-title="poem.history_title" title="历史记录">
+            <button
+              id="btn-history"
+              class="btn-history-link"
+              data-i18n-title="poem.history_title"
+              title="历史记录"
+            >
               &#128220;
             </button>
           </div>
@@ -128,8 +161,20 @@
 
         <section id="feedback-section" class="hidden card">
           <div class="feedback-buttons">
-            <button id="btn-accept" class="btn-accept" data-i18n="review.accept">定稿</button>
-            <button id="btn-reject" class="btn-reject" data-i18n="review.reject">不定稿</button>
+            <button
+              id="btn-accept"
+              class="btn-accept"
+              data-i18n="review.accept"
+            >
+              定稿
+            </button>
+            <button
+              id="btn-reject"
+              class="btn-reject"
+              data-i18n="review.reject"
+            >
+              不定稿
+            </button>
           </div>
           <div id="feedback-input-area" class="hidden">
             <div class="field">
@@ -140,7 +185,14 @@
                 placeholder="输入修改意见..."
               />
             </div>
-            <button id="btn-feedback" class="btn-send" disabled data-i18n="feedback.button">发送反馈</button>
+            <button
+              id="btn-feedback"
+              class="btn-send"
+              disabled
+              data-i18n="feedback.button"
+            >
+              发送反馈
+            </button>
           </div>
         </section>
       </main>
@@ -150,7 +202,8 @@
       <div class="modal-content">
         <h2 data-i18n="config_modal.title">LLM 配置</h2>
         <div class="config-group">
-          <label><span data-i18n="config_modal.language">语言</span>
+          <label
+            ><span data-i18n="config_modal.language">语言</span>
             <select id="cfg-language">
               <option value="zh" data-i18n="config_modal.lang_zh">汉语</option>
               <option value="en" data-i18n="config_modal.lang_en">英语</option>
@@ -169,8 +222,20 @@
           <label>Model <input type="text" id="cfg-checker-model" /></label>
         </div>
         <div class="modal-actions">
-          <button id="btn-save-config" class="btn-primary" data-i18n="config_modal.save">保存</button>
-          <button id="btn-close-config" class="btn-secondary" data-i18n="config_modal.cancel">取消</button>
+          <button
+            id="btn-save-config"
+            class="btn-primary"
+            data-i18n="config_modal.save"
+          >
+            保存
+          </button>
+          <button
+            id="btn-close-config"
+            class="btn-secondary"
+            data-i18n="config_modal.cancel"
+          >
+            取消
+          </button>
         </div>
       </div>
     </div>
@@ -180,7 +245,13 @@
         <h2 data-i18n="history_modal.title">历史记录</h2>
         <div id="history-list" class="history-list"></div>
         <div class="modal-actions">
-          <button id="btn-close-history" class="btn-secondary" data-i18n="history_modal.close">关闭</button>
+          <button
+            id="btn-close-history"
+            class="btn-secondary"
+            data-i18n="history_modal.close"
+          >
+            关闭
+          </button>
         </div>
       </div>
     </div>
@@ -191,15 +262,23 @@
         <div class="config-group">
           <label
             ><span data-i18n="template_modal.name_label">模板名称</span>
-            <input type="text" id="tmpl-name" data-i18n-placeholder="template_modal.name_placeholder" placeholder="如：浣溪沙"
+            <input
+              type="text"
+              id="tmpl-name"
+              data-i18n-placeholder="template_modal.name_placeholder"
+              placeholder="如：浣溪沙"
           /></label>
         </div>
         <div class="config-group config-row">
           <label
             ><span data-i18n="template_modal.language_label">语言</span>
             <select id="tmpl-language">
-              <option value="zh" data-i18n="template_modal.lang_zh">汉语</option>
-              <option value="en" data-i18n="template_modal.lang_en">英语</option>
+              <option value="zh" data-i18n="template_modal.lang_zh">
+                汉语
+              </option>
+              <option value="en" data-i18n="template_modal.lang_en">
+                英语
+              </option>
             </select>
           </label>
           <label
@@ -217,16 +296,36 @@
           /></label>
         </div>
         <div class="config-group">
-          <div class="section-header" style="margin-top: 8px" data-i18n="template_modal.constraints_title">每行音节约束</div>
+          <div
+            class="section-header"
+            style="margin-top: 8px"
+            data-i18n="template_modal.constraints_title"
+          >
+            每行音节约束
+          </div>
           <div id="tmpl-syllable-table" class="syllable-table"></div>
         </div>
         <div class="config-group">
-          <label data-i18n="template_modal.custom_code_label">自定义检测代码（Python，可选）</label>
+          <label data-i18n="template_modal.custom_code_label"
+            >自定义检测代码（Python，可选）</label
+          >
           <div id="tmpl-code" class="code-editor"></div>
         </div>
         <div class="modal-actions">
-          <button id="btn-create-template" class="btn-primary" data-i18n="template_modal.create">生成模板</button>
-          <button id="btn-close-template" class="btn-secondary" data-i18n="template_modal.cancel">取消</button>
+          <button
+            id="btn-create-template"
+            class="btn-primary"
+            data-i18n="template_modal.create"
+          >
+            生成模板
+          </button>
+          <button
+            id="btn-close-template"
+            class="btn-secondary"
+            data-i18n="template_modal.cancel"
+          >
+            取消
+          </button>
         </div>
       </div>
     </div>
@@ -253,8 +352,15 @@
       const STEP_ORDER = [1, 2, 3, 4];
 
       function applyButtonStates() {
-        document.getElementById("btn-generate").disabled =
-          llmDisabled || isGenerating;
+        var gen = document.getElementById("btn-generate");
+        gen.disabled = llmDisabled || isGenerating;
+        if (isGenerating) {
+          gen.classList.add("is-loading");
+          gen.textContent = t("generate.loading") || "生成中...";
+        } else {
+          gen.classList.remove("is-loading");
+          gen.textContent = t("generate.button");
+        }
         document.getElementById("btn-feedback").disabled = llmDisabled;
       }
 
@@ -395,7 +501,8 @@
           .then((r) => r.json())
           .then((templates) => {
             const select = document.getElementById("template-select");
-            select.innerHTML = '<option value="">' + t("template.default_option") + '</option>';
+            select.innerHTML =
+              '<option value="">' + t("template.default_option") + "</option>";
             templates.forEach((t) => {
               const opt = document.createElement("option");
               opt.value = t.key;
@@ -554,7 +661,7 @@
           const label = document.createElement("div");
           label.className = "step-record-label";
           label.textContent =
-            (d.title || "") + (count > 1 ? t("round", {count: count}) : "");
+            (d.title || "") + (count > 1 ? t("round", { count: count }) : "");
           rec.appendChild(label);
           const pre = document.createElement("pre");
           pre.textContent = d.content;
@@ -723,10 +830,14 @@
         checkerInline.classList.remove("hidden");
         if (data.checker_pass) {
           checkerInline.innerHTML =
-            '<div class="checker-pass">&#10004; ' + t("checker.pass") + '</div>';
+            '<div class="checker-pass">&#10004; ' +
+            t("checker.pass") +
+            "</div>";
         } else {
           checkerInline.innerHTML =
-            '<div class="checker-fail">&#10008; ' + t("checker.fail") + '</div>';
+            '<div class="checker-fail">&#10008; ' +
+            t("checker.fail") +
+            "</div>";
           if (data.checker_suggestions) {
             checkerInline.innerHTML +=
               '<div class="checker-detail">' +
@@ -848,7 +959,9 @@
           parts.push(formatted.textContent);
         } else {
           var lines = document.querySelectorAll(".poem-line");
-          lines.forEach(function (el) { parts.push(el.textContent); });
+          lines.forEach(function (el) {
+            parts.push(el.textContent);
+          });
         }
         var text = parts.join("\n");
         if (!text) return;
@@ -870,7 +983,8 @@
           .then(function (data) {
             const list = document.getElementById("history-list");
             if (data.length === 0) {
-              list.innerHTML = '<p class="history-empty">' + t("history_modal.empty") + '</p>';
+              list.innerHTML =
+                '<p class="history-empty">' + t("history_modal.empty") + "</p>";
               return;
             }
             list.innerHTML = "";
@@ -900,6 +1014,34 @@
       function closeHistory() {
         document.getElementById("history-modal").classList.add("hidden");
       }
+
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") {
+          if (
+            !document
+              .getElementById("history-modal")
+              .classList.contains("hidden")
+          ) {
+            closeHistory();
+          }
+          if (
+            !document
+              .getElementById("template-modal")
+              .classList.contains("hidden")
+          ) {
+            closeTemplateModal();
+          }
+        }
+      });
+
+      document.addEventListener("click", function (e) {
+        if (
+          e.target.classList.contains("modal") &&
+          !e.target.classList.contains("hidden")
+        ) {
+          e.target.classList.add("hidden");
+        }
+      });
 
       function escapeHtml(str) {
         const div = document.createElement("div");
@@ -962,7 +1104,7 @@
           row.className = "syl-row";
           const label = document.createElement("span");
           label.className = "syl-row-label";
-          label.textContent = t("line_label", {n: i + 1});
+          label.textContent = t("line_label", { n: i + 1 });
           row.appendChild(label);
           const cnt = sylCounts[i] || 7;
           for (let j = 0; j < cnt; j++) {
@@ -972,10 +1114,22 @@
             sel.dataset.pos = j;
             if (lang === "zh") {
               sel.innerHTML =
-                '<option value="">' + t("syllable_constraints.free") + '</option><option value="平">' + t("syllable_constraints.light") + '</option><option value="仄">' + t("syllable_constraints.heavy") + '</option>';
+                '<option value="">' +
+                t("syllable_constraints.free") +
+                '</option><option value="平">' +
+                t("syllable_constraints.light") +
+                '</option><option value="仄">' +
+                t("syllable_constraints.heavy") +
+                "</option>";
             } else {
               sel.innerHTML =
-                '<option value="">' + t("syllable_constraints.free") + '</option><option value="light">' + t("syllable_constraints.light") + '</option><option value="heavy">' + t("syllable_constraints.heavy") + '</option>';
+                '<option value="">' +
+                t("syllable_constraints.free") +
+                '</option><option value="light">' +
+                t("syllable_constraints.light") +
+                '</option><option value="heavy">' +
+                t("syllable_constraints.heavy") +
+                "</option>";
             }
             row.appendChild(sel);
           }

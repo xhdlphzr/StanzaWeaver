@@ -19,6 +19,7 @@ template:
 
 generate:
   button: 开始生成
+  loading: 生成中...
 
 progress:
   title: 生成进度

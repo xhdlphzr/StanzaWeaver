@@ -19,6 +19,7 @@ template:
 
 generate:
   button: Generate
+  loading: Generating...
 
 progress:
   title: Generation Progress
