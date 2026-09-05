@@ -16,7 +16,7 @@ a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[('templates', 'templates'), ('static', 'static'), ('src/knowledge/schema.sql', 'src/knowledge')],
+    datas=[('templates', 'templates'), ('static', 'static'), ('i18n', 'i18n'), ('src/knowledge/schema.sql', 'src/knowledge')],
     hiddenimports=['engineio.async_drivers.threading', 'gevent'],
     hookspath=[],
     hooksconfig={},
