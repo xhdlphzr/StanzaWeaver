@@ -79,7 +79,7 @@ SUBMIT_TOOL: dict[str, Any] = {
     "type": "function",
     "function": {
         "name": "submit",
-        "description": "提交当前诗稿。编写AI调用此工具将定稿送交检查AI终审。",
+        "description": "提交当前诗稿。程序会先执行全量格律校验，通过后才将定稿送交检查AI终审；不通过则返回具体错误，请继续修改后再次提交。",
         "parameters": {
             "type": "object",
             "properties": {

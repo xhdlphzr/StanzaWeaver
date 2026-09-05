@@ -616,6 +616,186 @@ def test_refine_submit_without_modification_allowed() -> None:
     assert any(h["tool"] == "submit" for h in history)
 
 
+def test_refine_submit_rejected_when_meter_invalid() -> None:
+    """submit 时全量格律未通过→拒绝并把错误返回给模型，通过后才提交。"""
+    from src.prosody.meter_validator import ValidationResult
+
+    class _SeqValidator:
+        """按序返回预置校验结果的假校验器。
+
+        Args:
+            results: validate 依次返回的 ValidationResult。
+        """
+
+        def __init__(self, results: list[ValidationResult]) -> None:
+            self._results = list(results)
+
+        def validate(
+            self, poem: list[str], template: dict[str, Any], template_obj: Any = None
+        ) -> ValidationResult:
+            return self._results.pop(0)
+
+    writer, _ = _make_writer()
+    _refine_seq(
+        writer,
+        [
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "1",
+                        "name": "submit",
+                        "arguments": {"title": "测试"},
+                    }
+                ],
+            },
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "2",
+                        "name": "submit",
+                        "arguments": {"title": "测试"},
+                    }
+                ],
+            },
+        ],
+    )
+    writer.validator = cast(
+        Any,
+        _SeqValidator(
+            [
+                ValidationResult(passed=False, errors=["第1行不匹配"]),
+                ValidationResult(passed=True),
+            ]
+        ),
+    )
+    msgs: list[dict[str, Any]] = []
+    poem, history, detail, rounds = writer.refine(
+        "主题", ["原"], {"language": "zh", "lines": 1}, msgs
+    )
+    assert poem == ["原"]
+    assert rounds == 2
+    submits = [h for h in history if h["tool"] == "submit"]
+    assert len(submits) == 2
+    # 第一次 submit 被全量校验拒绝，第二次通过
+    assert submits[0]["result"] == {"error": ["第1行不匹配"]}
+    assert submits[1]["result"] == "submitted"
+    assert "拒绝提交" in detail
+    assert "第1行不匹配" in detail
+
+
+def test_refine_submit_gate_end_to_end() -> None:
+    """真实五绝模板：不合律 submit 被拒；随后 refine_line 修正后以全量校验通过收尾。"""
+    valid_first_line = "远岸栖云树"
+    # 首句与对句“相对”被破坏（首句第2字改平），全诗不合律
+    invalid_poem = ["西窗残月冷", "溪流伴月明", "桃红迷柳岸", "古道远山风"]
+    valid_poem = [valid_first_line, "溪流伴月明", "桃红迷柳岸", "古道远山风"]
+    template = {
+        "name": "五言绝句",
+        "language": "zh",
+        "lines": 4,
+        "syllables_per_line": [5, 5, 5, 5],
+        "syllable_constraints": None,
+    }
+    from src.templates.zh import WujueTemplate
+
+    tpl = WujueTemplate()
+
+    writer, _ = _make_writer()
+    _refine_seq(
+        writer,
+        [
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "1",
+                        "name": "submit",
+                        "arguments": {"title": "测试"},
+                    }
+                ],
+            },
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "2",
+                        "name": "refine_line",
+                        "arguments": {"line": 0, "new_text": valid_first_line},
+                    }
+                ],
+            },
+        ],
+    )
+    msgs: list[dict[str, Any]] = []
+    poem, history, detail, rounds = writer.refine(
+        "主题", invalid_poem, template, msgs, tpl
+    )
+    assert poem == valid_poem
+    assert rounds == 2
+    submits = [h for h in history if h["tool"] == "submit"]
+    assert len(submits) == 1
+    # 全量格律未通过时 submit 被拒绝并给出错误信息
+    assert "error" in submits[0]["result"]
+    assert "拒绝提交" in detail
+    refines = [h for h in history if h["tool"] == "refine_line"]
+    assert len(refines) == 1
+    assert "poem" in refines[0]["result"]
+
+
+def test_refine_line_validation_errors_recorded() -> None:
+    """refine_line 修改后全量校验未通过时记录 validation_errors 并继续。"""
+    invalid_first_line = "西窗残月冷"
+    valid_first_line = "远岸栖云树"
+    initial_poem = ["远岫依烟岭", "溪流伴月明", "桃红迷柳岸", "古道远山风"]
+    template = {
+        "name": "五言绝句",
+        "language": "zh",
+        "lines": 4,
+        "syllables_per_line": [5, 5, 5, 5],
+        "syllable_constraints": None,
+    }
+    from src.templates.zh import WujueTemplate
+
+    tpl = WujueTemplate()
+
+    writer, _ = _make_writer()
+    _refine_seq(
+        writer,
+        [
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "1",
+                        "name": "refine_line",
+                        "arguments": {"line": 0, "new_text": invalid_first_line},
+                    }
+                ],
+            },
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "2",
+                        "name": "refine_line",
+                        "arguments": {"line": 0, "new_text": valid_first_line},
+                    }
+                ],
+            },
+        ],
+    )
+    msgs: list[dict[str, Any]] = []
+    poem, history, detail, _ = writer.refine("主题", initial_poem, template, msgs, tpl)
+    assert poem == [valid_first_line, "溪流伴月明", "桃红迷柳岸", "古道远山风"]
+    refines = [h for h in history if h["tool"] == "refine_line"]
+    assert len(refines) == 2
+    # 第一次 refine_line 改动后全量校验失败 -> 记录 validation_errors
+    assert "validation_errors" in refines[0]["result"]
+    assert "格律问题" in detail
+
+
 def test_refine_search_words_branch() -> None:
     """search_words 工具分支被处理并写入历史。"""
     writer, _ = _make_writer()
@@ -771,7 +951,7 @@ def test_refine_no_progress_guidance() -> None:
     template = {
         "language": "zh",
         "lines": 1,
-        "syllables_per_line": [5],
+        "syllables_per_line": [1],
         "syllable_constraints": None,
     }
     seq = [

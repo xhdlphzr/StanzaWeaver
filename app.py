@@ -369,9 +369,15 @@ def handle_generate(data: dict[str, Any]) -> None:
     pipeline = PoetryPipeline()
 
     def on_progress(state_dict: dict[str, Any]) -> None:
+        """推送流水线进度到该会话。
+
+        Args:
+            state_dict: 流水线状态字典。
+        """
         socketio.emit("progress", state_dict, to=session_id)
 
     def run() -> None:
+        """在后台线程执行四步流水线并推送 done/error 事件。"""
         try:
             result = pipeline.run(
                 topic=topic,
@@ -413,9 +419,15 @@ def handle_feedback(data: dict[str, Any]) -> None:
     pipeline = PoetryPipeline()
 
     def on_progress(state_dict: dict[str, Any]) -> None:
+        """推送流水线进度到该会话。
+
+        Args:
+            state_dict: 流水线状态字典。
+        """
         socketio.emit("progress", state_dict, to=session_id)
 
     def run() -> None:
+        """在后台线程按用户反馈续跑流水线并推送 done/error 事件。"""
         try:
             result = pipeline.continue_with_feedback(
                 state=pipeline_state,

@@ -211,3 +211,41 @@ def test_french_analyze_line_variants() -> None:
     variants = analyzer.analyze_line_variants("bon")
     assert len(variants) == 1
     assert len(variants[0]) == 1
+
+
+def test_french_silent_u_after_qu() -> None:
+    """qu 后的 u 静音：que/qui/quand 均算 1 音节（覆盖 _is_silent_u qu 分支）。"""
+    analyzer = FrenchAnalyzer()
+    assert analyzer.count_syllables_in_word("quel") == 1
+    assert analyzer.count_syllables_in_word("que") == 1
+    assert analyzer.count_syllables_in_word("qui") == 1
+    assert analyzer.count_syllables_in_word("quand") == 1
+    assert analyzer.count_syllables_in_word("nuit") == 1
+    assert analyzer.count_syllables_in_word("coup") == 1
+
+
+def test_french_silent_u_after_gu_front_vowel() -> None:
+    """gu 后接 e/i/y 时 u 静音，其余情况 u 计为元音（覆盖 _is_silent_u gu 分支）。"""
+    analyzer = FrenchAnalyzer()
+    assert analyzer.count_syllables_in_word("guerre") == 2
+    assert analyzer.count_syllables_in_word("guide") == 1
+    # 词尾 gu：u 发音（aigu = /e.gy/，2 音节）
+    assert analyzer.count_syllables_in_word("aigu") == 2
+
+
+def test_french_internal_apostrophe_words_not_mangled() -> None:
+    """内嵌撇号固定词不被误剥前缀：aujourd'hui 等不再被算成 1 音节。"""
+    analyzer = FrenchAnalyzer()
+    assert analyzer.count_syllables_in_word("aujourd'hui") == 3
+    assert analyzer.count_syllables_in_word("quelqu'un") == 2
+    assert analyzer.count_syllables_in_word("presqu'ile") == 2
+
+
+def test_french_elision_proclitics_counts() -> None:
+    """省音小品词整词切分计数与法语诵读一致。"""
+    analyzer = FrenchAnalyzer()
+    assert analyzer.count_syllables_in_word("l'amour") == 2
+    assert analyzer.count_syllables_in_word("l'eau") == 1
+    assert analyzer.count_syllables_in_word("d'avoir") == 2
+    assert analyzer.count_syllables_in_word("j'ai") == 1
+    assert analyzer.count_syllables_in_word("qu'il") == 1

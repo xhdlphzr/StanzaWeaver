@@ -126,7 +126,7 @@ class Config:
 
     @property
     def language(self) -> str:
-        """界面语言（"zh" 或 "en"，缺省 "zh"）。
+        """界面语言（"zh" 或 "en"，缺省 "en"）。
 
         Returns:
             语言代码。

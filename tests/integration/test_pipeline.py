@@ -13,8 +13,9 @@ from src.pipeline.pipeline import PoetryPipeline
 from tests.helpers import make_stub, tool_call
 
 DESC = "测试主题：静夜思"
-DRAFT = "床前明月光\n疑是地上霜\n举头望明月\n低头思故乡"
-REVISED_LINE = "窗前明月光"
+# 五言绝句（合律：二四相间/联内相对/联间相粘/二四行押平声韵）。
+DRAFT = "远岫依烟岭\n溪流伴月明\n桃红迷柳岸\n古道远山风"
+REVISED_LINE = "远岸栖云树"
 
 
 def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -38,20 +39,8 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
                     }
                 ],
             },
-            # Step 3: refine 第一轮 refine_line
+            # Step 3: refine 第一轮 refine_line（修改后仍需通过全量格律校验）
             tool_call("refine_line", {"line": 0, "new_text": REVISED_LINE}),
-            # Step 3: refine 提交（content 包含修改后的诗稿）
-            {
-                "role": "assistant",
-                "content": REVISED_LINE + "\n" + "\n".join(DRAFT.split("\n")[1:]),
-                "tool_calls": [
-                    {
-                        "id": "call_submit2",
-                        "name": "submit",
-                        "arguments": {"title": "静夜思"},
-                    }
-                ],
-            },
         ],
     )
     checker_stub = make_stub(chat=[tool_call("submit", {"pass": True})])
@@ -71,10 +60,9 @@ def test_pipeline_full_run(monkeypatch: pytest.MonkeyPatch) -> None:
     assert state.checker_pass is True
     assert state.title == "静夜思"
     assert state.final_poem == ["静夜思"] + state.draft
-    # 炼句确实修改了首行
+    # 炼句确实修改了首行，且修改后通过全量格律校验（否则不会结束炼句）
     assert state.draft[0] == REVISED_LINE
-    # 炼句循环至少执行了「修改 + 提交」两步
-    assert state.refine_rounds >= 2
+    assert state.refine_rounds >= 1
     assert state.description == DESC
 
 
@@ -88,7 +76,8 @@ def test_pipeline_continue_with_feedback(monkeypatch: pytest.MonkeyPatch) -> Non
     state = pipeline.run("静夜思", "zh_wujue")
     assert state.checker_pass is True
 
-    # 用户反馈续跑：新建流水线（新的桩客户端迭代器）再次进入炼句并定稿
+    # 用户反馈续跑：新建流水线（新的桩客户端迭代器）再次进入炼句并定稿。
+    # 当前诗稿已合律，续跑时模型直接 submit，submit 的全量校验同样通过。
     pipeline2 = PoetryPipeline(
         writer_config={"base_url": "x", "api_key": "x", "model": "x"},
         checker_config={"base_url": "x", "api_key": "x", "model": "x"},
