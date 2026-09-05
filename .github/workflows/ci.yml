@@ -60,8 +60,8 @@ jobs:
       - name: ruff check
         run: uv run ruff check ./
 
-      - name: ty (strict)
-        run: uv run ty check
+      - name: mypy (strict)
+        run: mypy --strict ./
 
       - name: pytest
         run: uv run pytest
