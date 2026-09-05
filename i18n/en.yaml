@@ -59,11 +59,16 @@ template_modal:
   language_label: Language
   lang_zh: Chinese
   lang_en: English
+  lang_fr: French
+  lang_it: Italian
+  lang_la: Classical Latin
   lines_label: Lines
   syllables_label: Syllables per line
   syllables_placeholder: comma separated
   constraints_title: Syllable constraints per line
   custom_code_label: Custom validation code (Python, optional)
+  code_hint: "Optional: write whole-form rules inside validate_full appending to errors. Reusable helpers for this language (call via rules.): {helpers}"
+  code_hint_empty: "Optional: write whole-form rules inside validate_full appending to errors (no per-position helpers for this language)."
   create: Create Template
   cancel: Cancel
 

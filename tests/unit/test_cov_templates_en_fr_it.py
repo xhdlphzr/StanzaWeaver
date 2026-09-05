@@ -307,3 +307,42 @@ def test_it_concrete_templates_methods() -> None:
         assert tmpl.get_syllable_constraints() is None
         dummy: list[list[Syllable]] = [[Syllable()] for _ in range(tmpl.lines)]
         assert isinstance(tmpl.validate_full(["x"] * tmpl.lines, dummy), list)
+
+
+def test_custom_template_schemes_all_five_languages() -> None:
+    """custom_template_schemes 覆盖 zh/en/it/la/fr 五语言及约束维度。"""
+    from src.templates import custom_template_schemes
+
+    schemes = custom_template_schemes()
+    assert set(schemes) == {"zh", "en", "fr", "it", "la"}
+    assert schemes["zh"] == ("tone", ("平", "仄"))
+    assert schemes["en"] == ("stress", ("light", "heavy"))
+    assert schemes["it"] == ("stress", ("light", "heavy"))
+    assert schemes["la"] == ("length", ("long", "short"))
+    assert schemes["fr"] == ("", ())
+
+
+def test_custom_template_schemes_returns_copy() -> None:
+    """custom_template_schemes 返回副本，外部修改不影响内部状态。"""
+    from src.templates import custom_template_schemes
+
+    schemes = custom_template_schemes()
+    schemes.pop("zh")
+    schemes["xx"] = ("tone", ("平",))
+    assert "zh" in custom_template_schemes()
+    assert "xx" not in custom_template_schemes()
+
+
+def test_template_helpers_lists_check_functions() -> None:
+    """template_helpers 返回按字母排序的 _check_* 辅助函数。"""
+    from src.templates import template_helpers
+
+    zh_helpers = template_helpers("zh")
+    assert isinstance(zh_helpers, tuple)
+    assert "_check_sanpingwei" in zh_helpers
+    assert all(name.startswith("_check_") for name in zh_helpers)
+    assert zh_helpers == tuple(sorted(zh_helpers))
+    en_helpers = template_helpers("en")
+    assert "_check_rhyme_group" in en_helpers
+    fr_helpers = template_helpers("fr")
+    assert "_check_rhyme_group" in fr_helpers

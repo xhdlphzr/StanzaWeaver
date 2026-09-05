@@ -236,6 +236,45 @@ _LANGUAGE_LABELS: dict[str, str] = {
     "la": "古典拉丁语",
 }
 
+#: 自定义模板编辑器支持的逐位约束方案：语言 -> (属性维度键, 可选值元组)。
+#: 维度键即写入 attributes 的真实取值字段；空维度（""）表示该语言无语位约束，
+#: 只能通过 validate_full 整体规则（押韵/行级条件）来限定。
+_CUSTOM_SCHEMES: dict[str, tuple[str, tuple[str, ...]]] = {
+    "zh": ("tone", ("平", "仄")),
+    "en": ("stress", ("light", "heavy")),
+    "it": ("stress", ("light", "heavy")),
+    "la": ("length", ("long", "short")),
+    "fr": ("", ()),
+}
+
+
+def custom_template_schemes() -> dict[str, tuple[str, tuple[str, ...]]]:
+    """返回自定义模板各语言的逐位约束方案（含受支持语言清单）。
+
+    Returns:
+        {"zh": ("tone", ("平", "仄")), ...}；键即受支持语言，
+        值为 (属性维度键, 可选值元组)。
+    """
+    return dict(_CUSTOM_SCHEMES)
+
+
+def template_helpers(language: str) -> tuple[str, ...]:
+    """列出某语言模板模块中可复用的 ``_check_*`` 辅助函数名。
+
+    用于自定义代码编辑器的提示：生成的模板会以 ``rules`` 别名导入对应
+    语言模块，自定义代码可通过 ``rules.<函数名>`` 复用这些整体规则函数。
+
+    Args:
+        language: 语言代码（zh/en/it/fr/la）。
+
+    Returns:
+        按字母排序的辅助函数名元组；语言模块不存在时抛出 ModuleNotFoundError。
+    """
+    import importlib
+
+    module = importlib.import_module(f"{__package__}.{language}")
+    return tuple(sorted(name for name in dir(module) if name.startswith("_check_")))
+
 
 def list_dicts() -> list[dict[str, Any]]:
     """返回全部模板的字典形式（含显示名），供前端下拉列表使用。

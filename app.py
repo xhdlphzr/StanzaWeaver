@@ -22,7 +22,7 @@ from flask import Flask, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
 
 from src.logging_setup import get_logger, setup_logging
-from src.templates import list_dicts
+from src.templates import custom_template_schemes, list_dicts, template_helpers
 from src.templates.en import register_english_templates
 from src.templates.fr import register_french_templates
 from src.templates.it import register_italian_templates
@@ -236,6 +236,23 @@ def api_templates() -> Any:
     return jsonify(list_dicts())
 
 
+@app.route("/api/templates/meta")
+def api_templates_meta() -> Any:
+    """自定义模板编辑器的逐语言约束元数据。
+
+    Returns:
+        JSON Response：{语言: {"attribute", "values", "helpers"}}。
+    """
+    meta: dict[str, dict[str, Any]] = {}
+    for lang, (attribute, values) in custom_template_schemes().items():
+        meta[lang] = {
+            "attribute": attribute,
+            "values": list(values),
+            "helpers": list(template_helpers(lang)),
+        }
+    return jsonify(meta)
+
+
 @app.route("/api/config", methods=["GET"])
 def api_get_config() -> Any:
     """读取 LLM 配置。
@@ -429,6 +446,76 @@ def handle_disconnect() -> None:
     _active_states.pop(request.sid, None)  # type: ignore[attr-defined]  # flask_socketio 注入
 
 
+def _build_custom_template_code(
+    name: str,
+    language: str,
+    lines: int,
+    syllables_per_line: list[int],
+    dimension: str,
+    constraints: list[Any],
+    custom_code: str,
+    class_name: str,
+    file_key: str,
+) -> str:
+    """生成自定义模板的 Python 源码（供 /api/templates/custom 落盘）。
+
+    Args:
+        name: 模板显示名。
+        language: 语言代码（zh/en/fr/it/la）。
+        lines: 行数。
+        syllables_per_line: 每行音节数。
+        dimension: 该语言的逐位约束属性键（"" 表示无语位约束）。
+        constraints: 逐位约束（行 -> 单元格 -> {attributes}）。
+        custom_code: 用户提供的 validate_full 附加代码。
+        class_name: 生成的模板类名。
+        file_key: 注册键（custom_<name>）。
+
+    Returns:
+        可直接写入 src/templates/custom_*.py 的源码文本。
+    """
+    constraints_code: list[str] = []
+    for line_c in constraints:
+        cells: list[str] = []
+        for c in line_c:
+            attrs = c.get("attributes", {}) if isinstance(c, dict) else {}
+            value = str(attrs.get(dimension, "") or "") if dimension else ""
+            if value:
+                rendered = json.dumps({dimension: value}, ensure_ascii=False)
+                cells.append(f"_make_syl(attributes={rendered})")
+            else:
+                cells.append("_make_syl()")
+        constraints_code.append("[" + ", ".join(cells) + "]")
+
+    constraints_str = (
+        "[\n            " + ",\n            ".join(constraints_code) + "\n        ]"
+    )
+
+    code_body = (
+        f"# Copyright (c) 2026 xhdlphzr\n"
+        f"# SPDX-License-Identifier: MIT\n"
+        f"# Auto-generated custom template: {name}\n\n"
+        f"from . import PoetryTemplate, _make_syl, register\n"
+        f"from . import {language} as rules\n\n\n"
+        f"class {class_name}(PoetryTemplate):\n"
+        f"    name = {json.dumps(name, ensure_ascii=False)}\n"
+        f'    language = "{language}"\n'
+        f"    lines = {lines}\n"
+        f"    syllables_per_line = {syllables_per_line}\n\n"
+        f"    def get_syllable_constraints(self):\n"
+        f"        return {constraints_str}\n\n"
+        f"    def validate_full(self, poem, syllables):\n"
+        f"        errors = []\n"
+    )
+    if custom_code:
+        for line in custom_code.split("\n"):
+            if line.strip():
+                code_body += f"        {line}\n"
+    code_body += "        return errors\n\n\n"
+    code_body += f"def register_custom_{file_key.replace('custom_', '')}():\n"
+    code_body += f'    register("{file_key}", {class_name}())\n'
+    return code_body
+
+
 @app.route("/api/templates/custom", methods=["POST"])
 def api_create_custom_template() -> Any:
     """创建自定义格律模板（落盘为 src/templates/custom_*.py 并热注册）。
@@ -458,12 +545,14 @@ def api_create_custom_template() -> Any:
         lines = 4
     lines = max(1, min(lines, 30))
     syllables_per_line = data.get("syllables_per_line", [5] * lines)
-    constraints = data.get("constraints", [])
+    raw_constraints = data.get("constraints", [])
+    constraints = raw_constraints if isinstance(raw_constraints, list) else []
     custom_code = str(data.get("code", "")).strip()
 
     if not name:
         return jsonify({"status": "error", "message": "模板名称不能为空"}), 400
-    if language not in ("zh", "en"):
+    schemes = custom_template_schemes()
+    if language not in schemes:
         return jsonify({"status": "error", "message": "不支持的语言"}), 400
     try:
         syllables_per_line = [max(1, int(s)) for s in syllables_per_line][:lines]
@@ -489,51 +578,18 @@ def api_create_custom_template() -> Any:
     file_key = f"custom_{safe_name}"
     file_path = Path(__file__).parent / "src" / "templates" / f"{file_key}.py"
 
-    constraints_code: list[str] = []
-    for line_c in constraints:
-        cells: list[str] = []
-        for c in line_c:
-            tone = c.get("attributes", {}).get("tone", "")
-            stress = c.get("attributes", {}).get("stress", "")
-            if tone:
-                cells.append(f'_t("{tone}")')
-            elif stress:
-                cells.append(f'_make_syl(attributes={{"stress": "{stress}"}})')
-            else:
-                cells.append("_FREE")
-        constraints_code.append("[" + ", ".join(cells) + "]")
-
-    constraints_str = (
-        "[\n            " + ",\n            ".join(constraints_code) + "\n        ]"
+    dimension, _value_options = schemes[language]
+    code_body = _build_custom_template_code(
+        name=name,
+        language=language,
+        lines=lines,
+        syllables_per_line=syllables_per_line,
+        dimension=dimension,
+        constraints=list(constraints),
+        custom_code=custom_code,
+        class_name=class_name,
+        file_key=file_key,
     )
-
-    code_body = (
-        f"# Copyright (c) 2026 xhdlphzr\n"
-        f"# SPDX-License-Identifier: MIT\n"
-        f"# Auto-generated custom template: {name}\n\n"
-        f"from . import PoetryTemplate, _make_syl, register\n"
-        f"from .zh import (\n"
-        f"    _FREE, _tone as _t,\n"
-        f"    _check_sanpingwei, _check_guping,\n"
-        f"    _check_rhyme, _check_alternation, _check_lv_alternation,\n"
-        f")\n\n\n"
-        f"class {class_name}(PoetryTemplate):\n"
-        f"    name = {json.dumps(name, ensure_ascii=False)}\n"
-        f'    language = "{language}"\n'
-        f"    lines = {lines}\n"
-        f"    syllables_per_line = {syllables_per_line}\n\n"
-        f"    def get_syllable_constraints(self):\n"
-        f"        return {constraints_str}\n\n"
-        f"    def validate_full(self, poem, syllables):\n"
-        f"        errors = []\n"
-    )
-    if custom_code:
-        for line in custom_code.split("\n"):
-            if line.strip():
-                code_body += f"        {line}\n"
-    code_body += "        return errors\n\n\n"
-    code_body += f"def register_custom_{safe_name}():\n"
-    code_body += f'    register("{file_key}", {class_name}())\n'
 
     try:
         file_path.parent.mkdir(parents=True, exist_ok=True)

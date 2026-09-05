@@ -59,11 +59,16 @@ template_modal:
   language_label: 语言
   lang_zh: 汉语
   lang_en: 英语
+  lang_fr: 法语
+  lang_it: 意大利语
+  lang_la: 古典拉丁语
   lines_label: 行数
   syllables_label: 每行音节
   syllables_placeholder: 逗号分隔
   constraints_title: 每行音节约束
   custom_code_label: 自定义检测代码（Python，可选）
+  code_hint: "可选：在 validate_full 中编写整体规则并追加到 errors。本语言可复用的辅助函数（经 rules 前缀调用）：{helpers}"
+  code_hint_empty: "可选：在 validate_full 中编写整体规则并追加到 errors（该语言无逐位辅助函数）。"
   create: 生成模板
   cancel: 取消
 
