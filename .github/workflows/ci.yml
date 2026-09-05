@@ -61,7 +61,7 @@ jobs:
         run: uv run ruff check ./
 
       - name: mypy (strict)
-        run: mypy --strict ./
+        run: uv run mypy --strict ./
 
       - name: pytest
         run: uv run pytest
