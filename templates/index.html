@@ -279,6 +279,15 @@
               <option value="en" data-i18n="template_modal.lang_en">
                 英语
               </option>
+              <option value="fr" data-i18n="template_modal.lang_fr">
+                法语
+              </option>
+              <option value="it" data-i18n="template_modal.lang_it">
+                意大利语
+              </option>
+              <option value="la" data-i18n="template_modal.lang_la">
+                古典拉丁语
+              </option>
             </select>
           </label>
           <label
@@ -458,7 +467,7 @@
           .addEventListener("change", rebuildSyllableTable);
         document
           .getElementById("tmpl-language")
-          .addEventListener("change", rebuildSyllableTable);
+          .addEventListener("change", refreshTplEditor);
 
         socket.on("progress", handleProgress);
         socket.on("done", handleDone);
@@ -1050,8 +1059,54 @@
 
       let cmEditor = null;
 
+      var TPL_META = null;
+      var TPL_META_DEFAULT = {
+        zh: { attribute: "tone", values: ["平", "仄"], helpers: [] },
+        en: { attribute: "stress", values: ["light", "heavy"], helpers: [] },
+        it: { attribute: "stress", values: ["light", "heavy"], helpers: [] },
+        la: { attribute: "length", values: ["long", "short"], helpers: [] },
+        fr: { attribute: "", values: [], helpers: [] },
+      };
+
+      function tplScheme(lang) {
+        var meta = TPL_META || TPL_META_DEFAULT;
+        return meta[lang] || TPL_META_DEFAULT.zh;
+      }
+
+      function templateCodeHint(lang) {
+        var hintKey = "template_modal.code_hint_empty";
+        var hint = t(hintKey);
+        var meta = TPL_META;
+        if (meta && meta[lang] && meta[lang].helpers.length) {
+          var names = meta[lang].helpers.map(function (h) {
+            return "rules." + h;
+          });
+          hint = t("template_modal.code_hint", { helpers: names.join(", ") });
+        }
+        return hint;
+      }
+
       function openTemplateModal() {
         document.getElementById("template-modal").classList.remove("hidden");
+        if (!TPL_META) {
+          fetch("/api/templates/meta")
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (d) {
+              TPL_META = d;
+              refreshTplEditor();
+            });
+        }
+        refreshTplEditor();
+      }
+
+      function closeTemplateModal() {
+        document.getElementById("template-modal").classList.add("hidden");
+      }
+
+      function refreshTplEditor() {
+        const lang = document.getElementById("tmpl-language").value;
         rebuildSyllableTable();
         if (!cmEditor) {
           cmEditor = CodeMirror(document.getElementById("tmpl-code"), {
@@ -1062,19 +1117,15 @@
             indentUnit: 4,
             tabSize: 4,
             lineWrapping: true,
-            placeholder:
-              "三平尾: errors.extend(_check_sanpingwei(syls))\n押韵:   errors.extend(_check_rhyme(syllables, [1,3]))\n\n可用: _check_sanpingwei, _check_guping, _check_rhyme, _check_alternation, _check_lv_alternation",
+            placeholder: templateCodeHint(lang),
           });
         } else {
+          cmEditor.setOption("placeholder", templateCodeHint(lang));
           cmEditor.setValue("");
         }
         setTimeout(function () {
           cmEditor.refresh();
         }, 50);
-      }
-
-      function closeTemplateModal() {
-        document.getElementById("template-modal").classList.add("hidden");
       }
 
       function rebuildSyllableTable() {
@@ -1095,6 +1146,8 @@
           .join(",");
 
         const lang = document.getElementById("tmpl-language").value;
+        const scheme = tplScheme(lang);
+        const freeLabel = t("syllable_constraints.free");
         const table = document.getElementById("tmpl-syllable-table");
         table.innerHTML = "";
 
@@ -1111,25 +1164,11 @@
             sel.className = "syl-cell";
             sel.dataset.line = i;
             sel.dataset.pos = j;
-            if (lang === "zh") {
-              sel.innerHTML =
-                '<option value="">' +
-                t("syllable_constraints.free") +
-                '</option><option value="平">' +
-                t("syllable_constraints.light") +
-                '</option><option value="仄">' +
-                t("syllable_constraints.heavy") +
-                "</option>";
-            } else {
-              sel.innerHTML =
-                '<option value="">' +
-                t("syllable_constraints.free") +
-                '</option><option value="light">' +
-                t("syllable_constraints.light") +
-                '</option><option value="heavy">' +
-                t("syllable_constraints.heavy") +
-                "</option>";
-            }
+            let html = '<option value="">' + freeLabel + "</option>";
+            (scheme.values || []).forEach(function (v) {
+              html += '<option value="' + v + '">' + v + "</option>";
+            });
+            sel.innerHTML = html;
             row.appendChild(sel);
           }
           table.appendChild(row);
@@ -1155,6 +1194,7 @@
         const code = cmEditor ? cmEditor.getValue() : "";
 
         const syllables_per_line = sylCounts.slice(0, lines);
+        const scheme = tplScheme(language);
         const constraints = [];
         for (let i = 0; i < lines; i++) {
           const lineConstraints = [];
@@ -1165,22 +1205,15 @@
           let j = 0;
           cells.forEach(function (sel) {
             if (j >= cnt) return;
-            const val = sel.value;
-            if (language === "zh") {
-              lineConstraints.push({
-                onset: "",
-                nucleus: "",
-                coda: "",
-                attributes: { tone: val, stress: "", length: "" },
-              });
-            } else {
-              lineConstraints.push({
-                onset: "",
-                nucleus: "",
-                coda: "",
-                attributes: { tone: "", stress: val, length: "" },
-              });
-            }
+            const attributes = { tone: "", stress: "", length: "" };
+            const val = sel.value || "";
+            if (scheme.attribute && val) attributes[scheme.attribute] = val;
+            lineConstraints.push({
+              onset: "",
+              nucleus: "",
+              coda: "",
+              attributes: attributes,
+            });
             j++;
           });
           constraints.push(lineConstraints);

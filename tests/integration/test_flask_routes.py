@@ -7,6 +7,7 @@
 """
 
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
 from flask.testing import FlaskClient
@@ -136,3 +137,69 @@ def test_history_post_requires_csrf(client: FlaskClient) -> None:
     )
     assert resp.status_code == 200
     assert resp.get_json().get("status") == "ok"
+
+
+def test_templates_meta_endpoint(client: FlaskClient) -> None:
+    """自定义模板 meta 应覆盖五语言并返回约束维度/可选项/辅助函数。"""
+    resp = client.get("/api/templates/meta")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert set(data) == {"zh", "en", "fr", "it", "la"}
+    assert data["zh"]["attribute"] == "tone"
+    assert data["zh"]["values"] == ["平", "仄"]
+    assert data["en"]["attribute"] == "stress"
+    assert data["la"]["attribute"] == "length"
+    assert data["fr"]["attribute"] == ""
+    assert "_check_sanpingwei" in data["zh"]["helpers"]
+    assert isinstance(data["zh"]["helpers"], list)
+
+
+def test_custom_template_rejects_unknown_language(client: FlaskClient) -> None:
+    """创建自定义模板时未知语言应返回 400。"""
+    resp = client.post(
+        "/api/templates/custom",
+        json={
+            "name": "测试",
+            "language": "xx",
+            "lines": 4,
+            "syllables_per_line": [5, 5, 5, 5],
+            "constraints": [],
+            "code": "",
+        },
+        headers=_csrf(),
+    )
+    assert resp.status_code == 400
+
+
+def test_build_custom_template_code_all_languages() -> None:
+    """五种语言的模板源码均可编译且使用对应语言模块别名 rules。"""
+    cases: list[tuple[str, str, str]] = [
+        ("zh", "tone", "平"),
+        ("en", "stress", "light"),
+        ("it", "stress", "heavy"),
+        ("la", "length", "long"),
+        ("fr", "", ""),
+    ]
+    for lang, dimension, value in cases:
+        attributes = {"tone": "", "stress": "", "length": ""}
+        constraints: list[list[dict[str, Any]]] = []
+        if dimension:
+            attributes[dimension] = value
+        constraints.append(
+            [{"onset": "", "nucleus": "", "coda": "", "attributes": attributes}]
+        )
+        code = app_module._build_custom_template_code(
+            name=f"P{lang}",
+            language=lang,
+            lines=1,
+            syllables_per_line=[1],
+            dimension=dimension,
+            constraints=constraints,
+            custom_code="",
+            class_name=f"CustomP{lang}Template",
+            file_key=f"custom_p{lang}",
+        )
+        compile(code, f"<custom_{lang}>", "exec")
+        assert f"from . import {lang} as rules" in code
+        if dimension:
+            assert f'"{dimension}": "{value}"' in code
