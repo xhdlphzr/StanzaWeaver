@@ -4,8 +4,9 @@
 """编写 AI：描述生成、初稿生成、ReAct 炼句循环。
 
 炼句循环无轮数上限：AI 反复调用 search_words/refine_line/rewrite
-修改诗句（每次修改后自动跑全部格律校验），直到调用 submit 提交。
-连续多轮无进展时注入引导提示（不中断循环）。
+修改诗句（每次修改后自动跑全部格律校验），直到调用 submit 提交；
+submit 时同样先做全量格律校验，通过后才接受定稿（拒绝则把错误返回
+模型继续修改）。连续多轮无进展时注入引导提示（不中断循环）。
 
 当对话 token 数超过 COMPRESS_THRESHOLD 时自动压缩历史并重开新对话，
 保留结构化摘要（目标/重要细节/工作状态/下一步行动）与当前诗稿。
@@ -415,6 +416,10 @@ class WriterAI:
     ) -> RefineResult:
         """ReAct 炼句循环（Step 3，无轮数上限，直到格律校验通过）。
 
+        每次 refine_line/rewrite 修改后都会立即执行全量格律校验；调用
+        submit 时同样先做全量校验，通过才接受定稿，否则把错误返回给模型
+        继续修改。
+
         Args:
             description: 主题描述。
             poem: 当前诗稿。
@@ -495,14 +500,27 @@ class WriterAI:
                 name = str(tool_call["name"])
                 args = tool_call["arguments"]
 
-                if name == "submit":
-                    history.append({"tool": "submit", "result": "submitted"})
-                    detail_parts.append(f"[第{round_num}轮] submit: 提交定稿")
-                    submit_called = True
-                    break
-
                 result: dict[str, Any] | None = None
-                if name == "search_words":
+                if name == "submit":
+                    # 提交前必须通过全量格律校验（与每次修改后的全量审查一致），
+                    # 否则拒绝并把具体错误返回给模型继续修改。
+                    submit_result = self.validator.validate(
+                        current_poem, template, template_obj
+                    )
+                    if submit_result.passed:
+                        history.append(
+                            {"tool": "submit", "arguments": args, "result": "submitted"}
+                        )
+                        detail_parts.append(
+                            f"[第{round_num}轮] submit: 提交定稿 (全量格律校验通过)"
+                        )
+                        submit_called = True
+                        break
+                    result = {"error": submit_result.errors}
+                    detail_parts.append(
+                        f"[第{round_num}轮] submit: 全量格律校验未通过，拒绝提交 - {submit_result.errors}"
+                    )
+                elif name == "search_words":
                     result = execute_search_words(template, args)
                     word_count_result = len(result.get("words", []))
                     detail_parts.append(

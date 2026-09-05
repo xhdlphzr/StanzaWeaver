@@ -105,19 +105,7 @@ def _syl_from_json(d: dict[str, Any]) -> Syllable:
     Returns:
         Syllable 实例。
     """
-    attrs = d.get("attributes", {})
-    if not isinstance(attrs, dict):
-        attrs = {}
-    return Syllable(
-        onset=str(d.get("onset", "")),
-        nucleus=str(d.get("nucleus", "")),
-        coda=str(d.get("coda", "")),
-        attributes={
-            "tone": str(attrs.get("tone", "")),
-            "stress": str(attrs.get("stress", "")),
-            "length": str(attrs.get("length", "")),
-        },
-    )
+    return Syllable.from_dict(d)
 
 
 def _syl_matches(

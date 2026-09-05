@@ -341,6 +341,30 @@ def _check_lv_alternation(
     return errors
 
 
+def _check_jinti_full(
+    syllables: list[list[Syllable]], rhyme_lines: list[int], rhyme_desc: str
+) -> list[str]:
+    """近体诗整诗检查（五/七言绝句与律诗共用）。
+
+    逐行三平尾/孤平、句式结构（相间/相对/相粘/首尾脚）、押韵。
+
+    Args:
+        syllables: 各行音节。
+        rhyme_lines: 押韵的偶数行号（0-based）。
+        rhyme_desc: 押韵错误描述前缀。
+
+    Returns:
+        错误信息列表（空列表表示通过）。
+    """
+    errors: list[str] = []
+    for syls in syllables:
+        errors.extend(_check_sanpingwei(syls))
+        errors.extend(_check_guping(syls))
+    errors.extend(_check_jinti_structure(syllables))
+    errors.extend(_check_jinti_rhyme(syllables, rhyme_lines, rhyme_desc))
+    return errors
+
+
 class WujueTemplate(PoetryTemplate):
     """五言绝句：4 行 5 字，二四字定平仄，偶句平声韵。"""
 
@@ -374,13 +398,7 @@ class WujueTemplate(PoetryTemplate):
         Returns:
             错误信息列表（空列表表示通过）。
         """
-        errors: list[str] = []
-        for i, syls in enumerate(syllables):
-            errors.extend(_check_sanpingwei(syls))
-            errors.extend(_check_guping(syls))
-        errors.extend(_check_jinti_structure(syllables))
-        errors.extend(_check_jinti_rhyme(syllables, [1, 3], "押韵(二四行)"))
-        return errors
+        return _check_jinti_full(syllables, [1, 3], "押韵(二四行)")
 
     def format_poem(self, poem: list[str]) -> str:
         """绝句格式：一句一行，句末加句号。"""
@@ -423,13 +441,7 @@ class QijueTemplate(PoetryTemplate):
         Returns:
             错误信息列表（空列表表示通过）。
         """
-        errors: list[str] = []
-        for i, syls in enumerate(syllables):
-            errors.extend(_check_sanpingwei(syls))
-            errors.extend(_check_guping(syls))
-        errors.extend(_check_jinti_structure(syllables))
-        errors.extend(_check_jinti_rhyme(syllables, [1, 3], "押韵(二四行)"))
-        return errors
+        return _check_jinti_full(syllables, [1, 3], "押韵(二四行)")
 
     def format_poem(self, poem: list[str]) -> str:
         """绝句格式：一句一行，句末加句号。"""
@@ -468,13 +480,7 @@ class WulvTemplate(PoetryTemplate):
         Returns:
             错误信息列表（空列表表示通过）。
         """
-        errors: list[str] = []
-        for i, syls in enumerate(syllables):
-            errors.extend(_check_sanpingwei(syls))
-            errors.extend(_check_guping(syls))
-        errors.extend(_check_jinti_structure(syllables))
-        errors.extend(_check_jinti_rhyme(syllables, [1, 3, 5, 7], "押韵(二四六八行)"))
-        return errors
+        return _check_jinti_full(syllables, [1, 3, 5, 7], "押韵(二四六八行)")
 
     def format_poem(self, poem: list[str]) -> str:
         """律诗格式：一联一行，联间逗号，末联句号。"""
@@ -520,13 +526,7 @@ class QilvTemplate(PoetryTemplate):
         Returns:
             错误信息列表（空列表表示通过）。
         """
-        errors: list[str] = []
-        for i, syls in enumerate(syllables):
-            errors.extend(_check_sanpingwei(syls))
-            errors.extend(_check_guping(syls))
-        errors.extend(_check_jinti_structure(syllables))
-        errors.extend(_check_jinti_rhyme(syllables, [1, 3, 5, 7], "押韵(二四六八行)"))
-        return errors
+        return _check_jinti_full(syllables, [1, 3, 5, 7], "押韵(二四六八行)")
 
     def format_poem(self, poem: list[str]) -> str:
         """律诗格式：一联一行，联间逗号，末联句号。"""

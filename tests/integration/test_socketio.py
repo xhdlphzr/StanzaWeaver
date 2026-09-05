@@ -17,8 +17,9 @@ from src.agents import checker_ai, writer_ai
 from tests.helpers import make_stub, tool_call
 
 DESC = "SocketIO 测试主题"
-DRAFT = "床前明月光\n疑是地上霜\n举头望明月\n低头思故乡"
-REVISED_LINE = "窗前明月光"
+# 五言绝句（合律：二四相间/联内相对/联间相粘/二四行押平声韵）。
+DRAFT = "远岫依烟岭\n溪流伴月明\n桃红迷柳岸\n古道远山风"
+REVISED_LINE = "远岸栖云树"
 
 
 def _make_emitter(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Any]]:
@@ -60,20 +61,8 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
                     }
                 ],
             },
-            # Step 3: refine 第一轮 refine_line
+            # Step 3: refine 第一轮 refine_line（修改后全量校验通过即结束炼句）
             tool_call("refine_line", {"line": 0, "new_text": REVISED_LINE}),
-            # Step 3: refine submit（content 含修改后诗稿）
-            {
-                "role": "assistant",
-                "content": REVISED_LINE + "\n" + "\n".join(DRAFT.split("\n")[1:]),
-                "tool_calls": [
-                    {
-                        "id": "call_submit2",
-                        "name": "submit",
-                        "arguments": {"title": "静夜思"},
-                    }
-                ],
-            },
         ],
     )
     checker_stub = make_stub(chat=[tool_call("submit", {"pass": True})])

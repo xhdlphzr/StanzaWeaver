@@ -4,6 +4,9 @@
 """法语音节分析器。
 
 - 按正字法切分音节：二合/三合元音（ou/eau/ain 等）、鼻化元音、静音 e。
+- 撇号仅作分隔符移除，不剥离词首字母前缀：aujourd'hui / quelqu'un /
+  presqu'île 等内嵌撇号词仍按完整词形切分。
+- qu 后的 u 恒静音、gu 后接 e/i/y 时 u 静音（quel/guerre 不计 u 音节）。
 - 词尾静音 e 规则：仅当它为“弱”尾音节（与前一元音间仅隔 0~1 个辅音，
   或位于元音后形成元音重复）时才省略；否则计入（如 entre/table/porte）。
 - 跨词省音（élision）与联诵（liaison）在整行切分中合并，避免重复计数。
@@ -82,8 +85,14 @@ _NASAL_FRONT: set[str] = {
 }
 _NASAL_BACK: set[str] = {"on", "om"}
 
-_APOSTROPHE_RE = re.compile(r"^[a-zA-Zàâäéèêëîïôöùûüÿæœ]*['’]")
-_PUNCT_RE = re.compile(r"[^a-zàâäéèêëîïôöùûüæœÿ']")
+# 撇号（l'、qu'il、aujourd'hui、quelqu'un 等）一律去除：省音撇号不构成音节，
+# 去掉后按相邻字母解析即可（qu 后的 u 由静音规则排除）。不得剥离词首的字母
+# 前缀，否则 aujourd'hui/quelqu'un/presqu'île 会被误删实义音节。
+_PUNCT_RE = re.compile(r"[^a-zàâäéèêëîïôöùûüæœÿ]")
+
+# gu 后 u 的静音条件：后接 e/i/y（guerre、guide、langue）时 u 不构成音节；
+# gu 后接 a/o/u 或词尾（aigu、Guadeloupe）时 u 正常发音。qu 后的 u 恒静音。
+_SILENT_GU_FOLLOW: set[str] = set("eéèêëiîïy")
 
 
 def _is_vowel(ch: str) -> bool:
@@ -103,17 +112,39 @@ class FrenchAnalyzer(SyllableAnalyzer):
 
     language = "fr"
 
-    def _clean_word(self, word: str) -> str:
-        """去标点、去省音前缀并转小写。
+    def _is_silent_u(self, w: str, i: int) -> bool:
+        """判断位置 i 的 'u' 是否静音（不构成音节）。
+
+        qu 后的 u 恒静音；gu 后接 e/i/y 时 u 静音。其余情况（gu 后接
+        a/o/u、独立元音、词首等）u 正常发音或参与二合元音。
 
         Args:
-            word: 法语单词（可含 l'、d' 等省音前缀与标点）。
+            w: 已清洗的词。
+            i: 'u' 的索引。
+
+        Returns:
+            静音返回 True。
+        """
+        if w[i] != "u" or i == 0:
+            return False
+        prev = w[i - 1]
+        if prev == "q":
+            return True
+        return prev == "g" and i + 1 < len(w) and w[i + 1] in _SILENT_GU_FOLLOW
+
+    def _clean_word(self, word: str) -> str:
+        """去标点并转小写。
+
+        省音撇号一并去除（l'amour → lamour），但不剥离词首字母前缀，
+        以免破坏 aujourd'hui / quelqu'un / presqu'île 等内嵌撇号词的切分。
+
+        Args:
+            word: 法语单词（可含省音撇号与标点）。
 
         Returns:
             清洗后的小写词；空串表示无实际内容。
         """
         w = word.lower().strip()
-        w = _APOSTROPHE_RE.sub("", w)
         w = _PUNCT_RE.sub("", w)
         return w
 
@@ -195,7 +226,7 @@ class FrenchAnalyzer(SyllableAnalyzer):
         i = 0
         n = len(w)
         while i < n:
-            if _is_vowel(w[i]):
+            if _is_vowel(w[i]) and not self._is_silent_u(w, i):
                 matched: str | None = None
                 for length in (3, 2):
                     if i + length <= n and w[i : i + length] in _FR_DIGRAPHS:

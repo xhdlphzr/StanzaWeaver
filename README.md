@@ -56,7 +56,7 @@ The two layers communicate **only through structured tools**. The AI can never o
 - `search_words` – retrieve candidate words/phrases from the local lexicon by meaning, tone, or rhyme category
 - `refine_line` – replace an entire line, then immediately run full meter validation
 - `rewrite` – rewrite the whole poem with a given instruction
-- `submit` – submit the final draft (only allowed after at least one successful line change)
+- `submit` – submit the final draft (accepted only after full‑poem meter validation passes)
 
 This "tools‑as‑interface" design keeps the AI’s creativity firmly within the boundaries of meter, and every modification is instantly verified by the symbolic layer — neither generating illegal lines, nor allowing the AI to bluff its way through with prose.
 
@@ -131,7 +131,7 @@ The following image shows the generation interface and refinement process:
 
 1. **Step 1 · Description Generation** – The Writer AI takes the user’s modern‑language theme and produces a poetic description (a “creative outline” reused in later steps).
 2. **Step 2 · First Draft** – The Writer AI produces an initial draft respecting the template’s meter requirements (line count, syllable count). Only line and syllable counts are validated at this stage.
-3. **Step 3 · Refinement Loop (ReAct)** – The AI repeatedly calls `search_words` to find compliant words/phrases, `refine_line` to replace lines, and `rewrite` to rewrite entire poems; every modification immediately triggers symbolic‑layer full‑poem validation. The AI is allowed to `submit` only after it has actually modified at least one line — otherwise it is rejected and asked to keep polishing. **There is no upper limit on this loop**; it continues until the draft is submitted.
+3. **Step 3 · Refinement Loop (ReAct)** – The AI repeatedly calls `search_words` to find compliant words/phrases, `refine_line` to replace lines, and `rewrite` to rewrite entire poems; every modification immediately triggers symbolic‑layer full‑poem validation. The AI may call `submit` at any time, but the submission is accepted **only after the full‑poem meter validation passes** — otherwise it is rejected with the concrete errors and the loop continues. **There is no upper limit on this loop**; it continues until the draft is submitted with a valid meter.
 4. **Step 4 · Semantic Final Review** – The Checker AI reviews the final draft from aspects such as coherence, thematic fit, and higher‑level dimensions beyond meter, then calls `submit` to give a pass/fail decision. If it fails, suggestions are sent back to Step 3 for further refinement; if it passes, the poem is finalised.
 
 ---

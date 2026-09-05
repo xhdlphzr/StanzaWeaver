@@ -23,8 +23,7 @@ MAX_FULL_COMBOS = 20000
 
 from ..models.syllable import Syllable
 from ..templates import format_count
-from .english import EnglishAnalyzer
-from .syllable_counter import count_syllables, get_analyzer
+from .syllable_counter import get_analyzer
 
 SyllableCount = int | tuple[int, int]
 Constraint = dict[str, Any]
@@ -271,15 +270,10 @@ class MeterValidator:
         for i in range(min_lines):
             line = poem[i]
             expected_count = syllables_expected[i]
-
-            if language == "en":
-                # 英语存在多音词，取任一发音变体满足即可（与完整校验一致）
-                variants = EnglishAnalyzer().analyze_line_variants(line)
-                ok = any(_count_matches(len(v), expected_count) for v in variants)
-                actual_count = len(variants[0]) if variants else 0
-            else:
-                actual_count = count_syllables(line, language)
-                ok = _count_matches(actual_count, expected_count)
+            # 与完整校验一致：取该行全部发音/切分变体，任一变体满足音节数即通过。
+            variants = get_analyzer(language).analyze_line_variants(line)
+            ok = any(_count_matches(len(v), expected_count) for v in variants)
+            actual_count = len(variants[0]) if variants else 0
 
             if not ok:
                 result.add_error(
