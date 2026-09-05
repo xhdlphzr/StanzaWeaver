@@ -65,14 +65,10 @@ python -m pytest
 
 ### 1.5 不使用 Docker（可选）
 
-本地用虚拟环境也可，但需 Python **3.14**：
+也可不依赖 Docker 在本地开发。项目使用 [uv](https://docs.astral.sh/uv/) 管理依赖，目标 Python **3.14**（见 `.python-version`）：
 
 ```bash
-python -m venv .venv
-.venv\Scripts\Activate.ps1          # Windows
-#   source .venv/bin/activate       # Linux / macOS
-pip install -r requirements.txt
-pip install pytest ruff mypy        # 测试/检查工具
+uv sync                    # 创建 .venv 并按 uv.lock 安装运行 + dev 依赖
 ```
 
 ---
@@ -83,23 +79,23 @@ pip install pytest ruff mypy        # 测试/检查工具
 
 ```bash
 # 1) 类型检查（零容忍，--strict）
-mypy --strict ./
+uv run mypy --strict ./
 
 # 2) 静态检查并自动修复（含 unsafe 修复）
-ruff check --fix --unsafe-fixes ./
+uv run ruff check --fix --unsafe-fixes ./
 
 # 3) 代码格式化
-ruff format ./
+uv run ruff format ./
 
-# 4) 测试（由 pytest.ini 的 --cov-fail-under=100 强制要求 100% 覆盖率）
-pytest
+# 4) 测试（由 pyproject.toml 的 --cov-fail-under=100 强制要求 100% 覆盖率）
+uv run pytest
 ```
 
 说明：
 
-- CI 中 `ruff` 以 `ruff check ./`（不自动修改）执行，因此**你本地必须先用上面的 `--fix --unsafe-fixes` 与 `format` 把代码整理干净**，否则 CI 会失败。
+- CI 中 `ruff` 以 `uv run ruff check ./`（不自动修改）执行，因此**你本地必须先用上面的 `--fix --unsafe-fixes` 与 `format` 把代码整理干净**，否则 CI 会失败。
 - `mypy` 必须使用本项目配套的虚拟环境版本（`python3.14` + 项目依赖），系统全局 `mypy` 可能出现 import-not-found 的误报。
-- `pytest` 使用仓库根目录的 `pytest.ini` 配置（`pythonpath = .`，`testpaths = tests`，`--cov=src --cov-fail-under=100`）。它**强制 `src` 达到 100% 覆盖率**，因此任何 `src` 改动都必须有测试覆盖，否则 `pytest` 会失败。测试使用 `tests/helpers.py` 中的 `StubLLMClient` 走桩，**不调用任何真实 LLM / 不联网**，可离线全量运行。
+- `pytest` 使用 `pyproject.toml` 中 `[tool.pytest.ini_options]` 的配置（`pythonpath = .`，`testpaths = tests`，`--cov=src --cov-fail-under=100`）。它**强制 `src` 达到 100% 覆盖率**，因此任何 `src` 改动都必须有测试覆盖，否则 `pytest` 会失败。测试使用 `tests/helpers.py` 中的 `StubLLMClient` 走桩，**不调用任何真实 LLM / 不联网**，可离线全量运行。
 
 ---
 

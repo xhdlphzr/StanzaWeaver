@@ -152,7 +152,7 @@ Example: `.\scripts\build.ps1 -b docker.m.daocloud.io/library/python:3.14-slim` 
 
 Notes:
 
-- **Dependencies** – Uses the full project `requirements.txt` (including desktop GUI and embedded reranking components, same functionality as local). The Linux image includes all these dependencies, so the image is large and initial build is slow, but can be reused after the first build.
+- **Dependencies** – Uses the full project dependencies declared in `pyproject.toml` and locked by `uv.lock` (managed with [uv](https://docs.astral.sh/uv/); includes desktop GUI and embedded reranking components, same functionality as local). The Linux image includes all these dependencies, so the image is large and initial build is slow, but can be reused after the first build.
 - **Data Persistence** – Configuration, lexicon, history, and logs are persisted via the `stanzaweaver-data` volume, mounted to `~/.stanza_weaver` inside the container.
 - **Security** – The application only accepts `localhost`/`127.0.0.1` Host headers (via `app.py`’s `_guard_local_access`). Docker deployment must access via `http://localhost:5000`; on Linux you can also use `network_mode: host` (see comments in `docker-compose.yml`).
 - **Custom Templates** – Templates created via the UI are written to `/app/src/templates/` inside the container; they will be lost when the container is rebuilt (source is not mounted). To persist them, you would need to mount the directory.
@@ -166,6 +166,7 @@ Notes:
 StanzaWeaver/
 ├── .dockerignore
 ├── .gitignore
+├── .python-version         # Python version (uv)
 ├── Dockerfile              # Image build (Python 3.14-slim + desktop/reranking dependencies)
 ├── LICENSE                 # MIT License
 ├── README.md               # Project documentation
@@ -173,7 +174,8 @@ StanzaWeaver/
 ├── StanzaWeaver.spec       # PyInstaller build spec
 ├── app.py                  # pywebview + Flask + SocketIO entry point
 ├── docker-compose.yml      # Compose deployment
-├── requirements.txt        # Project dependencies
+├── pyproject.toml          # Project dependencies (uv) + tool config
+├── uv.lock                 # Locked dependency versions (uv)
 ├── assets/
 │   └── 1.png               # Demo screenshot
 ├── scripts/                # Cross‑platform one‑click build/run scripts

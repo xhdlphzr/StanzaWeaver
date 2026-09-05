@@ -1,0 +1,125 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
+# StanzaWeaver — Neuro-Symbolic Poetry Generation App
+#
+# 依赖管理使用 uv：
+#   uv sync                # 安装运行依赖 + dev 依赖（按 uv.lock，等价旧 pip install -r requirements.txt + dev 工具）
+#   uv sync --no-dev       # 仅运行依赖（Web/容器部署用，dev 不进镜像）
+#   uv run pytest / ruff check ./ / mypy --strict ./ / ruff format .
+#
+# 本项目是纯应用（不可作为库导入打包），故 [tool.uv] package = false。
+
+[project]
+name = "stanzaweaver"
+version = "1.0.0"
+description = "Weaving Stanzas with Wisdom — A Neuro-Symbolic Intelligent Poetry Generation Desktop Application"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+keywords = ["poetry", "meter", "neuro-symbolic", "llm", "flask"]
+dependencies = [
+    "annotated-doc==0.0.5",
+    "annotated-types==0.8.0",
+    "anyio==4.14.2",
+    "ast_serialize==0.8.0",
+    "bidict==0.23.1",
+    "blinker==1.9.0",
+    "bottle==0.13.4",
+    "certifi==2026.7.22",
+    "cffi==2.1.0",
+    "charset-normalizer==3.5.1",
+    "click==8.4.2",
+    "clr_loader==0.3.1",
+    "colorama==0.4.6",
+    "defusedxml==0.7.1",
+    "distro==1.9.0",
+    "filelock==3.32.2",
+    "Flask==3.1.3",
+    "Flask-SocketIO==5.6.1",
+    "fsspec==2026.7.0",
+    "h11==0.16.0",
+    "hf-xet==1.5.2",
+    "httpcore==1.0.9",
+    "httpx==0.28.1",
+    "huggingface_hub==1.25.1",
+    "idna==3.18",
+    "iniconfig==2.3.0",
+    "itsdangerous==2.2.0",
+    "Jinja2==3.1.6",
+    "jiter==0.16.0",
+    "joblib==1.5.3",
+    "librt==0.15.0",
+    "markdown-it-py==4.2.0",
+    "MarkupSafe==3.0.3",
+    "mdurl==0.1.2",
+    "mpmath==1.3.0",
+    "narwhals==2.24.0",
+    "networkx==3.6.1",
+    "nltk==3.10.0",
+    "numpy==2.5.1",
+    "openai==2.48.0",
+    "packaging==26.2",
+    "pathspec==1.1.1",
+    "pluggy==1.6.0",
+    "proxy_tools==0.1.0",
+    "pycparser==3.0",
+    "pydantic==2.13.4",
+    "pydantic_core==2.46.4",
+    "Pygments==2.20.0",
+    "pypinyin==0.55.0",
+    "python-engineio==4.13.3",
+    "python-socketio==5.16.3",
+    "pythonnet==3.1.0",
+    "pywebview==6.2.1",
+    "PyYAML==6.0.3",
+    "regex==2026.7.19",
+    "requests==2.34.2",
+    "rich==15.0.0",
+    "safetensors==0.8.0",
+    "scikit-learn==1.9.0",
+    "scipy==1.18.0",
+    "sentence-transformers==5.6.1",
+    "shellingham==1.5.4",
+    "simple-websocket==1.1.0",
+    "sniffio==1.3.1",
+    "sympy==1.14.0",
+    "threadpoolctl==3.6.0",
+    "tiktoken==0.14.0",
+    "tokenizers==0.22.2",
+    "torch==2.13.0",
+    "tqdm==4.69.1",
+    "transformers==5.14.1",
+    "typer==0.27.0",
+    "typing-inspection==0.4.2",
+    "typing_extensions==4.16.0",
+    "urllib3==2.7.0",
+    "Werkzeug==3.1.8",
+    "wsproto==1.3.2",
+]
+
+[dependency-groups]
+dev = [
+    "altgraph==0.17.5",
+    "coverage==7.16.0",
+    "mypy==2.3.1",
+    "mypy_extensions==1.1.0",
+    "pefile==2024.8.26",
+    "pyinstaller==6.22.2",
+    "pyinstaller-hooks-contrib==2026.6",
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "pywin32-ctypes==0.2.3",
+    "ruff==0.16.5",
+    "setuptools==83.0.0",
+    "types-Flask-SocketIO==5.6.0.20260728",
+    "types-PyYAML==6.0.12.20260815",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q --cov=src --cov-report=term --cov-fail-under=100"
