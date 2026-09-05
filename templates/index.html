@@ -714,7 +714,7 @@
           }
         }
         if (data.draft && data.draft.length > 0) {
-          updatePoemDisplay(data.draft);
+          updatePoemDisplay(data.draft, data.title);
         }
 
         if (data.last_tool) {
@@ -786,12 +786,18 @@
         return wrapper;
       }
 
-      function updatePoemDisplay(poem) {
+      function updatePoemDisplay(poem, title) {
         if (JSON.stringify(poem) === JSON.stringify(lastPoem)) return;
         lastPoem = [...poem];
 
         const display = document.getElementById("poem-display");
         display.innerHTML = "";
+        if (title) {
+          const titleDiv = document.createElement("div");
+          titleDiv.className = "poem-title";
+          titleDiv.textContent = title;
+          display.appendChild(titleDiv);
+        }
         poem.forEach((line, i) => {
           const div = document.createElement("div");
           div.className = "poem-line";
@@ -808,20 +814,13 @@
         const display = document.getElementById("poem-display");
         display.innerHTML = "";
 
-        if (data.title) {
-          const titleDiv = document.createElement("div");
-          titleDiv.className = "poem-title";
-          titleDiv.textContent = data.title;
-          display.appendChild(titleDiv);
-        }
-
         if (data.formatted_poem) {
           const pre = document.createElement("pre");
           pre.className = "poem-formatted";
           pre.textContent = data.formatted_poem;
           display.appendChild(pre);
         } else {
-          updatePoemDisplay(poem);
+          updatePoemDisplay(poem, data.title);
         }
 
         document.getElementById("tool-status").classList.add("hidden");

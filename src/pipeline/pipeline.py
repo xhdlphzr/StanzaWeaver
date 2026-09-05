@@ -138,6 +138,7 @@ class PoetryPipeline:
                     "step": state.current_step,
                     "description": state.description,
                     "draft": state.draft,
+                    "title": state.title,
                     "refine_rounds": state.refine_rounds,
                     "checker_pass": state.checker_pass,
                     "checker_suggestions": state.checker_suggestions,
