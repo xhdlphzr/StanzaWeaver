@@ -4,17 +4,18 @@
 # StanzaWeaver CI/CD
 #
 # CI  (持续集成): 每次 push / PR 在 ubuntu-latest 上运行
-#   - ruff format ./           代码格式化
+#   - uv sync --frozen          按 uv.lock 安装运行依赖 + dev 依赖
+#   - ruff format ./            代码格式化
 #   - ruff check --fix --unsafe-fixes ./   静态检查与自动修复
 #   - mypy --strict ./         类型检查（零容忍）
 #   - pytest                   单元测试 + 集成测试（桩 LLM，无网络）
 #
 # CD  (持续交付): Release 发布时触发，三平台打包并上传分卷 zip 到 Release 附件
-#   - Windows : pyinstaller StanzaWeaver.spec --clean -> zip -s 1g 分卷
-#   - macOS   : pyinstaller StanzaWeaver.spec --clean -> zip -s 1g 分卷
-#   - Linux   : pyinstaller StanzaWeaver.spec --clean -> zip -s 1g 分卷
+#   - Windows : uv run pyinstaller StanzaWeaver.spec --clean -> zip -s 1g 分卷
+#   - macOS   : uv run pyinstaller StanzaWeaver.spec --clean -> zip -s 1g 分卷
+#   - Linux   : uv run pyinstaller StanzaWeaver.spec --clean -> zip -s 1g 分卷
 #
-# 注: 本地 venv 与 Dockerfile 均使用 Python 3.14，故 CI 统一锁定 3.14。
+# 注: Python 版本统一由仓库根目录 .python-version（3.14）决定，uv 会自动安装/使用。
 
 name: CI/CD
 
@@ -35,9 +36,6 @@ permissions:
 
 jobs:
   # ------------------------------------------------------------------
-  # CI: 两个平台并行执行 lint / 类型检查 / 测试
-  # ------------------------------------------------------------------
-  # ------------------------------------------------------------------
   # CI: 代码层持续集成（代码无关平台，统一在 ubuntu-latest 上一次跑完）
   #   - ruff check ./            静态检查（不自动修改）
   #   - mypy --strict ./         类型检查（零容忍）
@@ -50,25 +48,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.14"
-          cache: pip
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+        run: uv sync --frozen
 
       - name: ruff check
-        run: ruff check ./
+        run: uv run ruff check ./
 
-      - name: mypy (strict)
-        run: mypy --strict ./
+      - name: ty (strict)
+        run: uv run ty check
 
       - name: pytest
-        run: pytest
+        run: uv run pytest
 
   # ------------------------------------------------------------------
   # CD: Release 发布时触发，测试通过后跨平台打包并上传分卷 zip
@@ -86,16 +82,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.14"
-          cache: pip
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
-      - name: Install build dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+      - name: "Install dependencies (incl. dev: pyinstaller)"
+        run: uv sync --frozen
 
       - name: Install zip (Windows)
         if: runner.os == 'Windows'
@@ -107,7 +101,7 @@ jobs:
 
       # ---------- Windows / macOS / Linux: PyInstaller 出包（onedir 目录） ----------
       - name: Build with PyInstaller
-        run: pyinstaller StanzaWeaver.spec --clean
+        run: uv run pyinstaller StanzaWeaver.spec --clean
 
       # ---------- 分卷压缩（统一 zip -s 1g） ----------
       - name: Compress into 1GB volumes

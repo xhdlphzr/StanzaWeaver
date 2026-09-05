@@ -12,15 +12,22 @@
 #            -v stanzaweaver-data:/home/stanzaweaver/.stanza_weaver \
 #            stanzaweaver
 # 访问:  http://localhost:5000 （安全设计仅接受 localhost/127.0.0.1 的 Host 头）
+#
+# 依赖管理使用 uv：仅 COPY pyproject.toml + uv.lock 以利用 Docker 层缓存，
+# dev 依赖（pytest/ruff/mypy/pyinstaller 等）不进镜像，保持镜像精简。
 
 ARG BASE_IMAGE=python:3.14-slim
 FROM ${BASE_IMAGE}
 
+# 复制 uv（与官方 uv 镜像同版本可写死 tag 以便复用层缓存）
+COPY --from=ghcr.io/astral-sh/uv:0.12.10 /uv /uvx /bin/
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
+    UV_LINK_MODE=copy \
     STANZAWEAVER_HOST=127.0.0.1 \
-    STANZAWEAVER_PORT=5000
+    STANZAWEAVER_PORT=5000 \
+    PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
@@ -28,9 +35,9 @@ WORKDIR /app
 RUN groupadd -r stanzaweaver \
     && useradd -r -g stanzaweaver -d /home/stanzaweaver -m stanzaweaver
 
-# 先装依赖（利用层缓存；--no-cache-dir 避免 pip 缓存写入镜像层）
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# 先装依赖（利用层缓存；uv 在基础镜像内直接使用系统 Python 3.14）
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen
 
 # 复制源码（排除 .dockerignore 中的内容）
 COPY --chown=stanzaweaver:stanzaweaver . .

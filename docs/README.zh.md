@@ -152,7 +152,7 @@ flowchart TD
 
 说明：
 
-- **依赖**：直接用项目完整 `requirements.txt`（含桌面 GUI 与嵌入重排组件，功能与本地一致）；Linux 镜像会同时包含这些依赖，镜像较大、首次构建较慢，但构建一次后可复用。
+- **依赖**：直接用项目完整依赖（由 [uv](https://docs.astral.sh/uv/) 依据 `pyproject.toml` 声明、`uv.lock` 锁定；含桌面 GUI 与嵌入重排组件，功能与本地一致）；Linux 镜像会同时包含这些依赖，镜像较大、首次构建较慢，但构建一次后可复用。
 - **数据持久化**：配置、词库、历史记录、日志通过 volume `stanzaweaver-data` 持久化到容器内 `~/.stanza_weaver`。
 - **安全设计**：应用仅接受 `localhost`/`127.0.0.1` 的 Host 头（`app.py` 的 `_guard_local_access`），Docker 部署需通过 `http://localhost:5000` 访问；Linux 下也可改用 `network_mode: host`（见 `docker-compose.yml` 注释）。
 - **自定义模板**：通过 UI 创建的自定义模板写入容器内 `/app/src/templates/`，容器重建后需重新创建（源码未挂载）。
@@ -166,6 +166,7 @@ flowchart TD
 StanzaWeaver/
 ├── .dockerignore
 ├── .gitignore
+├── .python-version         # Python 版本（uv）
 ├── Dockerfile              # 镜像构建（Python 3.14-slim + 桌面/重排依赖）
 ├── LICENSE                 # MIT 许可证
 ├── README.md               # 项目文档
@@ -173,7 +174,8 @@ StanzaWeaver/
 ├── StanzaWeaver.spec       # PyInstaller 构建规格
 ├── app.py                  # pywebview + Flask + SocketIO 入口
 ├── docker-compose.yml      # Compose 部署编排
-├── requirements.txt        # 项目依赖
+├── pyproject.toml          # 项目依赖（uv）+ 工具配置
+├── uv.lock                 # 锁定的依赖版本（uv）
 ├── assets/
 │   └── 1.png               # 功能演示截图
 ├── scripts/                # 跨平台一键构建/运行脚本

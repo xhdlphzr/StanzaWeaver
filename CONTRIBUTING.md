@@ -65,14 +65,10 @@ python -m pytest
 
 ### 1.5 Without Docker (Optional)
 
-You can also use a local virtual environment, but Python **3.14** is required:
+You can also develop locally without Docker. The repo is dependency-managed with [uv](https://docs.astral.sh/uv/) and targets **Python 3.14** (see `.python-version`):
 
 ```bash
-python -m venv .venv
-.venv\Scripts\Activate.ps1          # Windows
-#   source .venv/bin/activate       # Linux / macOS
-pip install -r requirements.txt
-pip install pytest ruff mypy        # testing/linting tools
+uv sync                    # creates .venv; installs runtime + dev deps from uv.lock
 ```
 
 ---
@@ -83,23 +79,23 @@ Before each commit (or PR), run the following commands in the repository root �
 
 ```bash
 # 1) Type checking (zero tolerance, --strict)
-mypy --strict ./
+uv run mypy --strict ./
 
 # 2) Lint and auto‑fix (including unsafe fixes)
-ruff check --fix --unsafe-fixes ./
+uv run ruff check --fix --unsafe-fixes ./
 
 # 3) Code formatting
-ruff format ./
+uv run ruff format ./
 
-# 4) Tests (enforces 100% coverage via --cov-fail-under=100 in pytest.ini)
-pytest
+# 4) Tests (enforces 100% coverage via --cov-fail-under=100 in pyproject.toml)
+uv run pytest
 ```
 
 Notes:
 
-- In CI, `ruff` is run as `ruff check ./` (without auto‑fix), so **you must locally clean up with `--fix --unsafe-fixes` and `format`** first, otherwise CI will fail.
+- In CI, `ruff` is run as `uv run ruff check ./` (without auto‑fix), so **you must locally clean up with `--fix --unsafe-fixes` and `format`** first, otherwise CI will fail.
 - `mypy` must be used with the virtual environment that matches this project (`python3.14` + project dependencies); a system‑wide `mypy` may produce false‑positive import‑not‑found errors.
-- `pytest` uses the `pytest.ini` configuration at the repo root (`pythonpath = .`, `testpaths = tests`, `--cov=src --cov-fail-under=100`). It enforces **100% coverage on `src`**, so every `src` change must be fully covered by tests — `pytest` fails otherwise. Tests use the `StubLLMClient` from `tests/helpers.py` – **no real LLM calls / no network**; they can run fully offline.
+- `pytest` uses the `[tool.pytest.ini_options]` table in `pyproject.toml` (`pythonpath = .`, `testpaths = tests`, `--cov=src --cov-fail-under=100`). It enforces **100% coverage on `src`**, so every `src` change must be fully covered by tests — `pytest` fails otherwise. Tests use the `StubLLMClient` from `tests/helpers.py` – **no real LLM calls / no network**; they can run fully offline.
 
 ---
 
