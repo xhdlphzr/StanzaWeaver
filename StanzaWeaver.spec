@@ -6,9 +6,9 @@
 import sys
 
 if sys.platform == 'win32':
-    icon_file = 'Franx.ico'
+    icon_file = 'assets/Franx.ico'
 elif sys.platform == 'darwin':
-    icon_file = 'Franx.icns'
+    icon_file = 'assets/Franx.icns'
 else:
     icon_file = None
 

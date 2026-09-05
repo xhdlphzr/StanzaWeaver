@@ -298,6 +298,6 @@ Notes:
 
 ## License
 
-All code is open‑source under the **MIT License**, Copyright (c) 2026 xhdlphzr.
+All code is open‑source under the [**MIT License**](LICENSE), Copyright (c) 2026 xhdlphzr.
 
-The application icons `Franx.png`, `Franx.ico`, `Franx.icns` and all files under `assets/` are Copyright (c) 2026 xhdlphzr. All rights reserved.
+All files under `assets/` are under the [**CC BY-NC-ND 4.0 License**](assets/LICENSE), Copyright (c) 2026 xhdlphzr.
