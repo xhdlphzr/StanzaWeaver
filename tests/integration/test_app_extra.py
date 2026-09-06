@@ -149,11 +149,30 @@ def test_ping_endpoint_error_sets_error(monkeypatch: pytest.MonkeyPatch) -> None
             raise RuntimeError("boom")
 
     monkeypatch.setattr("src.agents.base.LLMClient", _Failing)
-    monkeypatch.setattr(
-        app_module, "_llm_status", {"writer": "checking", "checker": "x"}
-    )
+    monkeypatch.setattr(app_module, "_llm_status", {"writer": "checking", "checker": "x"})
     app_module._ping_one_endpoint("writer")
     assert app_module._llm_status["writer"] == "error"
+
+
+def test_ping_endpoint_ok_sets_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    """端点探测成功时置 ok（不依赖真实配置/网络）。"""
+    cfg = SimpleNamespace(
+        writer={"base_url": "http://x", "api_key": "k", "model": "m"},
+        checker={"base_url": "http://x", "api_key": "k", "model": "m"},
+    )
+    monkeypatch.setattr("src.config.get_config", lambda: cfg)
+
+    class _Healthy:
+        def __init__(self, base_url: str, api_key: str, model: str) -> None:
+            pass
+
+        def chat(self, messages: list[Any]) -> dict[str, Any]:
+            return {"ok": True}
+
+    monkeypatch.setattr("src.agents.base.LLMClient", _Healthy)
+    monkeypatch.setattr(app_module, "_llm_status", {"writer": "checking", "checker": "x"})
+    app_module._ping_one_endpoint("writer")
+    assert app_module._llm_status["writer"] == "ok"
 
 
 def test_auto_ping_loop_runs_once(monkeypatch: pytest.MonkeyPatch) -> None:
