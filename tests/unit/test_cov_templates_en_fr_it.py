@@ -90,7 +90,7 @@ class _ConstraintTemplate(PoetryTemplate):
 
 
 @pytest.fixture()
-def registry_snapshot() -> Generator[None, None, None]:
+def registry_snapshot() -> Generator[None]:
     """测试前后恢复全局 _registry，避免污染其他用例。
 
     Yields:

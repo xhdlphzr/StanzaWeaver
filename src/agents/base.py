@@ -5,6 +5,7 @@
 
 - 回环地址（127.0.0.1/localhost）自动绕过 shell 代理（trust_env=False），
   修复本地 Ollama 等服务的 502 Bad Gateway；
+- 适配 openai v3：其传输层已基于 ``httpx2``，故 http_client 也传 ``httpx2.Client``；
 - chat/chat_stream 支持工具调用（Function Calling）；
 - 失败时抛出带排查提示的 RuntimeError。
 """
@@ -14,7 +15,7 @@ from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlparse
 
-import httpx
+import httpx2
 import tiktoken
 from openai import OpenAI
 
@@ -53,9 +54,9 @@ class LLMClient:
             api_key: API 密钥。
             model: 模型名。
         """
-        http_client: httpx.Client | None = None
+        http_client: httpx2.Client | None = None
         if _is_loopback(base_url):
-            http_client = httpx.Client(trust_env=False)
+            http_client = httpx2.Client(trust_env=False)
         self.client = OpenAI(
             base_url=base_url, api_key=api_key, http_client=http_client
         )

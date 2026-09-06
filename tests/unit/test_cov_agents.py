@@ -126,8 +126,8 @@ def test_is_loopback_false() -> None:
 # LLMClient.__init__ / _raise_with_hint
 # --------------------------------------------------------------------------- #
 def test_init_creates_http_client_for_loopback() -> None:
-    """回环地址下应创建绕过代理的 httpx.Client（trust_env=False）。"""
-    with patch("httpx.Client") as httpx_cls:
+    """回环地址下应创建绕过代理的 httpx2.Client（trust_env=False）。"""
+    with patch("httpx2.Client") as httpx_cls:
         httpx_cls.return_value = MagicMock(trust_env=False)
         _c, _ = _make_llm("http://127.0.0.1:11434/v1")
         httpx_cls.assert_called_once_with(trust_env=False)
@@ -135,7 +135,7 @@ def test_init_creates_http_client_for_loopback() -> None:
 
 def test_init_non_loopback_no_special_client() -> None:
     """非回环地址下正常初始化（不抛错，不创建 trust_env=False 的 client）。"""
-    with patch("httpx.Client") as httpx_cls:
+    with patch("httpx2.Client") as httpx_cls:
         _c, _ = _make_llm("https://api.openai.com/v1")
         httpx_cls.assert_not_called()
 

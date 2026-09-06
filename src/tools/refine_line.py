@@ -27,7 +27,7 @@ def execute_refine_line(
     """
     try:
         line_idx = int(arguments.get("line", -1))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         line_idx = -1
     new_text = str(arguments.get("new_text", ""))
 

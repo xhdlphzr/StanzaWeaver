@@ -443,5 +443,5 @@ def json_dumps_safe(obj: Any, default: str = "") -> str:
     """
     try:
         return json.dumps(obj, ensure_ascii=False)
-    except (TypeError, ValueError, RecursionError):
+    except TypeError, ValueError, RecursionError:
         return str(obj)
