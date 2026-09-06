@@ -65,7 +65,7 @@ jobs:
         run: uv run reuse lint
 
       - name: "pytest (coverage: src + app)"
-        run: uv run pytest
+        run: uv run pytest -q --cov-report=term-missing
 
       - name: ruff check
         run: uv run ruff check ./
