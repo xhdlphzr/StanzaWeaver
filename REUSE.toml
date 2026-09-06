@@ -1,0 +1,36 @@
+# Copyright (c) 2026 xhdlphzr
+# SPDX-License-Identifier: MIT
+
+version = 1
+
+[[annotations]]
+path = [
+    ".github/**",
+    "docs/**",
+    "i18n/**",
+    "scripts/**",
+    "src/**",
+    "static/**",
+    "templates/**",
+    "tests/**",
+    ".dockerignore",
+    ".gitignore",
+    ".python-version",
+    "app.py",
+    "CONTRIBUTING.md",
+    "docker-compose.yml",
+    "Dockerfile",
+    "LICENSE",
+    "pyproject.toml",
+    "README.md",
+    "REUSE.toml",
+    "StanzaWeaver.spec",
+    "uv.lock"
+]
+SPDX-FileCopyrightText = "Copyright (c) 2026 The StanzaWeaver Project Contributors"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = ["assets/**"]
+SPDX-FileCopyrightText = "Copyright (c) 2026 xhdlphzr"
+SPDX-License-Identifier = "CC-BY-NC-ND-4.0"

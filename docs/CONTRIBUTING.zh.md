@@ -78,47 +78,65 @@ uv sync                    # 创建 .venv 并按 uv.lock 安装运行 + dev 依�
 每次提交（PR）前，请在仓库根目录依次运行以下命令，**全部 0 退出码 / 无输出错误** 才允许提交：
 
 ```bash
-# 1) 类型检查（零容忍，--strict）
-uv run mypy --strict ./
+# 1) 依赖锁一致性
+uv lock
+uv sync
+uv lock --check
 
-# 2) 静态检查并自动修复（含 unsafe 修复）
+# 2) REUSE 许可证合规检查（见 REUSE.toml / LICENSES/）
+uv run reuse lint
+
+# 3) 测试 —— src/ + 根目录 app.py 覆盖率必须 100%
+#    （参数在 pyproject.toml 的 [tool.pytest.ini_options].addopts）
+uv run pytest -q --cov=src --cov=app --cov-report=term --cov-fail-under=100
+
+# 4) 静态检查并自动修复（含 unsafe 修复）
 uv run ruff check --fix --unsafe-fixes ./
 
-# 3) 代码格式化
-uv run ruff format ./
+# 5) 类型检查（零容忍，--strict）
+uv run mypy --strict ./
 
-# 4) 测试（由 pyproject.toml 的 --cov-fail-under=100 强制要求 100% 覆盖率）
-uv run pytest
+# 6) 代码格式化
+uv run ruff format ./
+uv run ruff format --check ./
 ```
 
 说明：
 
-- CI 中 `ruff` 以 `uv run ruff check ./`（不自动修改）执行，因此**你本地必须先用上面的 `--fix --unsafe-fixes` 与 `format` 把代码整理干净**，否则 CI 会失败。
+- CI 中按规范顺序执行：`uv lock --check` → `reuse lint` → 覆盖率门禁的 `pytest` → `ruff check` → `mypy --strict` → `ruff format --check`。其中 `ruff check` 不自动修改，因此**你本地必须先用上面的 `--fix --unsafe-fixes` 与 `format` 把代码整理干净**，否则 CI 会失败。
 - `mypy` 必须使用本项目配套的虚拟环境版本（`python3.14` + 项目依赖），系统全局 `mypy` 可能出现 import-not-found 的误报。
-- `pytest` 使用 `pyproject.toml` 中 `[tool.pytest.ini_options]` 的配置（`pythonpath = .`，`testpaths = tests`，`--cov=src --cov-fail-under=100`）。它**强制 `src` 达到 100% 覆盖率**，因此任何 `src` 改动都必须有测试覆盖，否则 `pytest` 会失败。测试使用 `tests/helpers.py` 中的 `StubLLMClient` 走桩，**不调用任何真实 LLM / 不联网**，可离线全量运行。
+- 覆盖率测量范围为 **`src/` 与根目录 `app.py`（模块名 `app`）**，必须达到 **100%** —— 参数 `--cov=src --cov=app --cov-report=term --cov-fail-under=100` 已写入 `pyproject.toml` 的 `[tool.pytest.ini_options].addopts`，`pytest` 不达标会失败；任何 `src` / `app.py` 改动都必须有测试覆盖。测试使用 `tests/helpers.py` 中的 `StubLLMClient` 走桩，**不调用任何真实 LLM / 不联网**，可离线全量运行。
 
 ---
 
-## 3. 编程规范
+## 3. 编程规范（项目规范，1–13）
 
-### 3.1 算法与架构
+依赖管理使用 `uv`；测试覆盖范围为 **`src/` + 根目录 `app.py`**。
 
-1. **验证逻辑正确性** — 提交前审查算法/架构层是否正确。
-2. **100% 测试覆盖率** — `pytest` 必须全量通过，被改动的 `src` 模块需达到 100% 覆盖率。每个新 bug 必须有对应测试用例；审查测试代码是否存在考虑不周的情况。
-3. **接口统一** — 当同一功能存在多个接口时，评估是否可以合并统一。
+### 3.1 工程习惯
 
-### 3.2 代码质量
+1. **依赖锁** — `uv lock --check` 必须全量通过；每次提交前运行 `uv lock` 并 `uv sync`；定期（建议每月初）运行 `uv lock --upgrade`。
+2. **REUSE 合规** — `uv run reuse lint` 必须全量通过（见 `REUSE.toml` / `LICENSES/`）。
+3. **CI/CD 完整配置** — CI 按规范顺序把所有可统计工具跑一遍：`uv lock --check` → `reuse lint` → 覆盖率门禁的 `pytest` → `ruff check ./` → `mypy --strict ./` → `ruff format --check ./`。CD 在 `release` 发布后自动于 Windows/macOS/Linux 上打包，并将产物压缩为每卷 1G 的分卷上传到 Release 附件。
 
-4. **静态检查** — `ruff check` 必须完全通过。优先运行 `ruff check --fix --unsafe-fixes`，需要时再手动修改。
-5. **类型检查** — `mypy --strict` 必须全量通过。优先运行 `mypy --install-types`，需要时再手动修改。
-6. **文档字符串** — 每个函数、类、模块都必须有 Google 风格的 docstring。
-7. **代码格式化** — 每次写完代码后运行 `ruff format`。
-8. **删除冗余代码** — 删除不可达/冗余代码，逻辑保持简洁。
+### 3.2 算法与架构
 
-### 3.3 用户体验
+4. **验证逻辑正确性** — 提交前审查算法/架构层是否正确。
+5. **100% 覆盖率（src + app.py）** — 运行 `uv run pytest -q --cov=src --cov=app --cov-report=term --cov-fail-under=100` 并达到 100%。每个新 bug 必须有对应回归测试；审查测试代码是否存在考虑不周的情况。
+6. **接口统一** — 当同一功能存在多个接口时，评估是否可以合并统一。
 
-9. **功能完整性** — 在软件职能范围之内尽可能满足大部分需求。
-10. **UI 设计** — 追求精致视觉：圆角、英文标题用 Alex Brush、正文用 Noto Serif SC、动画效果（滑动、展开、淡入淡出）。
+### 3.3 代码质量
+
+7. **静态检查** — `ruff check` 必须完全通过。优先运行 `ruff check --fix --unsafe-fixes`，需要时再手动修改。
+8. **类型检查** — `mypy --strict` 必须全量通过。优先运行 `mypy --install-types`，需要时再手动修改。
+9. **文档字符串** — 每个函数、类、模块都必须有 Google 风格的 docstring。
+10. **代码格式化** — 每次写完代码后运行 `ruff format`；`ruff format --check` 必须通过。
+11. **删除冗余代码** — 删除不可达/冗余代码，逻辑保持简洁。
+
+### 3.4 用户体验
+
+12. **功能完整性** — 在软件职能范围之内尽可能满足大部分需求。
+13. **UI 设计** — 追求精致视觉：圆角、英文标题用 Alex Brush、正文用 Noto Serif SC、动画效果（滑动、展开、淡入淡出）。
 
 ---
 

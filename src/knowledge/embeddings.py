@@ -5,11 +5,12 @@
 
 用 sentence-transformers 多语言模型对候选词按语义相似度排序；
 模型未就绪或离线时静默降级为原顺序。
+
+不依赖 numpy：``encode(normalize_embeddings=True)`` 已输出归一化向量，
+相似度用纯 Python 点积计算即可（也避免引入重数值依赖）。
 """
 
 from typing import Any
-
-import numpy as np
 
 _MODEL: Any = None
 _MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
@@ -27,6 +28,18 @@ def _get_model() -> Any:
 
         _MODEL = SentenceTransformer(_MODEL_NAME)
     return _MODEL
+
+
+def _to_float_list(vec: Any) -> list[float]:
+    """把 encode 返回的向量（numpy 数组或可迭代序列）转为 float 列表。
+
+    Args:
+        vec: 单条向量。
+
+    Returns:
+        float 列表。
+    """
+    return [float(x) for x in vec]
 
 
 def rerank(
@@ -47,11 +60,11 @@ def rerank(
     try:
         model = _get_model()
         texts = [str(c["text"]) for c in candidates]
-        query_emb = model.encode([query], normalize_embeddings=True)[0]
-        doc_embs = model.encode(texts, normalize_embeddings=True)
-        scores = np.dot(doc_embs, query_emb)
-        for c, score in zip(candidates, scores):
-            c["_score"] = float(score)
+        query_vec = _to_float_list(model.encode([query], normalize_embeddings=True)[0])
+        doc_rows = model.encode(texts, normalize_embeddings=True)
+        for c, row in zip(candidates, doc_rows):
+            vec = _to_float_list(row)
+            c["_score"] = sum(a * b for a, b in zip(query_vec, vec))
         candidates.sort(key=lambda c: float(c.get("_score", 0)), reverse=True)
     except Exception:  # noqa: S110, BLE001 - 模型加载/编码失败时静默降级为原顺序
         pass

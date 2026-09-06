@@ -56,7 +56,7 @@ class Config:
             try:
                 with open(self._path, "r", encoding="utf-8") as f:
                     self._data = json.load(f)
-            except (json.JSONDecodeError, OSError):
+            except json.JSONDecodeError, OSError:
                 self._data = {}
         self._loaded = True
 

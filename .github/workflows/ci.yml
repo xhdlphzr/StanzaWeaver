@@ -3,12 +3,14 @@
 
 # StanzaWeaver CI/CD
 #
-# CI  (持续集成): 每次 push / PR 在 ubuntu-latest 上运行
-#   - uv sync --frozen          按 uv.lock 安装运行依赖 + dev 依赖
-#   - ruff format ./            代码格式化
-#   - ruff check --fix --unsafe-fixes ./   静态检查与自动修复
-#   - mypy --strict ./         类型检查（零容忍）
-#   - pytest                   单元测试 + 集成测试（桩 LLM，无网络）
+# CI  (持续集成): 每次 push / PR 在 ubuntu-latest 上运行（按规范顺序）
+#   - uv lock --check           依赖锁一致性
+#   - reuse lint                REUSE 许可证合规
+#   - pytest -q --cov=src --cov=app --cov-report=term --cov-fail-under=100
+#                               （单测+集成，桩 LLM 无网络；强制 src + app.py 覆盖率 100%）
+#   - ruff check ./             静态检查
+#   - mypy --strict ./          类型检查（零容忍）
+#   - ruff format --check ./    代码格式
 #
 # CD  (持续交付): Release 发布时触发，三平台打包并上传分卷 zip 到 Release 附件
 #   - Windows : uv run pyinstaller StanzaWeaver.spec --clean -> zip -s 1g 分卷
@@ -37,9 +39,8 @@ permissions:
 jobs:
   # ------------------------------------------------------------------
   # CI: 代码层持续集成（代码无关平台，统一在 ubuntu-latest 上一次跑完）
-  #   - ruff check ./            静态检查（不自动修改）
-  #   - mypy --strict ./         类型检查（零容忍）
-  #   - pytest                   单元测试 + 集成测试（桩 LLM，无网络）
+  #   顺序: uv lock --check -> reuse lint -> pytest(coverage) -> ruff check
+  #         -> mypy --strict -> ruff format --check
   # ------------------------------------------------------------------
   ci:
     name: CI
@@ -57,14 +58,23 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
+      - name: uv lock check
+        run: uv lock --check
+
+      - name: REUSE compliance
+        run: uv run reuse lint
+
+      - name: "pytest (coverage: src + app)"
+        run: uv run pytest
+
       - name: ruff check
         run: uv run ruff check ./
 
       - name: mypy (strict)
         run: uv run mypy --strict ./
 
-      - name: pytest
-        run: uv run pytest
+      - name: ruff format --check
+        run: uv run ruff format --check ./
 
   # ------------------------------------------------------------------
   # CD: Release 发布时触发，测试通过后跨平台打包并上传分卷 zip

@@ -33,7 +33,7 @@ def execute_search_words(
     length = str(arguments.get("length", ""))
     try:
         limit = max(1, min(int(arguments.get("limit", 20)), 50))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         limit = 20
 
     results = db_search(

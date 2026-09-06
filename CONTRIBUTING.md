@@ -78,47 +78,65 @@ uv sync                    # creates .venv; installs runtime + dev deps from uv.
 Before each commit (or PR), run the following commands in the repository root – **all must exit with 0 / no errors** before you commit:
 
 ```bash
-# 1) Type checking (zero tolerance, --strict)
-uv run mypy --strict ./
+# 1) Dependency lock consistency
+uv lock
+uv sync
+uv lock --check
 
-# 2) Lint and auto‑fix (including unsafe fixes)
+# 2) REUSE license compliance (see REUSE.toml / LICENSES/)
+uv run reuse lint
+
+# 3) Tests — 100% coverage over `src/` + root `app.py`
+#    (flags live in [tool.pytest.ini_options].addopts of pyproject.toml)
+uv run pytest -q --cov=src --cov=app --cov-report=term --cov-fail-under=100
+
+# 4) Lint and auto‑fix (including unsafe fixes)
 uv run ruff check --fix --unsafe-fixes ./
 
-# 3) Code formatting
-uv run ruff format ./
+# 5) Type checking (zero tolerance, --strict)
+uv run mypy --strict ./
 
-# 4) Tests (enforces 100% coverage via --cov-fail-under=100 in pyproject.toml)
-uv run pytest
+# 6) Code formatting
+uv run ruff format ./
+uv run ruff format --check ./
 ```
 
 Notes:
 
-- In CI, `ruff` is run as `uv run ruff check ./` (without auto‑fix), so **you must locally clean up with `--fix --unsafe-fixes` and `format`** first, otherwise CI will fail.
+- In CI, these run in the same order as the spec: `uv lock --check` → `reuse lint` → coverage‑gated `pytest` → `ruff check` → `mypy --strict` → `ruff format --check`. `ruff check` runs without auto‑fix, so **you must locally clean up with `--fix --unsafe-fixes` and `format`** first.
 - `mypy` must be used with the virtual environment that matches this project (`python3.14` + project dependencies); a system‑wide `mypy` may produce false‑positive import‑not‑found errors.
-- `pytest` uses the `[tool.pytest.ini_options]` table in `pyproject.toml` (`pythonpath = .`, `testpaths = tests`, `--cov=src --cov-fail-under=100`). It enforces **100% coverage on `src`**, so every `src` change must be fully covered by tests — `pytest` fails otherwise. Tests use the `StubLLMClient` from `tests/helpers.py` – **no real LLM calls / no network**; they can run fully offline.
+- Coverage measures **`src/` and root `app.py`** (module name `app`) and must reach **100%** — the flags `--cov=src --cov=app --cov-report=term --cov-fail-under=100` are baked into `pyproject.toml` `[tool.pytest.ini_options].addopts`; `pytest` fails otherwise. Every `src`/`app.py` change must be fully covered. Tests use the `StubLLMClient` from `tests/helpers.py` – **no real LLM calls / no network**; they can run fully offline.
 
 ---
 
-## 3. Coding Standards
+## 3. Coding Standards（项目规范，1–13）
 
-### 3.1 Algorithm & Architecture
+`uv` 是依赖管理器；测试覆盖范围是 **`src/` + 根目录 `app.py`**。
 
-1. **Verify logic correctness** — review the algorithm/architecture layer for correctness before submitting.
-2. **100% test coverage** — `pytest` must pass with 100% coverage on changed `src` modules. Every new bug must have a corresponding test case; review test code for blind spots.
-3. **Interface consolidation** — when multiple interfaces exist for the same functionality, evaluate whether they can be unified.
+### 3.1 Engineering Habits
 
-### 3.2 Code Quality
+1. **Dependency lock** — `uv lock --check` must pass; run `uv lock` + `uv sync` before each commit; periodically run `uv lock --upgrade` (e.g. at the start of each month).
+2. **REUSE compliance** — `uv run reuse lint` must pass (see `REUSE.toml` / `LICENSES/`).
+3. **CI/CD parity** — CI runs every measurable tool in the spec order: `uv lock --check` → `reuse lint` → coverage‑gated `pytest` → `ruff check ./` → `mypy --strict ./` → `ruff format --check ./`. On `release`, PyInstaller packages are built on Windows/macOS/Linux and uploaded as 1GB‑volume zips to the Release attachments.
 
-4. **Linting** — `ruff check` must pass cleanly. Always run `ruff check --fix --unsafe-fixes` first, then fix manually if needed.
-5. **Type checking** — `mypy --strict` must pass on all `src` files. Run `mypy --install-types` first if needed, then fix manually.
-6. **Docstrings** — every function, class, and module must have Google-style docstrings.
-7. **Formatting** — run `ruff format` after every code change.
-8. **Dead code** — remove unreachable/redundant code; keep logic concise.
+### 3.2 Algorithm & Architecture
 
-### 3.3 User Experience
+4. **Verify logic correctness** — review the algorithm/architecture layer for correctness before submitting.
+5. **100% coverage (`src` + `app.py`)** — `uv run pytest -q --cov=src --cov=app --cov-report=term --cov-fail-under=100` must pass at 100%. Every new bug must have a corresponding regression test; review test code for blind spots.
+6. **Interface consolidation** — when multiple interfaces exist for the same functionality, evaluate whether they can be unified.
 
-9. **Feature completeness** — within the scope of this software, accommodate the majority of user needs.
-10. **UI design** — aim for polished visuals: rounded corners, Alex Brush for English headings, Noto Serif SC for body text, and smooth animations (slide, expand, fade).
+### 3.3 Code Quality
+
+7. **Linting** — `ruff check` must pass cleanly. Always run `ruff check --fix --unsafe-fixes` first, then fix manually if needed.
+8. **Type checking** — `mypy --strict` must pass on all files. Run `mypy --install-types` first if needed, then fix manually.
+9. **Docstrings** — every function, class, and module must have Google-style docstrings.
+10. **Formatting** — run `ruff format` after every code change; `ruff format --check` must pass.
+11. **Dead code** — remove unreachable/redundant code; keep logic concise.
+
+### 3.4 User Experience
+
+12. **Feature completeness** — within the scope of this software, accommodate the majority of user needs.
+13. **UI design** — aim for polished visuals: rounded corners, Alex Brush for English headings, Noto Serif SC for body text, and smooth animations (slide, expand, fade).
 
 ---
 

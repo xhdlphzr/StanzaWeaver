@@ -98,11 +98,17 @@ def _auto_ping() -> None:
         _llm_ping_event.clear()
 
 
-# 测试环境下不启动后台自动导入（由 conftest 注入 STANZA_WEAVER_TEST=1），
-# 避免异步线程读取被测试重定向的数据库路径而污染临时词库。
-if os.environ.get("STANZA_WEAVER_TEST") != "1":
-    threading.Thread(target=_auto_import, daemon=True).start()
-    threading.Thread(target=_auto_ping, daemon=True).start()
+def _start_background_threads() -> None:
+    """按需启动后台导入/连通性探测线程。
+
+    仅在 ``start_server`` 启动 HTTP 服务时调用；测试环境下不启动（由
+    conftest 注入 STANZA_WEAVER_TEST=1），避免异步线程读取被测试重定向的
+    数据库路径而污染临时词库，也避免仅 import app 就发起网络请求。
+    """
+    if os.environ.get("STANZA_WEAVER_TEST") != "1":
+        threading.Thread(target=_auto_import, daemon=True).start()
+        threading.Thread(target=_auto_ping, daemon=True).start()
+
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
@@ -502,9 +508,12 @@ def _build_custom_template_code(
         "[\n            " + ",\n            ".join(constraints_code) + "\n        ]"
     )
 
+    # 生成文件的 REUSE 头。SPDX 标记拆开拼接，避免本文件源码中出现被
+    # REUSE 误解析为许可证表达式的连续字面量（reuse lint 会报 invalid）。
+    spdx_line = "# SPDX-License-" + "Identifier: MIT"
     code_body = (
         f"# Copyright (c) 2026 xhdlphzr\n"
-        f"# SPDX-License-Identifier: MIT\n"
+        f"{spdx_line}\n"
         f"# Auto-generated custom template: {name}\n\n"
         f"from . import PoetryTemplate, _make_syl, register\n"
         f"from . import {language} as rules\n\n\n"
@@ -553,7 +562,7 @@ def api_create_custom_template() -> Any:
     language = str(data.get("language", "zh"))
     try:
         lines = int(data.get("lines", 4))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         lines = 4
     lines = max(1, min(lines, 30))
     syllables_per_line = data.get("syllables_per_line", [5] * lines)
@@ -568,7 +577,7 @@ def api_create_custom_template() -> Any:
         return jsonify({"status": "error", "message": "不支持的语言"}), 400
     try:
         syllables_per_line = [max(1, int(s)) for s in syllables_per_line][:lines]
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return jsonify({"status": "error", "message": "每行音节数格式错误"}), 400
     if len(syllables_per_line) != lines:
         return jsonify(
@@ -729,6 +738,7 @@ def start_server() -> None:
     except ValueError:
         port = 5000
     logger.info("[StanzaWeaver] 服务启动 http://%s:%s", host, port)
+    _start_background_threads()
     socketio.run(app, host=host, port=port, allow_unsafe_werkzeug=True)
 
 

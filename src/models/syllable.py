@@ -88,7 +88,7 @@ class Syllable:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Syllable":
+    def from_dict(cls, d: dict[str, Any]) -> Syllable:
         """从字典重建音节（to_dict 的逆操作）。
 
         Args:
