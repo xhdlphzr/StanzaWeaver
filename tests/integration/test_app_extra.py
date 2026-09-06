@@ -149,7 +149,9 @@ def test_ping_endpoint_error_sets_error(monkeypatch: pytest.MonkeyPatch) -> None
             raise RuntimeError("boom")
 
     monkeypatch.setattr("src.agents.base.LLMClient", _Failing)
-    monkeypatch.setattr(app_module, "_llm_status", {"writer": "checking", "checker": "x"})
+    monkeypatch.setattr(
+        app_module, "_llm_status", {"writer": "checking", "checker": "x"}
+    )
     app_module._ping_one_endpoint("writer")
     assert app_module._llm_status["writer"] == "error"
 
@@ -170,7 +172,9 @@ def test_ping_endpoint_ok_sets_ok(monkeypatch: pytest.MonkeyPatch) -> None:
             return {"ok": True}
 
     monkeypatch.setattr("src.agents.base.LLMClient", _Healthy)
-    monkeypatch.setattr(app_module, "_llm_status", {"writer": "checking", "checker": "x"})
+    monkeypatch.setattr(
+        app_module, "_llm_status", {"writer": "checking", "checker": "x"}
+    )
     app_module._ping_one_endpoint("writer")
     assert app_module._llm_status["writer"] == "ok"
 
