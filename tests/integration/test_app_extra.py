@@ -412,10 +412,17 @@ def test_generate_then_feedback_success(monkeypatch: pytest.MonkeyPatch) -> None
     assert done2["args"][0]["draft"][0] == REVISED_LINE
 
 
-def test_disconnect_cleans_state() -> None:
-    """断开连接时清理会话状态。"""
+def test_disconnect_cleans_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    """断开连接时清理会话状态（确定性直调，避免依赖事件时序）。"""
     sio = _sio_client()
     sio.disconnect()
+
+    monkeypatch.setattr(app_module, "request", SimpleNamespace(sid="sess-1"))
+    monkeypatch.setattr(
+        app_module, "_active_states", {"sess-1": {"pipeline_state": object()}}
+    )
+    app_module.handle_disconnect()
+    assert app_module._active_states == {}
 
 
 # --------------------------------------------------------------------------- #
