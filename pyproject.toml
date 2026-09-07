@@ -122,4 +122,4 @@ package = false
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
-addopts = "-q --cov=src --cov=app --cov-report=term --cov-fail-under=100"
+addopts = "-q --cov=src --cov=app --cov-report=term-missing --cov-fail-under=100"
