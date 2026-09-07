@@ -109,9 +109,9 @@ Notes:
 
 ---
 
-## 3. Coding Standards（项目规范，1–13）
+## 3. Coding Standard (Project Specifications, 1–13)
 
-`uv` 是依赖管理器；测试覆盖范围是 **`src/` + 根目录 `app.py`**。
+Dependency management uses `uv`; the test coverage scope is **`src/` + the root directory `app.py`**.
 
 ### 3.1 Engineering Habits
 
