@@ -88,7 +88,7 @@ uv run reuse lint
 
 # 3) Tests — 100% coverage over `src/` + root `app.py`
 #    (flags live in [tool.pytest.ini_options].addopts of pyproject.toml)
-uv run pytest -q --cov=src --cov=app --cov-report=term --cov-fail-under=100
+uv run pytest -q --cov=src --cov=app --cov-report=term-missing --cov-fail-under=100
 
 # 4) Lint and auto‑fix (including unsafe fixes)
 uv run ruff check --fix --unsafe-fixes ./
@@ -122,7 +122,7 @@ Dependency management uses `uv`; the test coverage scope is **`src/` + the root 
 ### 3.2 Algorithm & Architecture
 
 4. **Verify logic correctness** — review the algorithm/architecture layer for correctness before submitting.
-5. **100% coverage (`src` + `app.py`)** — `uv run pytest -q --cov=src --cov=app --cov-report=term --cov-fail-under=100` must pass at 100%. Every new bug must have a corresponding regression test; review test code for blind spots.
+5. **100% coverage (`src` + `app.py`)** — `uv run pytest -q --cov=src --cov=app --cov-report=term-missing --cov-fail-under=100` must pass at 100%. Every new bug must have a corresponding regression test; review test code for blind spots.
 6. **Interface consolidation** — when multiple interfaces exist for the same functionality, evaluate whether they can be unified.
 
 ### 3.3 Code Quality

@@ -88,7 +88,7 @@ uv run reuse lint
 
 # 3) 测试 —— src/ + 根目录 app.py 覆盖率必须 100%
 #    （参数在 pyproject.toml 的 [tool.pytest.ini_options].addopts）
-uv run pytest -q --cov=src --cov=app --cov-report=term --cov-fail-under=100
+uv run pytest -q --cov=src --cov=app --cov-report=term-missing --cov-fail-under=100
 
 # 4) 静态检查并自动修复（含 unsafe 修复）
 uv run ruff check --fix --unsafe-fixes ./
@@ -122,7 +122,7 @@ uv run ruff format --check ./
 ### 3.2 算法与架构
 
 4. **验证逻辑正确性** — 提交前审查算法/架构层是否正确。
-5. **100% 覆盖率（src + app.py）** — 运行 `uv run pytest -q --cov=src --cov=app --cov-report=term --cov-fail-under=100` 并达到 100%。每个新 bug 必须有对应回归测试；审查测试代码是否存在考虑不周的情况。
+5. **100% 覆盖率（src + app.py）** — 运行 `uv run pytest -q --cov=src --cov=app --cov-report=term-missing --cov-fail-under=100` 并达到 100%。每个新 bug 必须有对应回归测试；审查测试代码是否存在考虑不周的情况。
 6. **接口统一** — 当同一功能存在多个接口时，评估是否可以合并统一。
 
 ### 3.3 代码质量

@@ -6,7 +6,7 @@
 # CI  (持续集成): 每次 push / PR 在 ubuntu-latest 上运行（按规范顺序）
 #   - uv lock --check           依赖锁一致性
 #   - reuse lint                REUSE 许可证合规
-#   - pytest -q --cov=src --cov=app --cov-report=term --cov-fail-under=100
+#   - pytest -q --cov=src --cov=app --cov-report=term-missing --cov-fail-under=100
 #                               （单测+集成，桩 LLM 无网络；强制 src + app.py 覆盖率 100%）
 #   - ruff check ./             静态检查
 #   - mypy --strict ./          类型检查（零容忍）
