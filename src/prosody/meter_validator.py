@@ -288,7 +288,7 @@ class MeterValidator:
         line_index: int,
         template: TemplateDict,
     ) -> ValidationResult:
-        """校验单行（refine_line 工具的前置检查）。
+        """校验单行（modify 工具 line 类型的前置检查）。
 
         Args:
             line_text: 新行文本。

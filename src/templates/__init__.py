@@ -5,7 +5,7 @@
 
 模板（PoetryTemplate）定义一种诗体的全部格律规则：
 - syllables_per_line: 每行音节数（int 或 (min, max) 区间）；
-- get_syllable_constraints(): 逐位约束（供 refine_line 单行校验与 LLM 提示）；
+- get_syllable_constraints(): 逐位约束（供 modify 单行校验与 LLM 提示）；
 - validate_full(): 完整规则检查（押韵、三平尾等跨行规则）；
 - describe(): 给 LLM 的人类可读格律描述。
 """
@@ -162,18 +162,44 @@ class PoetryTemplate(ABC):
             lines_desc += "\n" + self.rule_description
         return lines_desc
 
-    def format_poem(self, poem: list[str]) -> str:
+    def _punctuated_content(
+        self, poem: list[str], punctuation: list[str]
+    ) -> tuple[str, list[str]]:
+        """给正文行逐行加标点（标题不加标点）。
+
+        Args:
+            poem: 诗行列表（首元素为标题）。
+            punctuation: 标点列表（与正文行一一对应）。
+
+        Returns:
+            (标题, 已加标点的正文行列表)。
+        """
+        title = poem[0] if poem else ""
+        content = poem[1:] if len(poem) > 1 else poem
+        marked = [
+            content[i] + (punctuation[i] if i < len(punctuation) else "")
+            for i in range(len(content))
+        ]
+        return title, marked
+
+    def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
         """将无标点诗行格式化为可展示文本。
 
         子类可覆写以实现诗体专属格式（如标点、缩进、分段）。
         AI 生成的原始诗稿无标点、句间换行，本方法负责加上标点与排版。
+        punctuation 为空时使用诗体默认排版；提供时逐行套用给定标点。
 
         Args:
-            poem: 无标点的诗行列表（每句一行）。
+            poem: 无标点的诗行列表（首元素为标题）。
+            punctuation: 逐行标点列表；空/None 使用默认。
 
         Returns:
             格式化后的展示文本。
         """
+        if punctuation:
+            title, marked = self._punctuated_content(poem, punctuation)
+            lines = "\n".join(marked)
+            return title + "\n" + lines if title else lines
         return "\n".join(poem)
 
 

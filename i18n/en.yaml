@@ -83,8 +83,7 @@ steps:
 
 tools:
   search_words: Search words
-  refine_line: Refine line
-  rewrite: Rewrite
+  modify: Modify
   submit: Submit
   thinking: Thinking
 

@@ -16,7 +16,7 @@ def tool_call(name: str, arguments: dict[str, Any] | None = None) -> ChatResult:
     """构造一个带工具调用的助手消息（ChatResult）。
 
     Args:
-        name: 工具名（如 "refine_line" / "submit"）。
+        name: 工具名（如 "modify" / "submit"）。
         arguments: 工具参数。
 
     Returns:

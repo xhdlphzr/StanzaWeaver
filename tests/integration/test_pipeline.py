@@ -39,8 +39,11 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
                     }
                 ],
             },
-            # Step 3: refine 第一轮 refine_line（修改后仍需通过全量格律校验）
-            tool_call("refine_line", {"line": 0, "new_text": REVISED_LINE}),
+            # Step 3: refine 第一轮 modify（修改后仍需通过全量格律校验）
+            tool_call(
+                "modify",
+                {"modify_type": "line", "line": 0, "content": REVISED_LINE},
+            ),
         ],
     )
     checker_stub = make_stub(chat=[tool_call("submit", {"pass": True})])

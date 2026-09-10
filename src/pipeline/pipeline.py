@@ -49,6 +49,7 @@ class PipelineState:
     current_detail: str = ""
     messages: list[Message] = field(default_factory=list)
     title: str = ""
+    punctuation: list[str] = field(default_factory=list)
     formatted_poem: str = ""
 
 
@@ -256,7 +257,7 @@ class PoetryPipeline:
                 state.current_detail = text
                 self._report(state)
 
-        draft, title, detail = self._get_writer().generate_draft(
+        draft, title, punctuation, detail = self._get_writer().generate_draft(
             state.description,
             state.template,
             messages,
@@ -265,6 +266,7 @@ class PoetryPipeline:
         )
         state.draft = draft
         state.title = title
+        state.punctuation = punctuation
         state.stream_text = ""
         self._append_detail(
             state,
@@ -293,6 +295,10 @@ class PoetryPipeline:
                     step_info: 含 poem / last_tool / last_result / detail / stream_text 的步骤信息。
                 """
                 state.draft = list(step_info["poem"])
+                state.title = str(step_info.get("title", state.title))
+                state.punctuation = list(
+                    step_info.get("punctuation", state.punctuation)
+                )
                 state.last_tool = str(step_info["last_tool"])
                 state.last_tool_result = json_dumps_safe(
                     step_info.get("last_result", "")
@@ -319,19 +325,25 @@ class PoetryPipeline:
                     state.last_tool_result = text
                     self._report(state)
 
-            poem, history, detail, tool_rounds = self._get_writer().refine(
-                description=state.description,
-                poem=state.draft,
-                template=state.template,
-                messages=messages,
-                template_obj=self._template_obj,
-                feedback=checker_feedback,
-                on_step=on_step,
-                on_stream=on_stream,
-                start_round=state.refine_rounds,
+            poem, history, detail, tool_rounds, title, punctuation = (
+                self._get_writer().refine(
+                    description=state.description,
+                    poem=state.draft,
+                    template=state.template,
+                    messages=messages,
+                    template_obj=self._template_obj,
+                    feedback=checker_feedback,
+                    on_step=on_step,
+                    on_stream=on_stream,
+                    start_round=state.refine_rounds,
+                    title=state.title,
+                    punctuation=state.punctuation,
+                )
             )
 
             state.draft = poem
+            state.title = title
+            state.punctuation = punctuation
             state.refine_history = history
             state.refine_rounds += tool_rounds
             self._append_detail(
@@ -381,7 +393,9 @@ class PoetryPipeline:
                     self._template_obj, "format_poem"
                 ):
                     state.formatted_poem = str(
-                        self._template_obj.format_poem(state.final_poem)
+                        self._template_obj.format_poem(
+                            state.final_poem, state.punctuation or None
+                        )
                     )
                 else:
                     state.formatted_poem = "\n".join(state.final_poem)
@@ -397,7 +411,9 @@ class PoetryPipeline:
                 self._template_obj, "format_poem"
             ):
                 state.formatted_poem = str(
-                    self._template_obj.format_poem(state.final_poem)
+                    self._template_obj.format_poem(
+                        state.final_poem, state.punctuation or None
+                    )
                 )
             else:
                 state.formatted_poem = "\n".join(state.final_poem)

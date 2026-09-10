@@ -29,7 +29,7 @@ from src.pipeline.pipeline import (
 )
 from src.templates import get as get_template
 
-RefinePlan = list[RefineResult]
+RefinePlan = list[tuple[list[str], list[dict[str, Any]], str, int]]
 CheckPlan = list[dict[str, Any] | Exception]
 
 
@@ -74,7 +74,7 @@ class _FakeWriter(WriterAI):
         template_obj: Any = None,
         max_attempts: int = 0,
         on_stream: ChunkCallback = None,
-    ) -> tuple[list[str], str, str]:
+    ) -> tuple[list[str], str, list[str], str]:
         """返回固定初稿（Step 2）。
 
         Args:
@@ -86,10 +86,10 @@ class _FakeWriter(WriterAI):
             on_stream: 流式回调（未使用）。
 
         Returns:
-            (诗稿, 标题, 日志文本)。
+            (诗稿, 标题, 标点, 日志文本)。
         """
         self.generate_draft_calls += 1
-        return ["床前明月光", "疑是地上霜"], "测试标题", "初稿详情"
+        return ["床前明月光", "疑是地上霜"], "测试标题", [], "初稿详情"
 
     def refine(
         self,
@@ -102,6 +102,8 @@ class _FakeWriter(WriterAI):
         on_step: StepCallback = None,
         on_stream: ChunkCallback = None,
         start_round: int = 0,
+        title: str = "",
+        punctuation: list[str] | None = None,
     ) -> RefineResult:
         """按预置序列返回一次炼句结果，并触发 on_step 回调。
 
@@ -115,9 +117,11 @@ class _FakeWriter(WriterAI):
             on_step: 每步回调。
             on_stream: 流式回调（未使用）。
             start_round: 起始轮号（未使用）。
+            title: 当前标题（原样返回）。
+            punctuation: 当前标点（原样返回）。
 
         Returns:
-            预置的 RefineResult。
+            预置的 RefineResult（标题/标点沿用传入值）。
         """
         self.feedback_log.append(feedback)
         result = self._refine_plan.pop(0)
@@ -126,13 +130,15 @@ class _FakeWriter(WriterAI):
             on_step(
                 {
                     "poem": poem_out,
+                    "title": title,
+                    "punctuation": list(punctuation or []),
                     "last_tool": "submit",
                     "last_result": {},
                     "detail": detail,
                     "stream_text": "",
                 }
             )
-        return result
+        return poem_out, _history, detail, _rounds, title, list(punctuation or [])
 
 
 class _FakeChecker(CheckerAI):

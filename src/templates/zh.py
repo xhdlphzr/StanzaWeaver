@@ -400,12 +400,17 @@ class WujueTemplate(PoetryTemplate):
         """
         return _check_jinti_full(syllables, [1, 3], "押韵(二四行)")
 
-    def format_poem(self, poem: list[str]) -> str:
-        """绝句格式：一句一行，句末加句号。"""
+    def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
+        """绝句格式：一句一行，句末加标点（默认句号）。"""
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
-        lines = [f"{line}。" for line in content]
-        return title + "\n" + "\n".join(lines) if title else "\n".join(lines)
+        marks = punctuation or ["。"] * len(content)
+        lines = [
+            content[i] + (marks[i] if i < len(marks) else "")
+            for i in range(len(content))
+        ]
+        text = "\n".join(lines)
+        return title + "\n" + text if title else text
 
 
 class QijueTemplate(PoetryTemplate):
@@ -443,12 +448,17 @@ class QijueTemplate(PoetryTemplate):
         """
         return _check_jinti_full(syllables, [1, 3], "押韵(二四行)")
 
-    def format_poem(self, poem: list[str]) -> str:
-        """绝句格式：一句一行，句末加句号。"""
+    def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
+        """绝句格式：一句一行，句末加标点（默认句号）。"""
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
-        lines = [f"{line}。" for line in content]
-        return title + "\n" + "\n".join(lines) if title else "\n".join(lines)
+        marks = punctuation or ["。"] * len(content)
+        lines = [
+            content[i] + (marks[i] if i < len(marks) else "")
+            for i in range(len(content))
+        ]
+        text = "\n".join(lines)
+        return title + "\n" + text if title else text
 
 
 class WulvTemplate(PoetryTemplate):
@@ -482,17 +492,27 @@ class WulvTemplate(PoetryTemplate):
         """
         return _check_jinti_full(syllables, [1, 3, 5, 7], "押韵(二四六八行)")
 
-    def format_poem(self, poem: list[str]) -> str:
+    def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
         """律诗格式：一联一行，联间逗号，末联句号。"""
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
         coupled: list[str] = []
-        for i in range(0, len(content) - 1, 2):
-            coupled.append(f"{content[i]}，{content[i + 1]}")
-        if len(content) % 2 == 1:
-            coupled.append(content[-1])
-        if coupled:
-            coupled[-1] = coupled[-1].rstrip("，") + "。"
+        if punctuation:
+            marked = [
+                content[i] + (punctuation[i] if i < len(punctuation) else "")
+                for i in range(len(content))
+            ]
+            for i in range(0, len(marked) - 1, 2):
+                coupled.append(marked[i] + marked[i + 1])
+            if len(marked) % 2 == 1:
+                coupled.append(marked[-1])
+        else:
+            for i in range(0, len(content) - 1, 2):
+                coupled.append(f"{content[i]}，{content[i + 1]}")
+            if len(content) % 2 == 1:
+                coupled.append(content[-1])
+            if coupled:
+                coupled[-1] = coupled[-1].rstrip("，") + "。"
         lines = "\n".join(coupled)
         return title + "\n" + lines if title else lines
 
@@ -528,17 +548,27 @@ class QilvTemplate(PoetryTemplate):
         """
         return _check_jinti_full(syllables, [1, 3, 5, 7], "押韵(二四六八行)")
 
-    def format_poem(self, poem: list[str]) -> str:
+    def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
         """律诗格式：一联一行，联间逗号，末联句号。"""
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
         coupled: list[str] = []
-        for i in range(0, len(content) - 1, 2):
-            coupled.append(f"{content[i]}，{content[i + 1]}")
-        if len(content) % 2 == 1:
-            coupled.append(content[-1])
-        if coupled:
-            coupled[-1] = coupled[-1].rstrip("，") + "。"
+        if punctuation:
+            marked = [
+                content[i] + (punctuation[i] if i < len(punctuation) else "")
+                for i in range(len(content))
+            ]
+            for i in range(0, len(marked) - 1, 2):
+                coupled.append(marked[i] + marked[i + 1])
+            if len(marked) % 2 == 1:
+                coupled.append(marked[-1])
+        else:
+            for i in range(0, len(content) - 1, 2):
+                coupled.append(f"{content[i]}，{content[i + 1]}")
+            if len(content) % 2 == 1:
+                coupled.append(content[-1])
+            if coupled:
+                coupled[-1] = coupled[-1].rstrip("，") + "。"
         lines = "\n".join(coupled)
         return title + "\n" + lines if title else lines
 
@@ -622,10 +652,15 @@ class XiangjianhuanTemplate(PoetryTemplate):
             errors.append(f"下阕仄韵应与平韵不同部（换韵）: 均为'{lower_ze}'")
         return errors
 
-    def format_poem(self, poem: list[str]) -> str:
+    def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
         """相见欢格式：开头Tab，阙间Tab，阕内无换行（CSS wrap）。"""
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
+        if punctuation:
+            content = [
+                content[i] + (punctuation[i] if i < len(punctuation) else "")
+                for i in range(len(content))
+            ]
         upper = "".join(content[:3]) if len(content) >= 3 else "".join(content)
         lower = "".join(content[3:]) if len(content) > 3 else ""
         text = "\t" + upper

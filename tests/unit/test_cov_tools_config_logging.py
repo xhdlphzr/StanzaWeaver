@@ -1,9 +1,9 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""针对 refine_line / search_words / logging_setup / config 的覆盖补全测试。
+"""针对 search_words / logging_setup / config 的覆盖补全测试。
 
-仅用于把这四个模块的 LINE 覆盖率补到 100%，不修改既有测试文件。
+仅用于把这几个模块的 LINE 覆盖率补到 100%，不修改既有测试文件。
 """
 
 import os
@@ -14,26 +14,7 @@ import pytest
 
 from src import config as config_module
 from src import logging_setup as logging_setup_module
-from src.tools import refine_line as refine_line_module
 from src.tools import search_words as search_words_module
-
-_ZH_TPL: dict[str, Any] = {
-    "name": "五绝",
-    "language": "zh",
-    "lines": 4,
-    "syllables_per_line": [5, 5, 5, 5],
-    "syllable_constraints": None,
-}
-_POEM: list[str] = ["床前明月光", "疑是地上霜", "举头望明月", "低头思故乡"]
-
-
-def test_execute_refine_line_non_int_line() -> None:
-    """line 无法转为 int 时回退为 -1 并越界报错（覆盖 30-31）。"""
-    result = refine_line_module.execute_refine_line(
-        list(_POEM), _ZH_TPL, {"line": "abc", "new_text": "窗前明月光"}
-    )
-    assert "error" in result
-    assert "越界" in result["error"]
 
 
 class _FakeDB:

@@ -83,8 +83,7 @@ steps:
 
 tools:
   search_words: 搜索候选词
-  refine_line: 修改某行
-  rewrite: 整体重写
+  modify: 修改诗稿
   submit: 提交评审
   thinking: 思考
 
