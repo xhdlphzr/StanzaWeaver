@@ -3,8 +3,8 @@
 
 """Agent 工具定义（OpenAI Function Calling JSON Schema）。
 
-WRITER_TOOLS：编写 AI 可用的四个工具（search_words / refine_line /
-rewrite / submit）；CHECKER_TOOLS：检查 AI 的终审工具。
+WRITER_TOOLS：编写 AI 可用的三个工具（search_words / modify / submit）；
+CHECKER_TOOLS：检查 AI 的终审工具。
 """
 
 from typing import Any
@@ -41,36 +41,39 @@ SEARCH_WORDS_TOOL: dict[str, Any] = {
     },
 }
 
-REFINE_LINE_TOOL: dict[str, Any] = {
+MODIFY_TOOL: dict[str, Any] = {
     "type": "function",
     "function": {
-        "name": "refine_line",
-        "description": "重写指定某一行（整句替换）。给定行号和新的完整文本，程序会自动校验该句的音节数和逐位约束，不通过则拒绝修改并返回具体错误。",
+        "name": "modify",
+        "description": (
+            "修改诗稿。modify_type 指定修改类型（必传）："
+            "line=修改某一行（需提供 line 行号与 content 新文本字符串）；"
+            "title=修改标题（content 为标题字符串）；"
+            "punctuation=修改标点（content 为标点字符串列表，长度须等于格律行数）。"
+            "line 仅 line 类型需要，title/punctuation 会忽略它。"
+        ),
         "parameters": {
             "type": "object",
             "properties": {
-                "line": {"type": "integer", "description": "要修改的行号（从0开始）"},
-                "new_text": {"type": "string", "description": "该行的新完整文本"},
-            },
-            "required": ["line", "new_text"],
-        },
-    },
-}
-
-REWRITE_TOOL: dict[str, Any] = {
-    "type": "function",
-    "function": {
-        "name": "rewrite",
-        "description": "根据指令整体重写全诗。程序会自动校验整首诗的格律约束。",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "instruction": {
+                "modify_type": {
                     "type": "string",
-                    "description": "重写方向指令，描述希望如何调整（如'更婉约'、'换用秋景意象'等）",
-                }
+                    "enum": ["line", "title", "punctuation"],
+                    "description": "修改类型：line / title / punctuation",
+                },
+                "line": {
+                    "type": "integer",
+                    "description": "要修改的行号（从0开始）；仅 line 类型需要",
+                },
+                "content": {
+                    "type": ["string", "array"],
+                    "items": {"type": "string"},
+                    "description": (
+                        "修改后的内容：line/title 为字符串；"
+                        "punctuation 为标点字符串列表"
+                    ),
+                },
             },
-            "required": ["instruction"],
+            "required": ["modify_type"],
         },
     },
 }
@@ -79,13 +82,27 @@ SUBMIT_TOOL: dict[str, Any] = {
     "type": "function",
     "function": {
         "name": "submit",
-        "description": "提交当前诗稿。程序会先执行全量格律校验，通过后才将定稿送交检查AI终审；不通过则返回具体错误，请继续修改后再次提交。",
+        "description": (
+            "提交诗稿。可通过 poem 整首替换诗稿、通过 punctuation 设置标点；"
+            "程序会先执行全量格律校验，通过后才将定稿送交检查AI终审；"
+            "不通过则返回具体错误，请继续修改后再次提交。"
+        ),
         "parameters": {
             "type": "object",
             "properties": {
                 "title": {
                     "type": "string",
                     "description": "诗稿标题，简短精炼，不超过10个字",
+                },
+                "poem": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "整首替换的诗稿（每行一句）；留空则沿用当前诗稿",
+                },
+                "punctuation": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "标点列表，长度须等于格律行数；留空用默认",
                 },
             },
             "required": ["title"],
@@ -114,8 +131,7 @@ CHECKER_SUBMIT_TOOL: dict[str, Any] = {
 
 WRITER_TOOLS: list[dict[str, Any]] = [
     SEARCH_WORDS_TOOL,
-    REFINE_LINE_TOOL,
-    REWRITE_TOOL,
+    MODIFY_TOOL,
     SUBMIT_TOOL,
 ]
 CHECKER_TOOLS: list[dict[str, Any]] = [CHECKER_SUBMIT_TOOL]

@@ -484,7 +484,7 @@ def test_generate_draft_template_obj_describe() -> None:
         ],
     }
     msgs: list[dict[str, Any]] = []
-    poem, _title, _ = writer.generate_draft(
+    poem, _title, _punct, _ = writer.generate_draft(
         "主题", {"language": "zh", "lines": 2}, msgs, WujueTemplate()
     )
     assert len(poem) == 2
@@ -516,7 +516,7 @@ def test_generate_draft_submit_wrong_lines_then_retry() -> None:
         "syllable_constraints": None,
     }
     msgs: list[dict[str, Any]] = []
-    poem, _title, _ = writer.generate_draft("主题", template, msgs)
+    poem, _title, _punct, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
 
 
@@ -537,18 +537,77 @@ def test_generate_draft_stream_retry() -> None:
     }
     fired: list[str] = []
     msgs: list[dict[str, Any]] = []
-    poem, _title, _ = writer.generate_draft(
+    poem, _title, _punct, _ = writer.generate_draft(
         "主题", template, msgs, on_stream=lambda t: fired.append(t)
     )
     assert len(poem) == 2
     assert any("思考中" in f for f in fired)
 
 
+def test_generate_draft_submit_poem_arg_and_bad_punct() -> None:
+    """submit 提供 poem 整首替换；标点数量不符先拒绝再通过。"""
+    writer, chat = _make_writer()
+    chat.chat.side_effect = [
+        {
+            "content": "",
+            "tool_calls": [
+                {
+                    "id": "1",
+                    "name": "submit",
+                    "arguments": {
+                        "title": "标题",
+                        "poem": ["一二三四五", "六七八九十"],
+                        "punctuation": ["。"],
+                    },
+                }
+            ],
+        },
+        {
+            "content": "",
+            "tool_calls": [
+                {
+                    "id": "2",
+                    "name": "submit",
+                    "arguments": {
+                        "title": "标题",
+                        "poem": ["一二三四五", "六七八九十"],
+                        "punctuation": ["。", "。", "。"],
+                    },
+                }
+            ],
+        },
+        {
+            "content": "",
+            "tool_calls": [
+                {
+                    "id": "3",
+                    "name": "submit",
+                    "arguments": {
+                        "title": "标题",
+                        "poem": ["一二三四五", "六七八九十"],
+                        "punctuation": ["，", "。"],
+                    },
+                }
+            ],
+        },
+    ]
+    template = {
+        "language": "zh",
+        "lines": 2,
+        "syllables_per_line": [5, 5],
+        "syllable_constraints": None,
+    }
+    msgs: list[dict[str, Any]] = []
+    poem, _title, punct, _ = writer.generate_draft("主题", template, msgs)
+    assert poem == ["一二三四五", "六七八九十"]
+    assert punct == ["，", "。"]
+
+
 # --------------------------------------------------------------------------- #
 # WriterAI.refine
 # --------------------------------------------------------------------------- #
 def _refine_seq(writer: WriterAI, seq: list[dict[str, Any]]) -> Any:
-    """生成 refine_line 序列。
+    """生成 modify 序列。
 
     Args:
         writer: WriterAI 实例。
@@ -562,11 +621,9 @@ def _refine_seq(writer: WriterAI, seq: list[dict[str, Any]]) -> Any:
 
 
 def test_refine_no_tool_calls_then_submit() -> None:
-    """无工具调用轮→提醒；随后 refine_line 修改；submit 提交。"""
+    """无工具调用轮→提醒；随后 modify 修改；submit 提交。"""
     writer, _ = _make_writer()
-    with patch(
-        "src.agents.writer_ai.execute_refine_line", return_value={"poem": ["改"]}
-    ):
+    with patch("src.agents.writer_ai.execute_modify", return_value={"poem": ["改"]}):
         _refine_seq(
             writer,
             [
@@ -576,8 +633,12 @@ def test_refine_no_tool_calls_then_submit() -> None:
                     "tool_calls": [
                         {
                             "id": "1",
-                            "name": "refine_line",
-                            "arguments": {"line": 0, "new_text": "改"},
+                            "name": "modify",
+                            "arguments": {
+                                "modify_type": "line",
+                                "line": 0,
+                                "content": "改",
+                            },
                         }
                     ],
                 },
@@ -590,7 +651,9 @@ def test_refine_no_tool_calls_then_submit() -> None:
             ],
         )
         msgs: list[dict[str, Any]] = []
-        _, _, _, _ = writer.refine("主题", ["原"], {"language": "zh", "lines": 1}, msgs)
+        _, _, _, _, _, _ = writer.refine(
+            "主题", ["原"], {"language": "zh", "lines": 1}, msgs
+        )
 
 
 def test_refine_submit_without_modification_allowed() -> None:
@@ -608,7 +671,7 @@ def test_refine_submit_without_modification_allowed() -> None:
         ],
     )
     msgs: list[dict[str, Any]] = []
-    poem, history, _, rounds = writer.refine(
+    poem, history, _, rounds, _title, _punct = writer.refine(
         "主题", ["原"], {"language": "zh", "lines": 1}, msgs
     )
     assert poem == ["原"]
@@ -671,7 +734,7 @@ def test_refine_submit_rejected_when_meter_invalid() -> None:
         ),
     )
     msgs: list[dict[str, Any]] = []
-    poem, history, detail, rounds = writer.refine(
+    poem, history, detail, rounds, _title, _punct = writer.refine(
         "主题", ["原"], {"language": "zh", "lines": 1}, msgs
     )
     assert poem == ["原"]
@@ -686,7 +749,7 @@ def test_refine_submit_rejected_when_meter_invalid() -> None:
 
 
 def test_refine_submit_gate_end_to_end() -> None:
-    """真实五绝模板：不合律 submit 被拒；随后 refine_line 修正后以全量校验通过收尾。"""
+    """真实五绝模板：不合律 submit 被拒；随后 modify 修正后以全量校验通过收尾。"""
     valid_first_line = "远岸栖云树"
     # 首句与对句“相对”被破坏（首句第2字改平），全诗不合律
     invalid_poem = ["西窗残月冷", "溪流伴月明", "桃红迷柳岸", "古道远山风"]
@@ -721,15 +784,19 @@ def test_refine_submit_gate_end_to_end() -> None:
                 "tool_calls": [
                     {
                         "id": "2",
-                        "name": "refine_line",
-                        "arguments": {"line": 0, "new_text": valid_first_line},
+                        "name": "modify",
+                        "arguments": {
+                            "modify_type": "line",
+                            "line": 0,
+                            "content": valid_first_line,
+                        },
                     }
                 ],
             },
         ],
     )
     msgs: list[dict[str, Any]] = []
-    poem, history, detail, rounds = writer.refine(
+    poem, history, detail, rounds, _title, _punct = writer.refine(
         "主题", invalid_poem, template, msgs, tpl
     )
     assert poem == valid_poem
@@ -739,13 +806,13 @@ def test_refine_submit_gate_end_to_end() -> None:
     # 全量格律未通过时 submit 被拒绝并给出错误信息
     assert "error" in submits[0]["result"]
     assert "拒绝提交" in detail
-    refines = [h for h in history if h["tool"] == "refine_line"]
+    refines = [h for h in history if h["tool"] == "modify"]
     assert len(refines) == 1
     assert "poem" in refines[0]["result"]
 
 
-def test_refine_line_validation_errors_recorded() -> None:
-    """refine_line 修改后全量校验未通过时记录 validation_errors 并继续。"""
+def test_refine_modify_validation_errors_recorded() -> None:
+    """modify 修改后全量校验未通过时记录 validation_errors 并继续。"""
     invalid_first_line = "西窗残月冷"
     valid_first_line = "远岸栖云树"
     initial_poem = ["远岫依烟岭", "溪流伴月明", "桃红迷柳岸", "古道远山风"]
@@ -769,8 +836,12 @@ def test_refine_line_validation_errors_recorded() -> None:
                 "tool_calls": [
                     {
                         "id": "1",
-                        "name": "refine_line",
-                        "arguments": {"line": 0, "new_text": invalid_first_line},
+                        "name": "modify",
+                        "arguments": {
+                            "modify_type": "line",
+                            "line": 0,
+                            "content": invalid_first_line,
+                        },
                     }
                 ],
             },
@@ -779,19 +850,25 @@ def test_refine_line_validation_errors_recorded() -> None:
                 "tool_calls": [
                     {
                         "id": "2",
-                        "name": "refine_line",
-                        "arguments": {"line": 0, "new_text": valid_first_line},
+                        "name": "modify",
+                        "arguments": {
+                            "modify_type": "line",
+                            "line": 0,
+                            "content": valid_first_line,
+                        },
                     }
                 ],
             },
         ],
     )
     msgs: list[dict[str, Any]] = []
-    poem, history, detail, _ = writer.refine("主题", initial_poem, template, msgs, tpl)
+    poem, history, detail, _rounds, _title, _punct = writer.refine(
+        "主题", initial_poem, template, msgs, tpl
+    )
     assert poem == [valid_first_line, "溪流伴月明", "桃红迷柳岸", "古道远山风"]
-    refines = [h for h in history if h["tool"] == "refine_line"]
+    refines = [h for h in history if h["tool"] == "modify"]
     assert len(refines) == 2
-    # 第一次 refine_line 改动后全量校验失败 -> 记录 validation_errors
+    # 第一次 modify 改动后全量校验失败 -> 记录 validation_errors
     assert "validation_errors" in refines[0]["result"]
     assert "格律问题" in detail
 
@@ -804,9 +881,7 @@ def test_refine_search_words_branch() -> None:
             "src.agents.writer_ai.execute_search_words",
             return_value={"words": [{"word": "x"}]},
         ),
-        patch(
-            "src.agents.writer_ai.execute_refine_line", return_value={"poem": ["改"]}
-        ),
+        patch("src.agents.writer_ai.execute_modify", return_value={"poem": ["改"]}),
     ):
         _refine_seq(
             writer,
@@ -817,7 +892,7 @@ def test_refine_search_words_branch() -> None:
                         {
                             "id": "1",
                             "name": "search_words",
-                            "arguments": {"meaning": "春"},
+                            "arguments": {"query": "春"},
                         }
                     ],
                 },
@@ -826,8 +901,12 @@ def test_refine_search_words_branch() -> None:
                     "tool_calls": [
                         {
                             "id": "2",
-                            "name": "refine_line",
-                            "arguments": {"line": 0, "new_text": "改"},
+                            "name": "modify",
+                            "arguments": {
+                                "modify_type": "line",
+                                "line": 0,
+                                "content": "改",
+                            },
                         }
                     ],
                 },
@@ -840,7 +919,7 @@ def test_refine_search_words_branch() -> None:
             ],
         )
         msgs: list[dict[str, Any]] = []
-        _, history, _, _ = writer.refine(
+        _, history, _, _, _, _ = writer.refine(
             "主题",
             ["原"],
             {"language": "zh", "lines": 1},
@@ -850,11 +929,11 @@ def test_refine_search_words_branch() -> None:
     assert any(h["tool"] == "search_words" for h in history)
 
 
-def test_refine_refine_line_error_branch() -> None:
-    """refine_line 返回错误时记录失败详情；修正后再次提交通过。"""
+def test_refine_modify_error_branch() -> None:
+    """modify 返回错误时记录失败详情；修正后再次提交通过。"""
     writer, _ = _make_writer()
     with patch(
-        "src.agents.writer_ai.execute_refine_line",
+        "src.agents.writer_ai.execute_modify",
         side_effect=[
             {"error": "行号越界"},
             {"poem": ["改"]},
@@ -868,8 +947,12 @@ def test_refine_refine_line_error_branch() -> None:
                     "tool_calls": [
                         {
                             "id": "1",
-                            "name": "refine_line",
-                            "arguments": {"line": 99, "new_text": "x"},
+                            "name": "modify",
+                            "arguments": {
+                                "modify_type": "line",
+                                "line": 99,
+                                "content": "x",
+                            },
                         }
                     ],
                 },
@@ -878,8 +961,12 @@ def test_refine_refine_line_error_branch() -> None:
                     "tool_calls": [
                         {
                             "id": "2",
-                            "name": "refine_line",
-                            "arguments": {"line": 0, "new_text": "改"},
+                            "name": "modify",
+                            "arguments": {
+                                "modify_type": "line",
+                                "line": 0,
+                                "content": "改",
+                            },
                         }
                     ],
                 },
@@ -892,57 +979,170 @@ def test_refine_refine_line_error_branch() -> None:
             ],
         )
         msgs: list[dict[str, Any]] = []
-        _, _, detail, _ = writer.refine(
+        _, _, detail, _, _, _ = writer.refine(
             "主题", ["原"], {"language": "zh", "lines": 1}, msgs
         )
     assert "失败" in detail
 
 
-def test_refine_rewrite_branch() -> None:
-    """rewrite 工具分支被处理并写入历史。"""
+def test_refine_modify_title_and_punctuation() -> None:
+    """modify 的 title / punctuation 分支更新标题与标点。"""
     writer, _ = _make_writer()
-    with patch(
-        "src.agents.writer_ai.execute_refine_line", return_value={"poem": ["改"]}
-    ):
-        # 注意: rewrite 分支内部会调用 _handle_rewrite -> generate_draft，
-        # 额外消耗一次 self.client.chat（返回合法 1 行 5 音节诗稿）。
-        _refine_seq(
-            writer,
-            [
-                {
-                    "content": "",
-                    "tool_calls": [
-                        {
-                            "id": "1",
-                            "name": "rewrite",
-                            "arguments": {"instruction": "更婉约"},
-                        }
-                    ],
-                },
-                {"content": "一二三四五", "tool_calls": []},  # _handle_rewrite 内部生成
-                {
-                    "content": "",
-                    "tool_calls": [
-                        {
-                            "id": "2",
-                            "name": "refine_line",
-                            "arguments": {"line": 0, "new_text": "改"},
-                        }
-                    ],
-                },
-                {
-                    "content": "",
-                    "tool_calls": [
-                        {"id": "3", "name": "submit", "arguments": {"pass": True}}
-                    ],
-                },
-            ],
-        )
-        msgs: list[dict[str, Any]] = []
-        _, history, _, _ = writer.refine(
-            "主题", ["原"], {"language": "zh", "lines": 1}, msgs
-        )
-    assert any(h["tool"] == "rewrite" for h in history)
+    _refine_seq(
+        writer,
+        [
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "1",
+                        "name": "modify",
+                        "arguments": {"modify_type": "title", "content": "新标题"},
+                    }
+                ],
+            },
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "2",
+                        "name": "modify",
+                        "arguments": {
+                            "modify_type": "punctuation",
+                            "content": ["，", "。"],
+                        },
+                    }
+                ],
+            },
+            {
+                "content": "",
+                "tool_calls": [
+                    {"id": "3", "name": "submit", "arguments": {"title": "终稿"}}
+                ],
+            },
+        ],
+    )
+    msgs: list[dict[str, Any]] = []
+    poem, history, _, _, title, punct = writer.refine(
+        "主题", ["原", "句"], {"language": "zh", "lines": 2}, msgs
+    )
+    assert title == "终稿"
+    assert punct == ["，", "。"]
+    assert poem == ["原", "句"]
+    assert any(h["tool"] == "modify" for h in history)
+
+
+def test_refine_submit_replaces_whole_poem_and_punctuation() -> None:
+    """submit 的 poem 整首替换与 punctuation 设置。"""
+    writer, _ = _make_writer()
+    _refine_seq(
+        writer,
+        [
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "1",
+                        "name": "submit",
+                        "arguments": {
+                            "title": "新标题",
+                            "poem": ["新句一", "新句二"],
+                            "punctuation": ["，", "。"],
+                        },
+                    }
+                ],
+            },
+        ],
+    )
+    msgs: list[dict[str, Any]] = []
+    poem, history, _, _, title, punct = writer.refine(
+        "主题", ["旧一", "旧二"], {"language": "zh", "lines": 2}, msgs
+    )
+    assert poem == ["新句一", "新句二"]
+    assert title == "新标题"
+    assert punct == ["，", "。"]
+    assert any(h["tool"] == "submit" for h in history)
+
+
+def test_refine_submit_punctuation_length_rejected() -> None:
+    """submit 标点数量与格律行数不符时拒绝提交。"""
+    writer, _ = _make_writer()
+    _refine_seq(
+        writer,
+        [
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "1",
+                        "name": "submit",
+                        "arguments": {
+                            "title": "标题",
+                            "punctuation": ["，"],
+                        },
+                    }
+                ],
+            },
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "2",
+                        "name": "submit",
+                        "arguments": {
+                            "title": "标题",
+                            "punctuation": ["，", "。"],
+                        },
+                    }
+                ],
+            },
+        ],
+    )
+    msgs: list[dict[str, Any]] = []
+    _, history, detail, _, _, punct = writer.refine(
+        "主题", ["旧一", "旧二"], {"language": "zh", "lines": 2}, msgs
+    )
+    assert punct == ["，", "。"]
+    submits = [h for h in history if h["tool"] == "submit"]
+    assert any(
+        isinstance(h["result"], dict) and "error" in h["result"] for h in submits
+    )
+    assert "标点数量" in detail
+
+
+def test_refine_submit_punctuation_non_list_rejected() -> None:
+    """submit 标点非列表时拒绝提交。"""
+    writer, _ = _make_writer()
+    _refine_seq(
+        writer,
+        [
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "1",
+                        "name": "submit",
+                        "arguments": {"title": "标题", "punctuation": "，。"},
+                    }
+                ],
+            },
+            {
+                "content": "",
+                "tool_calls": [
+                    {"id": "2", "name": "submit", "arguments": {"title": "标题"}}
+                ],
+            },
+        ],
+    )
+    msgs: list[dict[str, Any]] = []
+    _, history, detail, _, _, _ = writer.refine(
+        "主题", ["旧一", "旧二"], {"language": "zh", "lines": 2}, msgs
+    )
+    submits = [h for h in history if h["tool"] == "submit"]
+    assert any(
+        isinstance(h["result"], dict) and "error" in h["result"] for h in submits
+    )
+    assert "标点必须是字符串列表" in detail
 
 
 def test_refine_no_progress_guidance() -> None:
@@ -972,8 +1172,8 @@ def test_refine_no_progress_guidance() -> None:
             "tool_calls": [
                 {
                     "id": "4",
-                    "name": "refine_line",
-                    "arguments": {"line": 0, "new_text": "改"},
+                    "name": "modify",
+                    "arguments": {"modify_type": "line", "line": 0, "content": "改"},
                 }
             ],
         },
@@ -1002,97 +1202,16 @@ def test_refine_no_progress_guidance() -> None:
             "src.agents.writer_ai.execute_search_words",
             return_value={"words": [{"word": "x"}]},
         ),
-        patch(
-            "src.agents.writer_ai.execute_refine_line", return_value={"poem": ["改"]}
-        ),
+        patch("src.agents.writer_ai.execute_modify", return_value={"poem": ["改"]}),
     ):
         writer.client.chat = fake_chat  # type: ignore[method-assign]
         msgs: list[dict[str, Any]] = []
-        _, _, _, rounds = writer.refine(
+        _, _, _, rounds, _, _ = writer.refine(
             "主题", ["原"], template, msgs, on_stream=lambda _t: None
         )
     assert rounds >= 1
     joined = "\n".join(str(m.get("content", "")) for msgs in captured for m in msgs)
     assert "连续多轮" in joined
-
-
-# --------------------------------------------------------------------------- #
-# WriterAI._handle_rewrite
-# --------------------------------------------------------------------------- #
-def test_handle_rewrite_args_none() -> None:
-    """args 为 None 时回退为空字典。"""
-    writer, _ = _make_writer()
-    writer.client.chat.side_effect = [  # type: ignore[attr-defined]
-        {"content": "一行", "tool_calls": []},
-        {"content": "一二三四五\n六七八九十", "tool_calls": []},
-    ]
-    template = {
-        "language": "zh",
-        "lines": 2,
-        "syllables_per_line": [5, 5],
-        "syllable_constraints": None,
-    }
-    res = writer._handle_rewrite("主题", ["原"], template, args=None)
-    assert "poem" in res
-
-
-def test_handle_rewrite_with_template_obj_and_stream() -> None:
-    """提供模板对象且带 on_stream 时走 describe 分支与 chat_stream。"""
-    writer, chat = _make_writer()
-    chat.chat_stream.return_value = {"content": "一行", "tool_calls": []}
-    chat.chat.return_value = {"content": "一二三四五\n六七八九十", "tool_calls": []}
-    template = {
-        "language": "zh",
-        "lines": 2,
-        "syllables_per_line": [5, 5],
-        "syllable_constraints": None,
-    }
-    obj = SimpleNamespace(describe=lambda: "格律描述")
-    res = writer._handle_rewrite(
-        "主题",
-        ["原"],
-        template,
-        template_obj=obj,
-        args={"instruction": "更婉约"},
-        on_stream=lambda _t: None,
-    )
-    assert "poem" in res
-
-
-def test_handle_rewrite_with_template_obj_no_stream() -> None:
-    """提供模板对象且无 on_stream 时走 describe 分支（chat 路径）。"""
-    writer, _ = _make_writer()
-    writer.client.chat.side_effect = [  # type: ignore[attr-defined]
-        {"content": "一二三四五", "tool_calls": []},
-    ]
-    template = {
-        "language": "zh",
-        "lines": 1,
-        "syllables_per_line": [5],
-        "syllable_constraints": None,
-    }
-    obj = SimpleNamespace(describe=lambda: "格律描述")
-    res = writer._handle_rewrite(
-        "主题", ["原"], template, template_obj=obj, args={"instruction": "更婉约"}
-    )
-    assert "poem" in res
-
-
-def test_handle_rewrite_validation_fail_then_pass() -> None:
-    """重写校验未通过（行数正确但音节错）→ 重试；最终通过。"""
-    writer, _ = _make_writer()
-    writer.client.chat.side_effect = [  # type: ignore[attr-defined]
-        {"content": "一二三四", "tool_calls": []},  # 1 行，但仅 4 音节，校验失败
-        {"content": "一二三四五", "tool_calls": []},  # 合法
-    ]
-    template = {
-        "language": "zh",
-        "lines": 1,
-        "syllables_per_line": [5],
-        "syllable_constraints": None,
-    }
-    res = writer._handle_rewrite("主题", ["原"], template)
-    assert "poem" in res
 
 
 # --------------------------------------------------------------------------- #
@@ -1166,7 +1285,7 @@ def test_generate_draft_submit_empty_content_fallback() -> None:
     msgs: list[dict[str, Any]] = []
     # 先手动写入一条 assistant 消息供回退提取
     msgs.append({"role": "assistant", "content": "一二三四五\n六七八九十"})
-    poem, _title, _ = writer.generate_draft("主题", template, msgs)
+    poem, _title, _punct, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
 
 
@@ -1196,7 +1315,7 @@ def test_generate_draft_submit_syllable_fail_then_pass() -> None:
         "syllable_constraints": None,
     }
     msgs: list[dict[str, Any]] = []
-    poem, _title, _ = writer.generate_draft("主题", template, msgs)
+    poem, _title, _punct, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
 
 
@@ -1221,7 +1340,7 @@ def test_generate_draft_no_tool_calls_retry() -> None:
         "syllable_constraints": None,
     }
     msgs: list[dict[str, Any]] = []
-    poem, _title, _ = writer.generate_draft("主题", template, msgs)
+    poem, _title, _punct, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
 
 
@@ -1246,7 +1365,7 @@ def test_generate_draft_no_tool_calls_wrong_lines_retry() -> None:
         "syllable_constraints": None,
     }
     msgs: list[dict[str, Any]] = []
-    poem, _title, _ = writer.generate_draft("主题", template, msgs)
+    poem, _title, _punct, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
 
 
@@ -1271,7 +1390,7 @@ def test_generate_draft_no_tool_calls_syllable_fail_retry() -> None:
         "syllable_constraints": None,
     }
     msgs: list[dict[str, Any]] = []
-    poem, _title, _ = writer.generate_draft("主题", template, msgs)
+    poem, _title, _punct, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
 
 
@@ -1299,7 +1418,7 @@ def test_generate_draft_empty_title_retry() -> None:
         "syllable_constraints": None,
     }
     msgs: list[dict[str, Any]] = []
-    poem, title, _ = writer.generate_draft("主题", template, msgs)
+    poem, title, _punct, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
     assert title == "测试标题"
 
@@ -1430,3 +1549,65 @@ def test_format_poem_la_elegy() -> None:
     t = HexameterTemplate()
     result = t.format_poem(["arma", "virumque", "cano"])
     assert result == "arma\nvirumque\ncano"
+
+
+def test_format_poem_base_with_punctuation() -> None:
+    """基类 format_poem 提供标点时逐行套用。"""
+    from src.templates.en import ShakespeareSonnetTemplate
+
+    t = ShakespeareSonnetTemplate()
+    result = t.format_poem(["title", "line1", "line2"], ["，", "。"])
+    assert result == "title\nline1，\nline2。"
+
+
+def test_format_poem_wulv_with_punctuation() -> None:
+    """五言律诗提供标点时按联拼接。"""
+    from src.templates.zh import WulvTemplate
+
+    t = WulvTemplate()
+    lines = ["标题", "句1", "句2", "句3", "句4", "句5", "句6", "句7", "句8"]
+    marks = ["，", "。", "，", "。", "，", "。", "，", "。"]
+    result = t.format_poem(lines, marks)
+    assert "句1，句2。" in result
+    assert "句7，句8。" in result
+
+
+def test_format_poem_wulv_with_punctuation_odd() -> None:
+    """五言律诗提供标点且正文奇数行时触发 odd-content 分支。"""
+    from src.templates.zh import WulvTemplate
+
+    t = WulvTemplate()
+    result = t.format_poem(["标题", "句1", "句2", "句3"], ["，", "。", "。"])
+    assert "句3。" in result
+
+
+def test_format_poem_qilv_with_punctuation() -> None:
+    """七言律诗提供标点时按联拼接。"""
+    from src.templates.zh import QilvTemplate
+
+    t = QilvTemplate()
+    lines = ["标题", "句1", "句2", "句3", "句4", "句5", "句6", "句7", "句8"]
+    marks = ["，", "。", "，", "。", "，", "。", "，", "。"]
+    result = t.format_poem(lines, marks)
+    assert "句1，句2。" in result
+
+
+def test_format_poem_qilv_with_punctuation_odd() -> None:
+    """七言律诗提供标点且正文奇数行时触发 odd-content 分支。"""
+    from src.templates.zh import QilvTemplate
+
+    t = QilvTemplate()
+    result = t.format_poem(["标题", "句1", "句2", "句3"], ["，", "。", "。"])
+    assert "句3。" in result
+
+
+def test_format_poem_xiangjianhuan_with_punctuation() -> None:
+    """相见欢提供标点时逐行套用后再按阙拼接。"""
+    from src.templates.zh import XiangjianhuanTemplate
+
+    t = XiangjianhuanTemplate()
+    lines = ["标题", "上1", "上2", "上3", "下1", "下2", "下3", "下4"]
+    marks = ["，", "，", "。", "，", "，", "，", "。"]
+    result = t.format_poem(lines, marks)
+    assert "\t" in result
+    assert "上1，上2，上3。" in result

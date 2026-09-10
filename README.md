@@ -51,12 +51,11 @@ The symbolic layer handles: syllable counting, tone/stress/length constraints, r
 
 ### Why Tool‑Call Decoupling?
 
-The two layers communicate **only through structured tools**. The AI can never output a block of free‑form text to "pretend" it has finished; it can only call these four tools with structured data:
+The two layers communicate **only through structured tools**. The AI can never output a block of free‑form text to "pretend" it has finished; it can only call these three tools with structured data:
 
 - `search_words` – retrieve candidate words/phrases from the local lexicon by meaning, tone, or rhyme category
-- `refine_line` – replace an entire line, then immediately run full meter validation
-- `rewrite` – rewrite the whole poem with a given instruction
-- `submit` – submit the final draft (accepted only after full‑poem meter validation passes)
+- `modify` – modify the poem by type: `line` (replace one line, then immediately run full meter validation), `title` (rename the title), or `punctuation` (set the punctuation list)
+- `submit` – submit the final draft; may replace the whole poem (`poem`) and set punctuation (`punctuation`), and is accepted only after full‑poem meter validation passes
 
 This "tools‑as‑interface" design keeps the AI’s creativity firmly within the boundaries of meter, and every modification is instantly verified by the symbolic layer — neither generating illegal lines, nor allowing the AI to bluff its way through with prose.
 
@@ -83,9 +82,9 @@ flowchart TD
     end
     subgraph S3 [Step 3 · Refinement Loop ReAct]
         W3[Writer AI tool calls]
-        T[Tool execution tools/<br/>search_words · refine_line · rewrite · submit]
+        T[Tool execution tools/<br/>search_words · modify · submit]
         Sym[Symbolic layer prosody/<br/>syllable count · tone · rhyme · solitary level]
-        W3 -->|search_words / refine_line / rewrite| T
+        W3 -->|search_words / modify| T
         T --> Sym
         Sym -->|per‑syllable meter validation| W3
     end
@@ -108,12 +107,12 @@ flowchart TD
 ## Core Features
 
 - **Neuro‑Symbolic Dual Engine** – Hard meter rules are enforced by deterministic pure‑Python validation; the AI is responsible only for poetic meaning, decoupled via structured tools.
-- **Four‑Step Generation Pipeline** – Description generation → First draft (syllable count only) → ReAct refinement loop (search + line replacement + full rewrite, with immediate full‑poem validation after each change) → Checker AI semantic final review.
+- **Four‑Step Generation Pipeline** – Description generation → First draft (syllable count only) → ReAct refinement loop (search + modify line/title/punctuation, or whole‑poem replacement via `submit`, with immediate full‑poem validation after each change) → Checker AI semantic final review.
 - **Three‑Element Feedback Loop** – Writer AI → Checker AI → User; any failure sends the work back to Step 3 for further refinement, **with no upper limit on refinement rounds**.
 - **Multi‑language Meter** – Chinese (5‑character quatrain, 7‑character quatrain, 5‑character regulated verse, 7‑character regulated verse, Xiangjianhuan), English (Shakespearean sonnet, villanelle, heroic couplet), Italian, French, Classical Latin; templates are defined as Python classes and can be extended indefinitely.
 - **Multi‑Layer Meter Validation** – Per‑syllable tone/stress constraints + three‑level‑tail + solitary level + alternating tone rule + rhyme checking (Chinese grouped by Thirteen Rhymes, Western languages by real‑time phoneme‑based rhyme).
 - **Real‑time Streaming Output** – LLM generation tokens are pushed to the frontend token by token, with the Step detail area continuously updating.
-- **Separable Dual AI Agents** – Writer AI (4 tools) and Checker AI (1 tool) can use different LLM endpoints and models independently.
+- **Separable Dual AI Agents** – Writer AI (3 tools) and Checker AI (1 tool) can use different LLM endpoints and models independently.
 - **Local Lexicon + Vector Reranking** – SQLite lexicon (CC‑CEDICT / CMUdict / Lexique / GLAW‑IT / Lewis & Short), with `sentence‑transformers` for semantic reranking.
 - **Desktop Packaging** – pywebview + Flask + SocketIO, packaged as a single executable using PyInstaller.
 
@@ -131,7 +130,7 @@ The following image shows the generation interface and refinement process:
 
 1. **Step 1 · Description Generation** – The Writer AI takes the user’s modern‑language theme and produces a poetic description (a “creative outline” reused in later steps).
 2. **Step 2 · First Draft** – The Writer AI produces an initial draft respecting the template’s meter requirements (line count, syllable count). Only line and syllable counts are validated at this stage.
-3. **Step 3 · Refinement Loop (ReAct)** – The AI repeatedly calls `search_words` to find compliant words/phrases, `refine_line` to replace lines, and `rewrite` to rewrite entire poems; every modification immediately triggers symbolic‑layer full‑poem validation. The AI may call `submit` at any time, but the submission is accepted **only after the full‑poem meter validation passes** — otherwise it is rejected with the concrete errors and the loop continues. **There is no upper limit on this loop**; it continues until the draft is submitted with a valid meter.
+3. **Step 3 · Refinement Loop (ReAct)** – The AI repeatedly calls `search_words` to find compliant words/phrases and `modify` to change a line, the title, or the punctuation; it may also call `submit` with a whole new poem (`poem`) or a punctuation list. Every modification immediately triggers symbolic‑layer full‑poem validation. The AI may call `submit` at any time, but the submission is accepted **only after the full‑poem meter validation passes** — otherwise it is rejected with the concrete errors and the loop continues. **There is no upper limit on this loop**; it continues until the draft is submitted with a valid meter.
 4. **Step 4 · Semantic Final Review** – The Checker AI reviews the final draft from aspects such as coherence, thematic fit, and higher‑level dimensions beyond meter, then calls `submit` to give a pass/fail decision. If it fails, suggestions are sent back to Step 3 for further refinement; if it passes, the poem is finalised.
 
 ---
@@ -217,10 +216,10 @@ StanzaWeaver/
     │   ├── __init__.py
     │   ├── base.py          # LLM call wrapper
     │   ├── checker_ai.py    # Checker AI (1 tool)
-    │   └── writer_ai.py     # Writer AI (4 tools)
+    │   └── writer_ai.py     # Writer AI (3 tools)
     ├── tools/               # Agent tool definitions
     │   ├── __init__.py      # OpenAI Tool JSON Schemas
-    │   ├── refine_line.py   # Line replacement execution
+    │   ├── modify.py        # Modify execution (line/title/punctuation)
     │   └── search_words.py  # Word search execution
     ├── templates/           # Meter templates (Python classes)
     │   ├── __init__.py      # PoetryTemplate base class + registry
@@ -242,7 +241,7 @@ Templates are defined as Python classes inheriting from `PoetryTemplate`, and mu
 
 | Method                       | Description                                                                          |
 | :--------------------------- | :----------------------------------------------------------------------------------- |
-| `get_syllable_constraints()` | Per‑position syllable constraints (used by `refine_line` for single‑line validation) |
+| `get_syllable_constraints()` | Per‑position syllable constraints (used by `modify` for single‑line validation)    |
 | `validate_full()`            | Full‑poem rule checking (three‑level‑tail, solitary level, rhyme, etc.)              |
 | `describe()`                 | Human‑readable meter description (used in the AI prompt)                             |
 
