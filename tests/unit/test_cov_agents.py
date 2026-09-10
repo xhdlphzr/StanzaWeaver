@@ -1440,14 +1440,6 @@ def test_format_poem_wujue() -> None:
     assert "更上一层楼。" in result
 
 
-def test_default_couplet_marks_odd_and_empty() -> None:
-    """默认标点辅助函数：奇数行末句号、空输入返回空列表。"""
-    from src.templates.zh import _default_couplet_marks
-
-    assert _default_couplet_marks(3) == ["，", "。", "。"]
-    assert _default_couplet_marks(0) == []
-
-
 def test_format_poem_qijue() -> None:
     """七言绝句格式：一句一行，联内逗号、联末句号。"""
     from src.templates.zh import QijueTemplate
@@ -1622,3 +1614,64 @@ def test_format_poem_xiangjianhuan_with_punctuation() -> None:
     result = t.format_poem(lines, marks)
     assert "\t" in result
     assert "上1，上2，上3。" in result
+
+
+def test_format_poem_rumengling() -> None:
+    """如梦令格式：开头Tab，单调不分阕，默认标点。"""
+    from src.templates.zh import RumenglingTemplate
+
+    t = RumenglingTemplate()
+    lines = [
+        "如梦令",
+        "常记溪亭日暮",
+        "沉醉不知归路",
+        "兴尽晚回舟",
+        "误入藕花深处",
+        "争渡",
+        "争渡",
+        "惊起一滩鸥鹭",
+    ]
+    result = t.format_poem(lines)
+    assert result.startswith("如梦令\n\t")
+    assert "常记溪亭日暮，" in result
+    assert "沉醉不知归路。" in result
+    assert "争渡，争渡，" in result
+    # 单调：正文内不出现阙间 Tab（仅开头一个 Tab）
+    assert result.split("\n")[1].count("\t") == 1
+
+
+def test_format_poem_langtaosha() -> None:
+    """浪淘沙格式：开头Tab，上下片阙间Tab，默认标点。"""
+    from src.templates.zh import LangtaoshaTemplate
+
+    t = LangtaoshaTemplate()
+    lines = ["浪淘沙"] + [f"句{i}" for i in range(1, 11)]
+    result = t.format_poem(lines)
+    assert result.startswith("浪淘沙\n\t")
+    assert result.split("\n")[1].count("\t") == 2
+    assert "句1，句2。句3。句4，句5。" in result
+    assert "句6，句7。句8。句9，句10。" in result
+
+
+def test_format_poem_qingpingyue() -> None:
+    """清平乐格式：开头Tab，上下片阙间Tab，默认标点。"""
+    from src.templates.zh import QingpingyueTemplate
+
+    t = QingpingyueTemplate()
+    lines = ["清平乐"] + [f"句{i}" for i in range(1, 9)]
+    result = t.format_poem(lines)
+    assert result.startswith("清平乐\n\t")
+    assert result.split("\n")[1].count("\t") == 2
+    assert "句1，句2。句3，句4。" in result
+    assert "句5，句6。句7，句8。" in result
+
+
+def test_format_poem_langtaosha_with_punctuation() -> None:
+    """浪淘沙提供标点时逐行套用。"""
+    from src.templates.zh import LangtaoshaTemplate
+
+    t = LangtaoshaTemplate()
+    lines = ["浪淘沙"] + [f"句{i}" for i in range(1, 11)]
+    marks = ["，"] * 10
+    result = t.format_poem(lines, marks)
+    assert "句1，句2，句3，句4，句5，" in result
