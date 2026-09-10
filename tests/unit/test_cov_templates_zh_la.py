@@ -18,6 +18,9 @@ from src.templates.la import (
     _validate_hex,
 )
 from src.templates.zh import (
+    LangtaoshaTemplate,
+    QingpingyueTemplate,
+    RumenglingTemplate,
     XiangjianhuanTemplate,
     _check_alternation,
     _check_guping,
@@ -233,6 +236,114 @@ def test_xjh_empty_line_tail() -> None:
     ]
     errs = XiangjianhuanTemplate().validate_full([""] * 7, syls)
     assert any("换韵" in e for e in errs)
+
+
+# --------------------------------------------------------------------------- #
+# zh.py: 如梦令 / 浪淘沙 / 清平乐（新增词牌）                                  #
+# --------------------------------------------------------------------------- #
+def test_rumengling_valid_and_constraints() -> None:
+    """如梦令：仄韵一韵到底、叠句通过；约束表逐位生成。"""
+    syls = [
+        _xjh_mk(6, "ang"),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(5, None),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(2, "ang"),
+        _xjh_mk(2, "ang"),
+        _xjh_mk(6, "ang"),
+    ]
+    poem = ["", "", "", "", "如梦", "如梦", ""]
+    tpl = RumenglingTemplate()
+    assert tpl.validate_full(poem, syls) == []
+    assert len(tpl.get_syllable_constraints()) == 7
+
+
+def test_rumengling_dieju_mismatch() -> None:
+    """如梦令：第5、6句非叠句时报错。"""
+    syls = [
+        _xjh_mk(6, "ang"),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(5, None),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(2, "ang"),
+        _xjh_mk(2, "ang"),
+        _xjh_mk(6, "ang"),
+    ]
+    poem = ["", "", "", "", "如梦", "依旧", ""]
+    errs = RumenglingTemplate().validate_full(poem, syls)
+    assert any("叠句" in e for e in errs)
+
+
+def test_rumengling_rhyme_mismatch() -> None:
+    """如梦令：韵脚不同部时报押韵错误。"""
+    syls = [
+        _xjh_mk(6, "ang"),
+        _xjh_mk(6, "eng"),
+        _xjh_mk(5, None),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(2, "ang"),
+        _xjh_mk(2, "ang"),
+        _xjh_mk(6, "ang"),
+    ]
+    errs = RumenglingTemplate().validate_full([""] * 7, syls)
+    assert any("押韵" in e for e in errs)
+
+
+def test_langtaosha_valid_and_constraints() -> None:
+    """浪淘沙：上下片平韵一韵到底；约束表逐位生成。"""
+    syls = [
+        _xjh_mk(5, "ang"),
+        _xjh_mk(4, "ang"),
+        _xjh_mk(7, "ang"),
+        _xjh_mk(7, None),
+        _xjh_mk(4, "ang"),
+        _xjh_mk(5, "ang"),
+        _xjh_mk(4, "ang"),
+        _xjh_mk(7, "ang"),
+        _xjh_mk(7, None),
+        _xjh_mk(4, "ang"),
+    ]
+    tpl = LangtaoshaTemplate()
+    assert tpl.validate_full([""] * 10, syls) == []
+    assert len(tpl.get_syllable_constraints()) == 10
+
+
+def test_qingpingyue_valid_and_constraints() -> None:
+    """清平乐：上片仄韵、下片平韵且换韵；约束表逐位生成。"""
+    syls = [
+        _xjh_mk(4, "ang"),
+        _xjh_mk(5, "ang"),
+        _xjh_mk(7, "ang"),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(6, "eng"),
+        _xjh_mk(6, "eng"),
+        _xjh_mk(6, None),
+        _xjh_mk(6, "eng"),
+    ]
+    tpl = QingpingyueTemplate()
+    assert tpl.validate_full([""] * 8, syls) == []
+    assert len(tpl.get_syllable_constraints()) == 8
+
+
+def test_qingpingyue_same_rhyme_rejected() -> None:
+    """清平乐：上下片同部时提示换韵。"""
+    syls = [
+        _xjh_mk(4, "ang"),
+        _xjh_mk(5, "ang"),
+        _xjh_mk(7, "ang"),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(6, None),
+        _xjh_mk(6, "ang"),
+    ]
+    errs = QingpingyueTemplate().validate_full([""] * 8, syls)
+    assert any("换韵" in e for e in errs)
+
+
+def test_qingpingyue_empty_syllables() -> None:
+    """清平乐：空音节列表时韵脚回退为空串（覆盖 else 分支）。"""
+    assert QingpingyueTemplate().validate_full([], []) == []
 
 
 # --------------------------------------------------------------------------- #

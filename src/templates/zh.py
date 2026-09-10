@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""中文格律模板：五言绝句、七言绝句、五言律诗、七言律诗、相见欢。
+"""中文格律模板：五言绝句、七言绝句、五言律诗、七言律诗、相见欢、如梦令、浪淘沙、清平乐。
 
 实现近体诗/词牌的符号层规则：
 - 平仄骨架：每句 2/4(6) 位相间、联内相对、联间相粘、出句仄脚/对句平脚；
@@ -32,20 +32,14 @@ _FREE: dict[str, Any] = _make_syl()
 #: 相见欢默认标点（七句：，。。，，。。）。
 _XIANGJIANHUAN_MARKS: list[str] = ["，", "。", "。", "，", "，", "。", "。"]
 
+#: 如梦令默认标点（七句）。
+_RUMENGLING_MARKS: list[str] = ["，", "。", "，", "。", "，", "，", "。"]
 
-def _default_couplet_marks(count: int) -> list[str]:
-    """生成近体诗默认标点：联内逗号、联末句号。
+#: 浪淘沙默认标点（上下片各五句）。
+_LANGTAOSHA_MARKS: list[str] = ["，", "。", "。", "，", "。"] * 2
 
-    Args:
-        count: 正文行数。
-
-    Returns:
-        逐行标点列表（末行保证句号）。
-    """
-    marks = (["，", "。"] * ((count + 1) // 2))[:count]
-    if count % 2 == 1:
-        marks[-1] = "。"
-    return marks
+#: 清平乐默认标点（上下片各四句）。
+_QINGPINGYUE_MARKS: list[str] = ["，", "。", "，", "。", "，", "。", "，", "。"]
 
 
 def _check_sanpingwei(syllables: list[Syllable]) -> list[str]:
@@ -422,7 +416,7 @@ class WujueTemplate(PoetryTemplate):
         """绝句格式：一句一行，联内逗号、联末句号。"""
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
-        marks = punctuation or _default_couplet_marks(len(content))
+        marks = punctuation or ["，", "。", "，", "。"]
         lines = [
             content[i] + (marks[i] if i < len(marks) else "")
             for i in range(len(content))
@@ -470,7 +464,7 @@ class QijueTemplate(PoetryTemplate):
         """绝句格式：一句一行，联内逗号、联末句号。"""
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
-        marks = punctuation or _default_couplet_marks(len(content))
+        marks = punctuation or ["，", "。", "，", "。"]
         lines = [
             content[i] + (marks[i] if i < len(marks) else "")
             for i in range(len(content))
@@ -687,6 +681,201 @@ class XiangjianhuanTemplate(PoetryTemplate):
         return title + "\n" + text if title else text
 
 
+class RumenglingTemplate(PoetryTemplate):
+    """如梦令（单调三十三字）：七句，五仄韵一叠韵，第5、6句须叠句。"""
+
+    name = "如梦令"
+    language = "zh"
+    lines = 7
+    syllables_per_line: ClassVar[list[int]] = [6, 6, 5, 6, 2, 2, 6]
+    rule_description = (
+        "格律规则：单调七句，全押仄声韵（一韵到底）；第5、6句为二字叠句须完全相同；"
+        "谱式：中仄中平中仄/中仄中平中仄/中仄仄平平/中仄中平中仄/中仄/中仄/中仄中平中仄。"
+    )
+
+    def get_syllable_constraints(self) -> ConstraintTable:
+        """词牌固定平仄谱（"中"=自由）。
+
+        Returns:
+            逐位音节约束表。
+        """
+        _f, _p, _z = _FREE, _tone("平"), _tone("仄")
+        return [
+            [_f, _z, _f, _p, _f, _z],
+            [_f, _z, _f, _p, _f, _z],
+            [_f, _z, _z, _p, _p],
+            [_f, _z, _f, _p, _f, _z],
+            [_f, _z],
+            [_f, _z],
+            [_f, _z, _f, _p, _f, _z],
+        ]
+
+    def validate_full(
+        self, poem: list[str], syllables: list[list[Syllable]]
+    ) -> list[str]:
+        """押韵与叠句检查：全词仄韵一韵到底，第5、6句须叠句。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
+        errors: list[str] = []
+        errors.extend(_check_rhyme(syllables, [0, 1, 3, 4, 5, 6], "押韵(仄韵)"))
+        if len(poem) > 5 and poem[4].strip() and poem[4].strip() != poem[5].strip():
+            errors.append(f"第5、6句应为叠句（相同），实际'{poem[4]}'与'{poem[5]}'")
+        return errors
+
+    def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
+        """如梦令格式：开头Tab，单调不分阕。"""
+        title = poem[0] if poem else ""
+        content = poem[1:] if len(poem) > 1 else poem
+        marks = punctuation or _RUMENGLING_MARKS
+        content = [
+            content[i] + (marks[i] if i < len(marks) else "")
+            for i in range(len(content))
+        ]
+        text = "\t" + "".join(content)
+        return title + "\n" + text if title else text
+
+
+class LangtaoshaTemplate(PoetryTemplate):
+    """浪淘沙（双调五十四字）：上下片各五句四平韵，一韵到底。"""
+
+    name = "浪淘沙"
+    language = "zh"
+    lines = 10
+    syllables_per_line: ClassVar[list[int]] = [5, 4, 7, 7, 4, 5, 4, 7, 7, 4]
+    rule_description = (
+        "格律规则：双调十句，上下片各五句四平韵（第4、9句为句不入韵），一韵到底；"
+        "谱式（上下片同）：中仄仄平平/中仄平平/中平中仄仄平平/中仄中平平仄仄/中仄平平。"
+    )
+
+    def get_syllable_constraints(self) -> ConstraintTable:
+        """词牌固定平仄谱（"中"=自由）。
+
+        Returns:
+            逐位音节约束表。
+        """
+        _f, _p, _z = _FREE, _tone("平"), _tone("仄")
+        return [
+            [_f, _z, _z, _p, _p],
+            [_f, _z, _p, _p],
+            [_f, _p, _f, _z, _z, _p, _p],
+            [_f, _z, _f, _p, _p, _z, _z],
+            [_f, _z, _p, _p],
+            [_f, _z, _z, _p, _p],
+            [_f, _z, _p, _p],
+            [_f, _p, _f, _z, _z, _p, _p],
+            [_f, _z, _f, _p, _p, _z, _z],
+            [_f, _z, _p, _p],
+        ]
+
+    def validate_full(
+        self, poem: list[str], syllables: list[list[Syllable]]
+    ) -> list[str]:
+        """押韵检查：上下片平韵一韵到底（第4、9句不入韵）。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
+        return _check_rhyme(syllables, [0, 1, 2, 4, 5, 6, 7, 9], "押韵(平韵·一韵到底)")
+
+    def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
+        """浪淘沙格式：开头Tab，阙间Tab，阕内无换行（CSS wrap）。"""
+        title = poem[0] if poem else ""
+        content = poem[1:] if len(poem) > 1 else poem
+        marks = punctuation or _LANGTAOSHA_MARKS
+        content = [
+            content[i] + (marks[i] if i < len(marks) else "")
+            for i in range(len(content))
+        ]
+        upper = "".join(content[:5])
+        lower = "".join(content[5:])
+        text = "\t" + upper
+        if lower:
+            text += "\t" + lower
+        return title + "\n" + text if title else text
+
+
+class QingpingyueTemplate(PoetryTemplate):
+    """清平乐（双调四十六字）：上片四句仄韵，下片四句平韵，上下换韵。"""
+
+    name = "清平乐"
+    language = "zh"
+    lines = 8
+    syllables_per_line: ClassVar[list[int]] = [4, 5, 7, 6, 6, 6, 6, 6]
+    rule_description = (
+        "格律规则：上片四句句句押仄韵，下片四句隔句押平韵（第7句为句不入韵），"
+        "上下片换韵；"
+        "谱式：上片中平中仄/中仄平平仄/中仄中平平仄仄/中仄中平中仄，"
+        "下片中平中仄平平/中平中仄平平/中仄中平中仄/中平中仄平平。"
+    )
+
+    def get_syllable_constraints(self) -> ConstraintTable:
+        """词牌固定平仄谱（"中"=自由）。
+
+        Returns:
+            逐位音节约束表。
+        """
+        _f, _p, _z = _FREE, _tone("平"), _tone("仄")
+        return [
+            [_f, _p, _f, _z],
+            [_f, _z, _p, _p, _z],
+            [_f, _z, _f, _p, _p, _z, _z],
+            [_f, _z, _f, _p, _f, _z],
+            [_f, _p, _f, _z, _p, _p],
+            [_f, _p, _f, _z, _p, _p],
+            [_f, _z, _f, _p, _f, _z],
+            [_f, _p, _f, _z, _p, _p],
+        ]
+
+    def validate_full(
+        self, poem: list[str], syllables: list[list[Syllable]]
+    ) -> list[str]:
+        """押韵检查：上片仄韵、下片平韵，且上下片换韵。
+
+        Args:
+            poem: 诗行列表。
+            syllables: 各行音节列表。
+
+        Returns:
+            错误信息列表（空列表表示通过）。
+        """
+        errors: list[str] = []
+        errors.extend(_check_rhyme(syllables, [0, 1, 2, 3], "押韵(上片·仄韵)"))
+        errors.extend(_check_rhyme(syllables, [4, 5, 7], "押韵(下片·平韵)"))
+        upper = _rhyme_key(syllables[0][-1]) if syllables and syllables[0] else ""
+        lower = (
+            _rhyme_key(syllables[4][-1]) if len(syllables) > 4 and syllables[4] else ""
+        )
+        if upper and lower and upper == lower:
+            errors.append(f"上下片应换韵: 上片'{upper}'与下片'{lower}'同部")
+        return errors
+
+    def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
+        """清平乐格式：开头Tab，阙间Tab，阕内无换行（CSS wrap）。"""
+        title = poem[0] if poem else ""
+        content = poem[1:] if len(poem) > 1 else poem
+        marks = punctuation or _QINGPINGYUE_MARKS
+        content = [
+            content[i] + (marks[i] if i < len(marks) else "")
+            for i in range(len(content))
+        ]
+        upper = "".join(content[:4])
+        lower = "".join(content[4:])
+        text = "\t" + upper
+        if lower:
+            text += "\t" + lower
+        return title + "\n" + text if title else text
+
+
 def register_chinese_templates() -> None:
     """注册全部中文模板。"""
     register("zh_wujue", WujueTemplate())
@@ -694,3 +883,6 @@ def register_chinese_templates() -> None:
     register("zh_wulv", WulvTemplate())
     register("zh_qilv", QilvTemplate())
     register("zh_xiangjianhuan", XiangjianhuanTemplate())
+    register("zh_rumengling", RumenglingTemplate())
+    register("zh_langtaosha", LangtaoshaTemplate())
+    register("zh_qingpingyue", QingpingyueTemplate())
