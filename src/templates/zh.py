@@ -29,6 +29,24 @@ def _tone(t: str) -> dict[str, Any]:
 
 _FREE: dict[str, Any] = _make_syl()
 
+#: 相见欢默认标点（七句：，。。，，。。）。
+_XIANGJIANHUAN_MARKS: list[str] = ["，", "。", "。", "，", "，", "。", "。"]
+
+
+def _default_couplet_marks(count: int) -> list[str]:
+    """生成近体诗默认标点：联内逗号、联末句号。
+
+    Args:
+        count: 正文行数。
+
+    Returns:
+        逐行标点列表（末行保证句号）。
+    """
+    marks = (["，", "。"] * ((count + 1) // 2))[:count]
+    if count % 2 == 1:
+        marks[-1] = "。"
+    return marks
+
 
 def _check_sanpingwei(syllables: list[Syllable]) -> list[str]:
     """检查三平尾（末三字全平）。
@@ -401,10 +419,10 @@ class WujueTemplate(PoetryTemplate):
         return _check_jinti_full(syllables, [1, 3], "押韵(二四行)")
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """绝句格式：一句一行，句末加标点（默认句号）。"""
+        """绝句格式：一句一行，联内逗号、联末句号。"""
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
-        marks = punctuation or ["。"] * len(content)
+        marks = punctuation or _default_couplet_marks(len(content))
         lines = [
             content[i] + (marks[i] if i < len(marks) else "")
             for i in range(len(content))
@@ -449,10 +467,10 @@ class QijueTemplate(PoetryTemplate):
         return _check_jinti_full(syllables, [1, 3], "押韵(二四行)")
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """绝句格式：一句一行，句末加标点（默认句号）。"""
+        """绝句格式：一句一行，联内逗号、联末句号。"""
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
-        marks = punctuation or ["。"] * len(content)
+        marks = punctuation or _default_couplet_marks(len(content))
         lines = [
             content[i] + (marks[i] if i < len(marks) else "")
             for i in range(len(content))
@@ -656,11 +674,11 @@ class XiangjianhuanTemplate(PoetryTemplate):
         """相见欢格式：开头Tab，阙间Tab，阕内无换行（CSS wrap）。"""
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
-        if punctuation:
-            content = [
-                content[i] + (punctuation[i] if i < len(punctuation) else "")
-                for i in range(len(content))
-            ]
+        marks = punctuation or _XIANGJIANHUAN_MARKS
+        content = [
+            content[i] + (marks[i] if i < len(marks) else "")
+            for i in range(len(content))
+        ]
         upper = "".join(content[:3]) if len(content) >= 3 else "".join(content)
         lower = "".join(content[3:]) if len(content) > 3 else ""
         text = "\t" + upper
