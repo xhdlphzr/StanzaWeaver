@@ -1427,7 +1427,7 @@ def test_generate_draft_empty_title_retry() -> None:
 # format_poem (Chinese templates)
 # --------------------------------------------------------------------------- #
 def test_format_poem_wujue() -> None:
-    """五言绝句格式：一句一行，句末句号。"""
+    """五言绝句格式：一句一行，联内逗号、联末句号。"""
     from src.templates.zh import WujueTemplate
 
     t = WujueTemplate()
@@ -1435,12 +1435,21 @@ def test_format_poem_wujue() -> None:
         ["静夜思", "白日依山尽", "黄河入海流", "欲穷千里目", "更上一层楼"]
     )
     assert result.startswith("静夜思\n")
-    assert "白日依山尽。" in result
+    assert "白日依山尽，" in result
+    assert "黄河入海流。" in result
     assert "更上一层楼。" in result
 
 
+def test_default_couplet_marks_odd_and_empty() -> None:
+    """默认标点辅助函数：奇数行末句号、空输入返回空列表。"""
+    from src.templates.zh import _default_couplet_marks
+
+    assert _default_couplet_marks(3) == ["，", "。", "。"]
+    assert _default_couplet_marks(0) == []
+
+
 def test_format_poem_qijue() -> None:
-    """七言绝句格式：一句一行，句末句号。"""
+    """七言绝句格式：一句一行，联内逗号、联末句号。"""
     from src.templates.zh import QijueTemplate
 
     t = QijueTemplate()
@@ -1462,7 +1471,7 @@ def test_format_poem_wulv() -> None:
 
 
 def test_format_poem_xiangjianhuan() -> None:
-    """相见欢格式：开头Tab，阙间Tab，阕内无换行。"""
+    """相见欢格式：开头Tab，阙间Tab，默认标点，。。，，。。"""
     from src.templates.zh import XiangjianhuanTemplate
 
     t = XiangjianhuanTemplate()
@@ -1470,6 +1479,8 @@ def test_format_poem_xiangjianhuan() -> None:
     result = t.format_poem(lines)
     assert result.startswith("标题\n\t")
     assert "\t" in result.split("\n")[1]
+    assert "上1，上2。上3。" in result
+    assert "下1，下2，下3。下4。" in result
 
 
 def test_format_poem_qilv() -> None:
