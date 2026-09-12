@@ -274,17 +274,3 @@ class EnglishAnalyzer(SyllableAnalyzer):
             )
             for _ in range(count)
         ]
-
-    def count_syllables(self, text: str) -> int:
-        """逐词统计音节总数。
-
-        Args:
-            text: 英文文本。
-
-        Returns:
-            音节总数。
-        """
-        total = 0
-        for word in text.split():
-            total += len(self.analyze_word(word))
-        return total

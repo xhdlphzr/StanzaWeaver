@@ -7,9 +7,10 @@
 - 撇号仅作分隔符移除，不剥离词首字母前缀：aujourd'hui / quelqu'un /
   presqu'île 等内嵌撇号词仍按完整词形切分。
 - qu 后的 u 恒静音、gu 后接 e/i/y 时 u 静音（quel/guerre 不计 u 音节）。
-- 词尾静音 e 规则：仅当它为“弱”尾音节（与前一元音间仅隔 0~1 个辅音，
-  或位于元音后形成元音重复）时才省略；否则计入（如 entre/table/porte）。
-- 跨词省音（élision）与联诵（liaison）在整行切分中合并，避免重复计数。
+- 词尾静音 e 规则：词尾 e muet（后仅接静音辅音 s/t/x/p 或为空）在词中
+  还有其它元音核时省略；唯一元音时保留（如 le/de/que）。
+- 跨词仅处理联诵（liaison）：前词尾辅音并入后词首 onset，不改变音节数；
+  跨词元音相遇不省音（法语省音仅由撇号在同一词形内体现，如 l'eau）。
 - 韵脚 key 为词末发音元音核（鼻化归并），并丢弃词尾静音辅音。
 """
 
@@ -176,11 +177,11 @@ class FrenchAnalyzer(SyllableAnalyzer):
     def _apply_final_e(
         self, syls: list[Syllable], w: str, nuclei: list[tuple[int, int, str]]
     ) -> list[Syllable]:
-        """按规则省略词尾静音 e（若其为弱尾音节）。
+        """省略词尾静音 e（e muet）。
 
-        省略条件：末元音核恰为单字母 "e"，且 e 之后（词尾）仅含静音辅音；
-        同时 e 与前一元音核之间仅隔 0~1 个辅音（即 e 非真实尾音节所必需）。
-        唯一元音或与前一元音隔 2+ 辅音时保留。
+        省略条件：末元音核恰为单字母 "e"，且 e 之后（词尾）仅含静音辅音
+        （s/t/x/p）或为空；只要词中还有其它元音核即省略。唯一元音时保留
+        （如 le/de/que）。
 
         Args:
             syls: 初步切分出的音节。
@@ -199,8 +200,6 @@ class FrenchAnalyzer(SyllableAnalyzer):
         if after and not all(c in _MUTE_FINALS for c in after):
             return syls
         if len(syls) == 1:
-            return syls
-        if len(last.onset) >= 2:
             return syls
         return syls[:-1]
 
@@ -298,11 +297,11 @@ class FrenchAnalyzer(SyllableAnalyzer):
         return self._syllabify_word(word)
 
     def syllabify_line(self, text: str) -> list[Syllable]:
-        """整行切分：逐词切分并应用跨词省音与联诵。
+        """整行切分：逐词切分并应用跨词联诵（liaison）。
 
-        前词末音节以元音结尾、后词首音节以元音开头时，二者省音合并为
-        一个音节；前词以辅音结尾、后词以元音开头时，该辅音作为联诵
-        onset 并入后词首音节。两者均避免重复计数。
+        前词以辅音结尾、后词以元音开头时，该辅音作为联诵 onset 并入后词
+        首音节（不改变音节总数）。跨词元音相遇不省音（法语省音仅由撇号
+        在同一词形内体现，如 l'eau）。
 
         Args:
             text: 一行法语诗。
@@ -319,26 +318,12 @@ class FrenchAnalyzer(SyllableAnalyzer):
             if all_syls and syls:
                 prev = all_syls[-1]
                 curr = syls[0]
-                if prev.coda == "" and curr.onset == "":
-                    # 省音：前词末元音与后词首元音合并
-                    all_syls.pop()
-                elif prev.coda != "" and curr.onset == "":
+                if prev.coda != "" and curr.onset == "":
                     # 联诵：前词尾辅音成为后词首音节 onset
                     curr.onset = prev.coda
                     prev.coda = ""
             all_syls.extend(syls)
         return all_syls
-
-    def count_syllables(self, text: str) -> int:
-        """统计文本音节总数（含跨词省音/联诵合并）。
-
-        Args:
-            text: 法语文本（可为多词或整行）。
-
-        Returns:
-            音节总数。
-        """
-        return len(self.syllabify_line(text))
 
     def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
         """整行切分变体（法语标准音节划分下仅返回一种切分）。

@@ -141,8 +141,8 @@ def test_validate_constraints_mismatch() -> None:
         # 仅第 1 行第 1 音节要求平声
         "syllable_constraints": [[{"attributes": {"tone": "平"}}]],
     }
-    # 去 (qù, 仄) 不满足平声约束
-    bad = ["去前明月光", "疑是地上霜", "举头望明月", "低头思故乡"]
+    # 望 (wàng, 仄；无平声异读) 不满足平声约束
+    bad = ["望前明月光", "疑是地上霜", "举头望明月", "低头思故乡"]
     res = v.validate(bad, tpl)
     assert res.passed is False
     assert any("第1行第1音节不匹配" in e for e in res.errors)

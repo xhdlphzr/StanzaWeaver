@@ -291,17 +291,6 @@ class LatinAnalyzer(SyllableAnalyzer):
             eff = 1
         return eff
 
-    def count_syllables(self, text: str) -> int:
-        """逐词统计音节总数。
-
-        Args:
-            text: 拉丁语文本。
-
-        Returns:
-            音节总数。
-        """
-        return sum(len(self.analyze_word(w)) for w in text.split() if w.strip())
-
     def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
         """整行切分变体（拉丁语标准切分下 muta cum liquida 并入一节拍，故仅返回标准切分）。
 

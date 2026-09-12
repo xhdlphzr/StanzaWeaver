@@ -10,15 +10,15 @@ from src.templates.fr import RondeauTemplate
 def test_count_syllables_parle() -> None:
     """验证 count syllables parle。"""
     a = FrenchAnalyzer()
-    # par-le：词尾 e 为合法末音节核，计入 -> 2 音节
-    assert a.count_syllables("parle") == 2
+    # par-le：词尾 e muet 省略 -> 1 音节
+    assert a.count_syllables("parle") == 1
 
 
 def test_rhyme_key_parle() -> None:
     """验证 rhyme key parle。"""
     a = FrenchAnalyzer()
-    # 末音节核为 e（阴韵），丢弃词尾静音辅音
-    assert a.rhyme_key("parle") == "e"
+    # 词尾 e muet 省略后，韵脚取末个发音元音核 a
+    assert a.rhyme_key("parle") == "a"
 
 
 def test_count_syllables_bonjour() -> None:
@@ -50,15 +50,19 @@ def test_single_nucleus_words() -> None:
     assert a.analyze_word("yeux")[0].nucleus == "yeu"
 
 
-def test_final_mute_e_counted() -> None:
-    """验证 final mute e counted。"""
+def test_final_mute_e_silent() -> None:
+    """验证 final mute e silent。"""
     a = FrenchAnalyzer()
-    # FR-2：词尾 e 作为合法末音节核时必须计入
-    assert a.count_syllables("entre") == 2
-    assert a.count_syllables("table") == 2
+    # 词尾 e muet 省略（标准法语）：entre/table/porte/parle 均 1 音节
+    assert a.count_syllables("entre") == 1
+    assert a.count_syllables("table") == 1
+    assert a.count_syllables("porte") == 1
+    assert a.count_syllables("parle") == 1
+    # 尾元音非 e 或 e 前无其它元音核时照常计数
     assert a.count_syllables("maison") == 2
     assert a.count_syllables("petite") == 2
-    assert a.count_syllables("porte") == 2
+    assert a.count_syllables("le") == 1
+    assert a.count_syllables("que") == 1
 
 
 def test_rhyme_key_nasal_merge() -> None:
@@ -71,12 +75,13 @@ def test_rhyme_key_nasal_merge() -> None:
     assert a.rhyme_key("ami") == a.rhyme_key("amis")
 
 
-def test_syllabify_line_elision() -> None:
-    """验证 syllabify line elision。"""
+def test_syllabify_line_no_cross_word_elision() -> None:
+    """验证 syllabify line no cross word elision。"""
     a = FrenchAnalyzer()
-    # FR-4：跨词省音，l'eau 计为 1 音节
+    # 撇号省音仍计 1 音节（l'eau 为同一词形）
     assert a.count_syllables("l'eau") == 1
-    assert a.count_syllables("la eau") == 1
+    # 跨词元音相遇不省音：la + eau = 2 音节
+    assert a.count_syllables("la eau") == 2
 
 
 def test_rondeau_accepts_uniform_10() -> None:

@@ -224,17 +224,6 @@ class ItalianAnalyzer(SyllableAnalyzer):
         """
         return self._syllabify_word(word)
 
-    def count_syllables(self, text: str) -> int:
-        """统计文本音节数（含 sinalefe 合并）。
-
-        Args:
-            text: 意大利语文本。
-
-        Returns:
-            音节总数。
-        """
-        return len(self.syllabify_line(text))
-
     def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
         """整行切分变体（意大利语标准诵读下 sinalefe 为强制，故仅返回标准切分）。
 

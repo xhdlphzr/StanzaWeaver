@@ -24,7 +24,6 @@ from ..tools.modify import execute_modify
 from ..tools.search_words import execute_search_words
 from .base import LLMClient, Message
 
-CONTEXT_LIMIT = 200_000
 COMPRESS_THRESHOLD = 180_000
 
 ChunkCallback = Callable[[str], None] | None
@@ -306,7 +305,6 @@ class WriterAI:
         template: dict[str, Any],
         messages: list[Message],
         template_obj: object = None,
-        max_attempts: int = 0,
         on_stream: ChunkCallback = None,
     ) -> DraftResult:
         """生成初稿（Step 2，通过 submit 工具提交，无尝试次数上限）。
@@ -316,7 +314,6 @@ class WriterAI:
             template: 模板字典。
             messages: 共享对话消息列表（会被追加）。
             template_obj: 模板对象。
-            max_attempts: 已废弃，保留仅为接口兼容。
             on_stream: 流式回调。
 
         Returns:

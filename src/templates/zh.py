@@ -413,7 +413,15 @@ class WujueTemplate(PoetryTemplate):
         return _check_jinti_full(syllables, [1, 3], "押韵(二四行)")
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """绝句格式：一句一行，联内逗号、联末句号。"""
+        """绝句格式：一句一行，联内逗号、联末句号。
+
+        Args:
+            poem: 诗行列表（首元素为标题）。
+            punctuation: 逐行标点；空/None 使用默认。
+
+        Returns:
+            格式化后的展示文本。
+        """
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
         marks = punctuation or ["，", "。", "，", "。"]
@@ -461,7 +469,15 @@ class QijueTemplate(PoetryTemplate):
         return _check_jinti_full(syllables, [1, 3], "押韵(二四行)")
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """绝句格式：一句一行，联内逗号、联末句号。"""
+        """绝句格式：一句一行，联内逗号、联末句号。
+
+        Args:
+            poem: 诗行列表（首元素为标题）。
+            punctuation: 逐行标点；空/None 使用默认。
+
+        Returns:
+            格式化后的展示文本。
+        """
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
         marks = punctuation or ["，", "。", "，", "。"]
@@ -505,7 +521,15 @@ class WulvTemplate(PoetryTemplate):
         return _check_jinti_full(syllables, [1, 3, 5, 7], "押韵(二四六八行)")
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """律诗格式：一联一行，联间逗号，末联句号。"""
+        """律诗格式：一联一行，联间逗号，末联句号。
+
+        Args:
+            poem: 诗行列表（首元素为标题）。
+            punctuation: 逐行标点；空/None 使用默认。
+
+        Returns:
+            格式化后的展示文本。
+        """
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
         coupled: list[str] = []
@@ -561,7 +585,15 @@ class QilvTemplate(PoetryTemplate):
         return _check_jinti_full(syllables, [1, 3, 5, 7], "押韵(二四六八行)")
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """律诗格式：一联一行，联间逗号，末联句号。"""
+        """律诗格式：一联一行，联间逗号，末联句号。
+
+        Args:
+            poem: 诗行列表（首元素为标题）。
+            punctuation: 逐行标点；空/None 使用默认。
+
+        Returns:
+            格式化后的展示文本。
+        """
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
         coupled: list[str] = []
@@ -665,7 +697,15 @@ class XiangjianhuanTemplate(PoetryTemplate):
         return errors
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """相见欢格式：开头Tab，阙间Tab，阕内无换行（CSS wrap）。"""
+        """相见欢格式：开头Tab，阙间Tab，阕内无换行（CSS wrap）。
+
+        Args:
+            poem: 诗行列表（首元素为标题）。
+            punctuation: 逐行标点；空/None 使用默认。
+
+        Returns:
+            格式化后的展示文本。
+        """
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
         marks = punctuation or _XIANGJIANHUAN_MARKS
@@ -729,7 +769,15 @@ class RumenglingTemplate(PoetryTemplate):
         return errors
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """如梦令格式：开头Tab，单调不分阕。"""
+        """如梦令格式：开头Tab，单调不分阕。
+
+        Args:
+            poem: 诗行列表（首元素为标题）。
+            punctuation: 逐行标点；空/None 使用默认。
+
+        Returns:
+            格式化后的展示文本。
+        """
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
         marks = punctuation or _RUMENGLING_MARKS
@@ -788,7 +836,15 @@ class LangtaoshaTemplate(PoetryTemplate):
         return _check_rhyme(syllables, [0, 1, 2, 4, 5, 6, 7, 9], "押韵(平韵·一韵到底)")
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """浪淘沙格式：开头Tab，阙间Tab，阕内无换行（CSS wrap）。"""
+        """浪淘沙格式：开头Tab，阙间Tab，阕内无换行（CSS wrap）。
+
+        Args:
+            poem: 诗行列表（首元素为标题）。
+            punctuation: 逐行标点；空/None 使用默认。
+
+        Returns:
+            格式化后的展示文本。
+        """
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
         marks = punctuation or _LANGTAOSHA_MARKS
@@ -860,7 +916,15 @@ class QingpingyueTemplate(PoetryTemplate):
         return errors
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """清平乐格式：开头Tab，阙间Tab，阕内无换行（CSS wrap）。"""
+        """清平乐格式：开头Tab，阙间Tab，阕内无换行（CSS wrap）。
+
+        Args:
+            poem: 诗行列表（首元素为标题）。
+            punctuation: 逐行标点；空/None 使用默认。
+
+        Returns:
+            格式化后的展示文本。
+        """
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
         marks = punctuation or _QINGPINGYUE_MARKS

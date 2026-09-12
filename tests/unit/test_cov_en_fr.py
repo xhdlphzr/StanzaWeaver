@@ -227,7 +227,8 @@ def test_french_silent_u_after_qu() -> None:
 def test_french_silent_u_after_gu_front_vowel() -> None:
     """gu 后接 e/i/y 时 u 静音，其余情况 u 计为元音（覆盖 _is_silent_u gu 分支）。"""
     analyzer = FrenchAnalyzer()
-    assert analyzer.count_syllables_in_word("guerre") == 2
+    # guerre：gu 的 u 静音，词尾 e muet 亦省略 -> 1 音节
+    assert analyzer.count_syllables_in_word("guerre") == 1
     assert analyzer.count_syllables_in_word("guide") == 1
     # 词尾 gu：u 发音（aigu = /e.gy/，2 音节）
     assert analyzer.count_syllables_in_word("aigu") == 2

@@ -704,6 +704,7 @@ html[lang="en"] .slogan {
   letter-spacing: 3px;
   color: #3d3226;
   white-space: pre-wrap;
+  tab-size: 4;
   text-align: center;
   user-select: text;
   cursor: text;

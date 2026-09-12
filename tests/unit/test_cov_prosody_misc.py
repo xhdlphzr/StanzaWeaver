@@ -254,3 +254,40 @@ def test_describe_syllable_with_coda() -> None:
         Syllable(onset="z", nucleus="a", coda="ng", attributes={})
     )
     assert "韵尾=ng" in desc
+
+
+def test_validate_full_variants_cap_break() -> None:
+    """变体组合数超过 MAX_FULL_COMBOS 时截断（覆盖 239 行）。"""
+
+    class _ManyVariants(_BaseStub):
+        """每行返回 30 个相同变体，3 行共 27000 组合 > 20000。"""
+
+        language = "en"
+
+        def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
+            """返回 30 个相同变体。"""
+            return [
+                [Syllable(onset="", nucleus="x", coda="", attributes={})]
+                for _ in range(30)
+            ]
+
+    class _AlwaysErrorTemplate:
+        """validate_full 恒返回错误的模板桩。"""
+
+        def validate_full(
+            self, poem: list[str], syllables: list[list[Syllable]]
+        ) -> list[str]:
+            """始终返回非空错误列表。"""
+            return ["err"]
+
+    stub = _ManyVariants()
+    v = MeterValidator()
+    tpl: dict[str, Any] = {
+        "language": "en",
+        "lines": 3,
+        "syllables_per_line": [1, 1, 1],
+        "syllable_constraints": None,
+    }
+    with mock.patch.dict(sc_module._ANALYZERS, {"en": stub}):
+        res = v.validate(["a", "b", "c"], tpl, _AlwaysErrorTemplate())
+    assert res.passed is False

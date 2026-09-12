@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from pypinyin import Style
 
+from src.models.syllable import Syllable
 from src.prosody.chinese import (
     ChineseAnalyzer,
     _split_final,
@@ -108,3 +109,37 @@ def test_analyze_line_variants_empty_word_variant() -> None:
         variants = a.analyze_line_variants("中")
     # 回退 [[]] 与初始 [[]] 笛卡尔积仍为 [[]]
     assert variants == [[]]
+
+
+def test_analyze_word_variants_mismatched_lengths_fallback() -> None:
+    """声母/韵母候选数均 >1 且不等时回退 zip 配对（覆盖 294 行）。"""
+    a = ChineseAnalyzer()
+    initials_list: list[list[str]] = [["x", "y"]]
+    finals_list: list[list[str]] = [["a1", "b1", "c1"]]
+
+    def _pinyin(
+        word: str,
+        style: Style = Style.NORMAL,
+        strict: bool = True,
+        heteronym: bool = False,
+    ) -> list[list[str]]:
+        """mock 的 pinyin 替身：按 style 返回预设的 initials/finals 列表。"""
+        if style == Style.INITIALS:
+            return initials_list
+        return finals_list
+
+    with patch("src.prosody.chinese.pinyin", side_effect=_pinyin):
+        variants = a.analyze_word_variants("中")
+    # zip 按较短者截断 -> 2 种读音
+    assert len(variants) == 2
+
+
+def test_analyze_line_variants_truncates_to_64() -> None:
+    """整行读音组合超过 64 时截断到前 64 种（覆盖 294 行）。"""
+    a = ChineseAnalyzer()
+    many = [
+        [Syllable(onset="", nucleus="a", coda="", attributes={})] for _ in range(10)
+    ]
+    with patch.object(ChineseAnalyzer, "analyze_word_variants", return_value=many):
+        variants = a.analyze_line_variants("中中")
+    assert len(variants) == 64

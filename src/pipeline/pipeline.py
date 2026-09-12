@@ -198,7 +198,12 @@ class PoetryPipeline:
         return state
 
     def _run_step1(self, state: PipelineState, messages: list[Message]) -> None:
-        """Step 1：生成现代文描述（流式推送）。"""
+        """Step 1：生成现代文描述（流式推送）。
+
+        Args:
+            state: 流水线状态（就地更新 description）。
+            messages: 共享对话消息列表（会被追加）。
+        """
         state.current_step = 1
         state.stream_text = ""
         state.current_detail_step = 1
@@ -235,7 +240,12 @@ class PoetryPipeline:
         self._report(state)
 
     def _run_step2(self, state: PipelineState, messages: list[Message]) -> None:
-        """Step 2：生成初稿（通过 submit 工具提交，同时取标题）。"""
+        """Step 2：生成初稿（通过 submit 工具提交，同时取标题与标点）。
+
+        Args:
+            state: 流水线状态（就地更新 draft/title/punctuation）。
+            messages: 共享对话消息列表（会被追加）。
+        """
         state.current_step = 2
         state.stream_text = ""
         state.current_detail_step = 2
@@ -281,6 +291,10 @@ class PoetryPipeline:
 
         炼句本身（writer.refine）无轮数上限，本外层循环在检查 AI 不通过时
         持续打回重炼，同样不设上限。
+
+        Args:
+            state: 流水线状态（就地更新 draft/title/punctuation/checker 结果）。
+            messages: 共享对话消息列表（会被追加）。
         """
         checker_feedback = state.user_feedback
 

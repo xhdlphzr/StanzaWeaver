@@ -346,6 +346,77 @@ def test_qingpingyue_empty_syllables() -> None:
     assert QingpingyueTemplate().validate_full([], []) == []
 
 
+def test_ci_templates_meter_validate_canonical() -> None:
+    """三首典范词经 MeterValidator 全量校验（逐位谱 + 押韵）通过。"""
+    from src.prosody.meter_validator import MeterValidator
+
+    validator = MeterValidator()
+    cases = [
+        (
+            RumenglingTemplate(),
+            [
+                "常记溪亭日暮",
+                "沉醉不知归路",
+                "兴尽晚回舟",
+                "误入藕花深处",
+                "争渡",
+                "争渡",
+                "惊起一滩鸥鹭",
+            ],
+        ),
+        (
+            LangtaoshaTemplate(),
+            [
+                "帘外雨潺潺",
+                "春意阑珊",
+                "罗衾不耐五更寒",
+                "梦里不知身是客",
+                "一晌贪欢",
+                "独自莫凭栏",
+                "无限江山",
+                "别时容易见时难",
+                "流水落花春去也",
+                "天上人间",
+            ],
+        ),
+        (
+            QingpingyueTemplate(),
+            [
+                "别来春半",
+                "触目柔肠断",
+                "砌下落梅如雪乱",
+                "拂了一身还满",
+                "雁来音信无凭",
+                "路遥归梦难成",
+                "离恨恰如春草",
+                "更行更远还生",
+            ],
+        ),
+    ]
+    for tpl, poem in cases:
+        result = validator.validate(poem, tpl.to_dict(), tpl)
+        assert result.passed, (tpl.name, result.errors)
+
+
+def test_rumengling_meter_rejects_bad_rhyme() -> None:
+    """如梦令韵脚不同部时 MeterValidator 拒绝。"""
+    from src.prosody.meter_validator import MeterValidator
+
+    tpl = RumenglingTemplate()
+    poem = [
+        "常记溪亭日暮",
+        "沉醉不知归路",
+        "兴尽晚回舟",
+        "误入藕花深处",
+        "争渡",
+        "争渡",
+        "惊起一滩鸥望",
+    ]
+    result = MeterValidator().validate(poem, tpl.to_dict(), tpl)
+    assert result.passed is False
+    assert any("押韵" in e for e in result.errors)
+
+
 # --------------------------------------------------------------------------- #
 # la.py: _make_syl / _validate_hex                                            #
 # --------------------------------------------------------------------------- #
