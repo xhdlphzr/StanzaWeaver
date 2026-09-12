@@ -180,17 +180,19 @@ def test_ping_endpoint_ok_sets_ok(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_auto_ping_loop_runs_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    """_auto_ping 执行完整一轮（含 clear）后由 wait 异常退出。"""
+    """_auto_ping 执行一轮后阻塞等待事件（不再定时轮询），由 wait 异常退出。"""
     emitted: list[tuple[str, Any]] = []
     monkeypatch.setattr(app_module.socketio, "emit", lambda *a, **k: emitted.append(a))
     monkeypatch.setattr(app_module, "_ping_one_endpoint", lambda name: None)
+    waits: list[float | None] = []
 
     class _FakeEvent:
         def __init__(self) -> None:
             self.calls = 0
             self.cleared = 0
 
-        def wait(self, timeout: float = 0) -> None:
+        def wait(self, timeout: float | None = None) -> None:
+            waits.append(timeout)
             self.calls += 1
             if self.calls >= 2:
                 raise KeyboardInterrupt()
@@ -205,6 +207,8 @@ def test_auto_ping_loop_runs_once(monkeypatch: pytest.MonkeyPatch) -> None:
         app_module._auto_ping()
     assert event.cleared == 1
     assert any("llm_status" in e[0] for e in emitted)
+    # 关键：不再带 timeout 定时轮询（取消设置不会触发重探）
+    assert waits and all(w is None for w in waits)
 
 
 def test_start_background_threads_runs(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -625,6 +629,19 @@ def test_history_post_not_dict(client: FlaskClient) -> None:
     """保存历史记录时非对象请求体返回 400。"""
     resp = client.post("/api/history", data="x", headers=_csrf_headers())
     assert resp.status_code == 400
+
+
+def test_history_db_path_default_and_override(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """历史库路径：默认指向用户目录，set_history_db_path 可覆盖（供测试隔离）。"""
+    monkeypatch.setattr(app_module, "_HISTORY_DB_PATH", None)
+    assert (
+        app_module.get_history_db_path()
+        == Path.home() / ".stanza_weaver" / "history.db"
+    )
+    app_module.set_history_db_path(tmp_path / "h.db")
+    assert app_module.get_history_db_path() == tmp_path / "h.db"
 
 
 # --------------------------------------------------------------------------- #

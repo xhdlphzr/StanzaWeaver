@@ -50,6 +50,18 @@ def _init_session_db() -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True, scope="session")
+def _redirect_history_db() -> Iterator[None]:
+    """会话级：把历史记录数据库重定向到临时文件，避免污染用户真实数据。"""
+    import app as app_module
+
+    prev = app_module._HISTORY_DB_PATH
+    tmp = Path(tempfile.mkdtemp(prefix="stanza_weaver_history_"))
+    app_module.set_history_db_path(tmp / "history.db")
+    yield
+    app_module._HISTORY_DB_PATH = prev
+
+
+@pytest.fixture(autouse=True, scope="session")
 def _seed_offline_cmudict() -> None:
     """会话级：离线播种少量 CMUdict 词条，避免英语分析器联网下载。"""
     english_module._cmudict_loaded = True

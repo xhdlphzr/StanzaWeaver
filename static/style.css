@@ -1060,8 +1060,7 @@ html[lang="en"] .slogan {
   flex: 1;
 }
 
-.btn-copy,
-.btn-history-link {
+.btn-copy {
   background: rgba(255, 255, 255, 0.4);
   border: 1px solid rgba(180, 150, 120, 0.3);
   border-radius: 6px;
@@ -1072,8 +1071,7 @@ html[lang="en"] .slogan {
   color: #8b7355;
 }
 
-.btn-copy:hover,
-.btn-history-link:hover {
+.btn-copy:hover {
   background: rgba(139, 115, 85, 0.1);
   border-color: rgba(139, 115, 85, 0.4);
 }

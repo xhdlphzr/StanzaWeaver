@@ -87,14 +87,18 @@ def _ping_one_endpoint(endpoint_name: str) -> None:
 
 
 def _auto_ping() -> None:
-    """后台线程：间歇 ping LLM 端点并推送状态到前端。"""
+    """后台线程：启动时探测一次 LLM 端点，之后仅在配置保存/词库导入后重探。
+
+    不再定时轮询：避免用户点击"取消设置"等操作后被误认为重新检测连接性；
+    连通性只在保存配置（或词库导入完成、手动点击检查）时刷新。
+    """
     time.sleep(5)
     while True:
         socketio.emit("llm_status", {"writer": "checking", "checker": "checking"})
         _ping_one_endpoint("writer")
         _ping_one_endpoint("checker")
         socketio.emit("llm_status", dict(_llm_status))
-        _llm_ping_event.wait(timeout=30)
+        _llm_ping_event.wait()
         _llm_ping_event.clear()
 
 
@@ -645,11 +649,36 @@ def api_create_custom_template() -> Any:
     )
 
 
+_HISTORY_DB_PATH: Path | None = None
+
+
+def set_history_db_path(path: Path) -> None:
+    """覆盖历史记录数据库路径（主要供测试使用）。
+
+    Args:
+        path: 新的数据库文件路径。
+    """
+    global _HISTORY_DB_PATH
+    _HISTORY_DB_PATH = path
+
+
+def get_history_db_path() -> Path:
+    """返回历史记录数据库路径（默认 ~/.stanza_weaver/history.db）。
+
+    Returns:
+        数据库文件路径。
+    """
+    global _HISTORY_DB_PATH
+    if _HISTORY_DB_PATH is None:
+        _HISTORY_DB_PATH = Path.home() / ".stanza_weaver" / "history.db"
+    return _HISTORY_DB_PATH
+
+
 def _init_history_db() -> None:
     """初始化历史记录表（幂等）。"""
     import sqlite3
 
-    hdb = Path.home() / ".stanza_weaver" / "history.db"
+    hdb = get_history_db_path()
     hdb.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(hdb))
     conn.execute(
@@ -675,7 +704,7 @@ def api_get_history() -> Any:
     import sqlite3
 
     _init_history_db()
-    hdb = Path.home() / ".stanza_weaver" / "history.db"
+    hdb = get_history_db_path()
     conn = sqlite3.connect(str(hdb))
     rows = conn.execute(
         "SELECT id, topic, template_name, poem, created_at FROM history ORDER BY id DESC LIMIT 50"
@@ -716,7 +745,7 @@ def api_save_history() -> Any:
         return jsonify({"status": "error", "message": "请求格式错误"}), 400
 
     _init_history_db()
-    hdb = Path.home() / ".stanza_weaver" / "history.db"
+    hdb = get_history_db_path()
     conn = sqlite3.connect(str(hdb))
     conn.execute(
         "INSERT INTO history (topic, template_name, poem) VALUES (?, ?, ?)",
