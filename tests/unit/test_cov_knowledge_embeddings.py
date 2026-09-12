@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""词条向量重排模块（src.knowledge.embeddings）的 100% 行覆盖测试。"""
+"""词条向量重排模块（src.knowledge.embeddings）的 100% 行覆盖测试。."""
 
 import sys
 from unittest.mock import MagicMock, patch
@@ -10,7 +10,7 @@ from src.knowledge import embeddings
 
 
 class _FakeModel:
-    """用于替换 SentenceTransformer 的轻量假模型。
+    """用于替换 SentenceTransformer 的轻量假模型。.
 
     对单条查询返回固定向量，对多篇文档返回可区分的向量，
     使相似度排序可被断言。
@@ -19,7 +19,7 @@ class _FakeModel:
     def encode(
         self, texts: list[str], normalize_embeddings: bool = False
     ) -> list[list[float]]:
-        """根据输入长度返回查询或文档向量（忽略归一化参数）。
+        """根据输入长度返回查询或文档向量（忽略归一化参数）。.
 
         Args:
             texts: 待编码文本列表。
@@ -27,6 +27,7 @@ class _FakeModel:
 
         Returns:
             二维 float 列表，形状为 (len(texts), 2)。
+
         """
         if len(texts) == 1:
             return [[1.0, 0.0]]
@@ -34,18 +35,18 @@ class _FakeModel:
 
 
 def test_rerank_empty_query_returns_candidates() -> None:
-    """空查询时直接返回原候选列表（line 45-46）。"""
+    """空查询时直接返回原候选列表（line 45-46）。."""
     candidates = [{"text": "a"}, {"text": "b"}]
     assert embeddings.rerank("", candidates) == candidates
 
 
 def test_rerank_empty_candidates_returns_candidates() -> None:
-    """空候选列表时直接返回原候选列表（line 45-46）。"""
+    """空候选列表时直接返回原候选列表（line 45-46）。."""
     assert embeddings.rerank("query", []) == []
 
 
 def test_rerank_sorts_by_similarity_and_sets_scores() -> None:
-    """正常路径：按语义相似度重排并写入 _score。"""
+    """正常路径：按语义相似度重排并写入 _score。."""
     candidates = [
         {"text": "doc_b"},
         {"text": "doc_a"},
@@ -62,7 +63,7 @@ def test_rerank_sorts_by_similarity_and_sets_scores() -> None:
 
 
 def test_rerank_respects_top_k() -> None:
-    """结果按 top_k 截断。"""
+    """结果按 top_k 截断。."""
     candidates = [{"text": f"d{i}"} for i in range(5)]
     fake = _FakeModel()
     with patch.object(embeddings, "_get_model", return_value=fake):
@@ -71,7 +72,7 @@ def test_rerank_respects_top_k() -> None:
 
 
 def test_rerank_model_failure_silent_fallback() -> None:
-    """模型加载/编码异常时静默降级为原顺序。"""
+    """模型加载/编码异常时静默降级为原顺序。."""
     candidates = [{"text": "a"}, {"text": "b"}]
     with patch.object(embeddings, "_get_model", side_effect=RuntimeError("boom")):
         result = embeddings.rerank("query", candidates)
@@ -79,7 +80,7 @@ def test_rerank_model_failure_silent_fallback() -> None:
 
 
 def test_get_model_loads_once_and_caches() -> None:
-    """_get_model 仅在首次调用时加载模型，之后复用缓存。"""
+    """_get_model 仅在首次调用时加载模型，之后复用缓存。."""
     from types import SimpleNamespace
 
     fake_st = MagicMock()

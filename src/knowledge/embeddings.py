@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""词条向量重排。
+"""词条向量重排。.
 
 用 sentence-transformers 多语言模型对候选词按语义相似度排序；
 模型未就绪或离线时静默降级为原顺序。
@@ -17,10 +17,11 @@ _MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 
 
 def _get_model() -> Any:
-    """惰性加载嵌入模型（仅首次调用时加载）。
+    """惰性加载嵌入模型（仅首次调用时加载）。.
 
     Returns:
         SentenceTransformer 实例（或任意具备 encode 的对象）。
+
     """
     global _MODEL
     if _MODEL is None:
@@ -31,13 +32,14 @@ def _get_model() -> Any:
 
 
 def _to_float_list(vec: Any) -> list[float]:
-    """把 encode 返回的向量（numpy 数组或可迭代序列）转为 float 列表。
+    """把 encode 返回的向量（numpy 数组或可迭代序列）转为 float 列表。.
 
     Args:
         vec: 单条向量。
 
     Returns:
         float 列表。
+
     """
     return [float(x) for x in vec]
 
@@ -45,7 +47,7 @@ def _to_float_list(vec: Any) -> list[float]:
 def rerank(
     query: str, candidates: list[dict[str, Any]], top_k: int = 20
 ) -> list[dict[str, Any]]:
-    """按语义相似度重排候选词。
+    """按语义相似度重排候选词。.
 
     Args:
         query: 查询文本。
@@ -54,6 +56,7 @@ def rerank(
 
     Returns:
         重排后的列表（失败时保持原顺序）。
+
     """
     if not query or not candidates:
         return candidates

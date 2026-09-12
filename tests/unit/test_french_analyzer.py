@@ -1,35 +1,35 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""法语音节分析器单元测试（符号层）。"""
+"""法语音节分析器单元测试（符号层）。."""
 
 from src.prosody.french import FrenchAnalyzer
 from src.templates.fr import RondeauTemplate
 
 
 def test_count_syllables_parle() -> None:
-    """验证 count syllables parle。"""
+    """验证 count syllables parle。."""
     a = FrenchAnalyzer()
     # par-le：词尾 e muet 省略 -> 1 音节
     assert a.count_syllables("parle") == 1
 
 
 def test_rhyme_key_parle() -> None:
-    """验证 rhyme key parle。"""
+    """验证 rhyme key parle。."""
     a = FrenchAnalyzer()
     # 词尾 e muet 省略后，韵脚取末个发音元音核 a
     assert a.rhyme_key("parle") == "a"
 
 
 def test_count_syllables_bonjour() -> None:
-    """验证 count syllables bonjour。"""
+    """验证 count syllables bonjour。."""
     a = FrenchAnalyzer()
     # bon-jour: 2 音节
     assert a.count_syllables("bonjour") == 2
 
 
 def test_digraph_eau() -> None:
-    """验证 digraph eau。"""
+    """验证 digraph eau。."""
     a = FrenchAnalyzer()
     syls = a.analyze_word("eau")
     assert len(syls) == 1
@@ -37,7 +37,7 @@ def test_digraph_eau() -> None:
 
 
 def test_single_nucleus_words() -> None:
-    """验证 single nucleus words。"""
+    """验证 single nucleus words。."""
     a = FrenchAnalyzer()
     # FR-1：三合/二合元音视为单一音节核
     assert a.count_syllables("oui") == 1
@@ -51,7 +51,7 @@ def test_single_nucleus_words() -> None:
 
 
 def test_final_mute_e_silent() -> None:
-    """验证 final mute e silent。"""
+    """验证 final mute e silent。."""
     a = FrenchAnalyzer()
     # 词尾 e muet 省略（标准法语）：entre/table/porte/parle 均 1 音节
     assert a.count_syllables("entre") == 1
@@ -66,7 +66,7 @@ def test_final_mute_e_silent() -> None:
 
 
 def test_rhyme_key_nasal_merge() -> None:
-    """验证 rhyme key nasal merge。"""
+    """验证 rhyme key nasal merge。."""
     a = FrenchAnalyzer()
     # FR-3：鼻化元音归并 + 丢弃词尾静音辅音
     assert a.rhyme_key("an") == a.rhyme_key("en")
@@ -76,7 +76,7 @@ def test_rhyme_key_nasal_merge() -> None:
 
 
 def test_syllabify_line_no_cross_word_elision() -> None:
-    """验证 syllabify line no cross word elision。"""
+    """验证 syllabify line no cross word elision。."""
     a = FrenchAnalyzer()
     # 撇号省音仍计 1 音节（l'eau 为同一词形）
     assert a.count_syllables("l'eau") == 1
@@ -85,7 +85,7 @@ def test_syllabify_line_no_cross_word_elision() -> None:
 
 
 def test_rondeau_accepts_uniform_10() -> None:
-    """验证 rondeau accepts uniform 10。"""
+    """验证 rondeau accepts uniform 10。."""
     from src.prosody.meter_validator import MeterValidator
 
     template = RondeauTemplate()

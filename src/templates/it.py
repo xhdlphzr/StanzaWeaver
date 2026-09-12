@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""意大利语格律模板：三行体（Terza Rima）、八行体（Ottava Rima）、歌谣。
+"""意大利语格律模板：三行体（Terza Rima）、八行体（Ottava Rima）、歌谣。.
 
 十一音节句（endecasillabo）的定义特征：每行第 10 个音节必须重读。
 """
@@ -17,7 +17,7 @@ def _check_tenth_syllable_stress(
     errors: list[str],
     indices: list[int] | None = None,
 ) -> None:
-    """检查 11 音节句的第 10 音节须重读、第 11 音节须非重读。
+    """检查 11 音节句的第 10 音节须重读、第 11 音节须非重读。.
 
     仅对传入（或默认全部）行中长度足够的行生效：10 音节及以上需第 10
     音节重读；11 音节及以上还需第 11 音节不可重读（避免 tronca 误判）。
@@ -26,6 +26,7 @@ def _check_tenth_syllable_stress(
         syllables: 各行音节。
         errors: 错误列表（就地追加）。
         indices: 仅检查这些行号（0-based）；为 None 时检查全部行。
+
     """
     targets = indices if indices is not None else list(range(len(syllables)))
     for i in targets:
@@ -41,12 +42,13 @@ def _check_last_syllable_stress(
     errors: list[str],
     indices: list[int] | None = None,
 ) -> None:
-    """检查指定行末音节必须重读（tronca 行尾）。
+    """检查指定行末音节必须重读（tronca 行尾）。.
 
     Args:
         syllables: 各行音节。
         errors: 错误列表（就地追加）。
         indices: 仅检查这些行号（0-based）；为 None 时检查全部行。
+
     """
     targets = indices if indices is not None else list(range(len(syllables)))
     for i in targets:
@@ -58,13 +60,14 @@ def _check_last_syllable_stress(
 def _check_rhyme_group(
     syllables: list[list[Syllable]], indices: list[int], label: str, errors: list[str]
 ) -> None:
-    """检查一组行末音节同韵（韵腹+韵尾）。
+    """检查一组行末音节同韵（韵腹+韵尾）。.
 
     Args:
         syllables: 各行音节。
         indices: 参与该韵组的行号（0-based）。
         label: 韵组名。
         errors: 错误列表（就地追加）。
+
     """
     rhymes: list[tuple[int, str]] = []
     for idx in indices:
@@ -82,7 +85,7 @@ def _check_rhyme_group(
 
 
 class TerzaRimaTemplate(PoetryTemplate):
-    """三行体：14 行十一音节句，链式循环押韵 ABA BCB CDC DED EE。"""
+    """三行体：14 行十一音节句，链式循环押韵 ABA BCB CDC DED EE。."""
 
     name = "三行体"
     language = "it"
@@ -95,17 +98,18 @@ class TerzaRimaTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束。
+        """无逐位约束。.
 
         Returns:
             逐位音节约束表。
+
         """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：第10音节重读 + 链式韵式。
+        """完整检查：第10音节重读 + 链式韵式。.
 
         Args:
             poem: 诗行列表。
@@ -113,6 +117,7 @@ class TerzaRimaTemplate(PoetryTemplate):
 
         Returns:
             错误信息列表（空列表表示通过）。
+
         """
         errors: list[str] = []
         _check_tenth_syllable_stress(syllables, errors)
@@ -129,7 +134,7 @@ class TerzaRimaTemplate(PoetryTemplate):
 
 
 class OttavaRimaTemplate(PoetryTemplate):
-    """八行体：8 行十一音节句，韵式 ABABABCC。"""
+    """八行体：8 行十一音节句，韵式 ABABABCC。."""
 
     name = "八行体"
     language = "it"
@@ -142,17 +147,18 @@ class OttavaRimaTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束。
+        """无逐位约束。.
 
         Returns:
             逐位音节约束表。
+
         """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：第10音节重读 + ABABABCC 韵式。
+        """完整检查：第10音节重读 + ABABABCC 韵式。.
 
         Args:
             poem: 诗行列表。
@@ -160,6 +166,7 @@ class OttavaRimaTemplate(PoetryTemplate):
 
         Returns:
             错误信息列表（空列表表示通过）。
+
         """
         errors: list[str] = []
         _check_tenth_syllable_stress(syllables, errors)
@@ -174,7 +181,7 @@ class OttavaRimaTemplate(PoetryTemplate):
 
 
 class CanzoneTemplate(PoetryTemplate):
-    """歌谣：13 行（11/7 音节交错），奇数行末非重读、偶数行与末行重读，韵脚至多 4 个。"""
+    """歌谣：13 行（11/7 音节交错），奇数行末非重读、偶数行与末行重读，韵脚至多 4 个。."""
 
     name = "歌谣"
     language = "it"
@@ -202,18 +209,20 @@ class CanzoneTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束。
+        """无逐位约束。.
 
         Returns:
             逐位音节约束表。
+
         """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：奇数行（11 音节）第 10 重读/第 11 非重读，偶数行与
-        第 13 行（7 音节）末音节重读；韵脚 ≤4、连续同韵 ≤2、末三行各异。
+        """完整检查：奇数行（11 音节）第 10 重读、第 11 非重读。.
+
+        偶数行与第 13 行（7 音节）末音节重读；韵脚 ≤4、连续同韵 ≤2、末三行各异。.
 
         Args:
             poem: 诗行列表。
@@ -221,6 +230,7 @@ class CanzoneTemplate(PoetryTemplate):
 
         Returns:
             错误信息列表（空列表表示通过）。
+
         """
         errors: list[str] = []
         # 奇数行（1,3,5,7,9,11）：11 音节，第 10 音节重读、第 11 不可重读
@@ -265,7 +275,7 @@ class CanzoneTemplate(PoetryTemplate):
 
 
 def register_italian_templates() -> None:
-    """注册全部意大利语模板。"""
+    """注册全部意大利语模板。."""
     register("it_terza_rima", TerzaRimaTemplate())
     register("it_ottava_rima", OttavaRimaTemplate())
     register("it_canzone", CanzoneTemplate())

@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""检查 AI：句意终审。
+"""检查 AI：句意终审。.
 
 对诗歌做语义评审（句意通顺、语义契合；中文 8 行以上附加对仗检查），
 通过 submit 工具返回 pass/suggestions。
@@ -19,7 +19,7 @@ CheckResult = dict[str, Any]
 def _build_checker_system(
     description: str, poem: list[str], template: dict[str, Any]
 ) -> str:
-    """构造检查 AI 的系统提示。
+    """构造检查 AI 的系统提示。.
 
     Args:
         description: 主题描述。
@@ -28,6 +28,7 @@ def _build_checker_system(
 
     Returns:
         系统提示文本。
+
     """
     parallelism_note = ""
     dim_count = 2
@@ -58,13 +59,14 @@ def _build_checker_system(
 
 
 class CheckerAI:
-    """句意终审代理（独立 LLM 端点/模型）。"""
+    """句意终审代理（独立 LLM 端点/模型）。."""
 
     def __init__(self, config: dict[str, Any]):
-        """初始化检查 AI。
+        """初始化检查 AI。.
 
         Args:
             config: {"base_url", "api_key", "model"}。
+
         """
         self.client = LLMClient(
             base_url=str(config["base_url"]),
@@ -78,7 +80,7 @@ class CheckerAI:
         poem: list[str],
         template: dict[str, Any],
     ) -> CheckResult:
-        """执行句意终审（最多重试 3 轮直到拿到 submit 结论）。
+        """执行句意终审（最多重试 3 轮直到拿到 submit 结论）。.
 
         Args:
             description: 主题描述。
@@ -87,6 +89,7 @@ class CheckerAI:
 
         Returns:
             {"pass": bool, "suggestions": str}。
+
         """
         system_prompt = _build_checker_system(description, poem, template)
         messages: list[Message] = [

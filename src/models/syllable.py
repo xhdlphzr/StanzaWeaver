@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""数据模型：音节（Syllable）。
+"""数据模型：音节（Syllable）。.
 
 格律分析的最小单元——声母(onset)、韵腹(nucleus)、韵尾(coda)以及
 平仄/重音/长短等音系属性。所有语言的音节分析器统一产出该结构。
@@ -17,13 +17,14 @@ LENGTH_LABEL = str  # "" | "long" | "short"
 
 @dataclass
 class Syllable:
-    """一个音节。
+    """一个音节。.
 
     Attributes:
         onset: 声母/辅音首（英文如 "str"，中文如 "zh"）。
         nucleus: 韵腹/元音核心（中文如 "a"、"iao"，英文如 "IY"）。
         coda: 韵尾/尾辅音（中文如 "ng"，英文如 "T"）。
         attributes: 音系属性字典，键为 tone/stress/length。
+
     """
 
     onset: str = ""
@@ -35,15 +36,16 @@ class Syllable:
 
     @property
     def text(self) -> str:
-        """返回音节完整拼写（onset + nucleus + coda）。
+        """返回音节完整拼写（onset + nucleus + coda）。.
 
         Returns:
             拼写字符串。
+
         """
         return self.onset + self.nucleus + self.coda
 
     def match_constraint(self, constraint: dict[str, Any]) -> bool:
-        """判断本音节是否满足一条逐位约束。
+        """判断本音节是否满足一条逐位约束。.
 
         约束字典可含 onset/nucleus/coda 及 attributes 子字典；
         空字段表示不限。只有显式给出的字段会被比较。
@@ -53,6 +55,7 @@ class Syllable:
 
         Returns:
             满足全部约束返回 True，否则 False。
+
         """
         if not constraint:
             return True
@@ -75,10 +78,11 @@ class Syllable:
         return True
 
     def to_dict(self) -> dict[str, Any]:
-        """序列化为可 JSON 化的字典。
+        """序列化为可 JSON 化的字典。.
 
         Returns:
             {"onset": ..., "nucleus": ..., "coda": ..., "attributes": {...}}。
+
         """
         return {
             "onset": self.onset,
@@ -89,13 +93,14 @@ class Syllable:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Syllable:
-        """从字典重建音节（to_dict 的逆操作）。
+        """从字典重建音节（to_dict 的逆操作）。.
 
         Args:
             d: to_dict() 产生的字典。
 
         Returns:
             还原后的 Syllable 实例。
+
         """
         attrs = d.get("attributes", {})
         if not isinstance(attrs, dict):

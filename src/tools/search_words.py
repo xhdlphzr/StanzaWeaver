@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""search_words 工具执行：按约束查询词库并返回候选词。"""
+"""search_words 工具执行：按约束查询词库并返回候选词。."""
 
 from typing import Any
 
@@ -11,7 +11,7 @@ from ..knowledge.vocabulary import search_words as db_search
 def execute_search_words(
     template: dict[str, Any], arguments: dict[str, Any]
 ) -> dict[str, Any]:
-    """执行候选词搜索。
+    """执行候选词搜索。.
 
     Args:
         template: 模板字典（提供语言）。
@@ -19,6 +19,7 @@ def execute_search_words(
 
     Returns:
         {"words": [词条字典, ...]}。
+
     """
     language = str(template.get("language", "zh"))
     query = str(arguments.get("query", ""))

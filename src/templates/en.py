@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""英语格律模板：莎士比亚商籁体、维拉内拉诗、英雄双行体。
+"""英语格律模板：莎士比亚商籁体、维拉内拉诗、英雄双行体。.
 
 押韵采用严格重音匹配：韵脚必须落在主/次重音音节上，且该音节起的
 全部音素（含重音层级）完全一致，任一发音满足押韵即通过
@@ -22,19 +22,20 @@ _h: dict[str, Any] = _make_syl(attributes={"stress": "heavy"})
 
 
 def _en_last_word(line: str) -> str:
-    """取行末词（去标点、小写）。
+    """取行末词（去标点、小写）。.
 
     Args:
         line: 一行诗。
 
     Returns:
         行末词；空行返回空串。
+
     """
     return _last_word(line, "A-Za-z0-9'-")
 
 
 def _en_rhyme_key(line_text: str) -> tuple[str, ...] | None:
-    """严格重音押韵 key：行末词全部发音中"自重读音节起的音素串"集合。
+    """严格重音押韵 key：行末词全部发音中"自重读音节起的音素串"集合。.
 
     押韵须为严格重音匹配（含重音层级），且任一发音满足押韵即通过，
     故返回去重后的尾串元组（可哈希，便于集合运算）。
@@ -44,6 +45,7 @@ def _en_rhyme_key(line_text: str) -> tuple[str, ...] | None:
 
     Returns:
         押韵尾串元组；行末词无重读音节时返回 None（不能作韵脚）。
+
     """
     word = _en_last_word(line_text)
     if not word:
@@ -57,13 +59,14 @@ def _en_rhyme_key(line_text: str) -> tuple[str, ...] | None:
 def _check_stress_count(
     poem: list[str], syllables: list[list[Syllable]], min_stress: int, errors: list[str]
 ) -> None:
-    """检查每行重读音节数下限（次重音亦计入）。
+    """检查每行重读音节数下限（次重音亦计入）。.
 
     Args:
         poem: 诗行列表。
         syllables: 各行音节。
         min_stress: 最少重读音节数。
         errors: 错误列表（就地追加）。
+
     """
     for i, syls in enumerate(syllables):
         stress_count = sum(1 for s in syls if s.attributes.get("stress") == "heavy")
@@ -74,13 +77,14 @@ def _check_stress_count(
 def _check_rhyme_group(
     poem: list[str], indices: list[int], label: str, errors: list[str]
 ) -> None:
-    """检查一组行严格重音押韵一致（组内所有行共享至少一个韵尾）。
+    """检查一组行严格重音押韵一致（组内所有行共享至少一个韵尾）。.
 
     Args:
         poem: 诗行列表。
         indices: 参与该韵组的行号（0-based）。
         label: 韵组名（A/B/AA 等）。
         errors: 错误列表（就地追加）。
+
     """
     keys: list[tuple[int, tuple[str, ...]]] = []
     for idx in indices:
@@ -106,7 +110,7 @@ def _check_rhyme_group(
 
 
 class ShakespeareSonnetTemplate(PoetryTemplate):
-    """莎士比亚商籁体：14 行抑扬格五音步，韵式 ABAB CDCD EFEF GG。"""
+    """莎士比亚商籁体：14 行抑扬格五音步，韵式 ABAB CDCD EFEF GG。."""
 
     name = "莎士比亚商籁体"
     language = "en"
@@ -120,10 +124,11 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
-        """抑扬格逐位约束：奇数位轻、偶数位重。
+        """抑扬格逐位约束：奇数位轻、偶数位重。.
 
         Returns:
             逐位音节约束表。
+
         """
         line = [_l, _h, _l, _h, _l, _h, _l, _h, _l, _h]
         return [line for _ in range(14)]
@@ -131,7 +136,7 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：重音下限、ABAB CDCD EFEF GG 韵式、组内 A/B 韵不同。
+        """完整检查：重音下限、ABAB CDCD EFEF GG 韵式、组内 A/B 韵不同。.
 
         Args:
             poem: 诗行列表。
@@ -139,6 +144,7 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
 
         Returns:
             错误信息列表（空列表表示通过）。
+
         """
         errors: list[str] = []
         _check_stress_count(poem, syllables, 4, errors)
@@ -177,7 +183,7 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
 
 
 class VillanelleTemplate(PoetryTemplate):
-    """维拉内拉诗：19 行，韵式 ABA…ABAA，两叠句循环，音节数不限。"""
+    """维拉内拉诗：19 行，韵式 ABA…ABAA，两叠句循环，音节数不限。."""
 
     name = "维拉内拉诗"
     language = "en"
@@ -196,17 +202,18 @@ class VillanelleTemplate(PoetryTemplate):
     _rhyme_b: ClassVar[list[int]] = [1, 4, 7, 10, 13, 16]
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束（只要求每行 ≥4 重读音节）。
+        """无逐位约束（只要求每行 ≥4 重读音节）。.
 
         Returns:
             逐位音节约束表。
+
         """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：重音下限、叠句原文重复、A/B 两韵及互异。
+        """完整检查：重音下限、叠句原文重复、A/B 两韵及互异。.
 
         Args:
             poem: 诗行列表。
@@ -214,6 +221,7 @@ class VillanelleTemplate(PoetryTemplate):
 
         Returns:
             错误信息列表（空列表表示通过）。
+
         """
         errors: list[str] = []
         _check_stress_count(poem, syllables, 4, errors)
@@ -241,19 +249,20 @@ class VillanelleTemplate(PoetryTemplate):
 
 
 def _norm_refrain(line: str) -> str:
-    """叠句归一化：折叠空白并忽略大小写。
+    """叠句归一化：折叠空白并忽略大小写。.
 
     Args:
         line: 一行诗。
 
     Returns:
         归一化后的文本。
+
     """
     return " ".join(line.split()).casefold()
 
 
 class HeroicCoupletTemplate(PoetryTemplate):
-    """英雄双行体：两行抑扬格五音步，AA 严格重音押韵，可连续堆叠。"""
+    """英雄双行体：两行抑扬格五音步，AA 严格重音押韵，可连续堆叠。."""
 
     name = "英雄双行体"
     language = "en"
@@ -266,10 +275,11 @@ class HeroicCoupletTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
-        """抑扬格逐位约束。
+        """抑扬格逐位约束。.
 
         Returns:
             逐位音节约束表。
+
         """
         line = [_l, _h, _l, _h, _l, _h, _l, _h, _l, _h]
         return [line, line]
@@ -277,7 +287,7 @@ class HeroicCoupletTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：重音下限 + AA 押韵。
+        """完整检查：重音下限 + AA 押韵。.
 
         Args:
             poem: 诗行列表。
@@ -285,6 +295,7 @@ class HeroicCoupletTemplate(PoetryTemplate):
 
         Returns:
             错误信息列表（空列表表示通过）。
+
         """
         errors: list[str] = []
         _check_stress_count(poem, syllables, 4, errors)
@@ -293,7 +304,7 @@ class HeroicCoupletTemplate(PoetryTemplate):
 
 
 def register_english_templates() -> None:
-    """注册全部英语模板。"""
+    """注册全部英语模板。."""
     register("en_sonnet", ShakespeareSonnetTemplate())
     register("en_villanelle", VillanelleTemplate())
     register("en_heroic_couplet", HeroicCoupletTemplate())

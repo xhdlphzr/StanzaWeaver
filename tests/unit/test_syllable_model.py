@@ -1,32 +1,32 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""Syllable 数据模型单元测试（符号层）。"""
+"""Syllable 数据模型单元测试（符号层）。."""
 
 from src.models.syllable import Syllable
 
 
 def test_text_concatenates_parts() -> None:
-    """验证 text concatenates parts。"""
+    """验证 text concatenates parts。."""
     s = Syllable(onset="zh", nucleus="a", coda="ng")
     assert s.text == "zhang"
 
 
 def test_match_constraint_empty_always_passes() -> None:
-    """验证 match constraint empty always passes。"""
+    """验证 match constraint empty always passes。."""
     s = Syllable(onset="b", nucleus="a", coda="")
     assert s.match_constraint({}) is True
 
 
 def test_match_constraint_onset_mismatch() -> None:
-    """验证 match constraint onset mismatch。"""
+    """验证 match constraint onset mismatch。."""
     s = Syllable(onset="zh", nucleus="a", coda="")
     assert s.match_constraint({"onset": "z"}) is False
     assert s.match_constraint({"onset": "zh"}) is True
 
 
 def test_match_constraint_nucleus_and_coda() -> None:
-    """验证 match constraint nucleus and coda。"""
+    """验证 match constraint nucleus and coda。."""
     s = Syllable(onset="", nucleus="iao", coda="ng")
     assert s.match_constraint({"nucleus": "iao", "coda": "ng"}) is True
     assert s.match_constraint({"nucleus": "ia"}) is False
@@ -34,14 +34,14 @@ def test_match_constraint_nucleus_and_coda() -> None:
 
 
 def test_match_constraint_attributes() -> None:
-    """验证 match constraint attributes。"""
+    """验证 match constraint attributes。."""
     s = Syllable(attributes={"tone": "平", "stress": "", "length": ""})
     assert s.match_constraint({"attributes": {"tone": "平"}}) is True
     assert s.match_constraint({"attributes": {"tone": "仄"}}) is False
 
 
 def test_to_dict_from_dict_roundtrip() -> None:
-    """验证 to dict from dict roundtrip。"""
+    """验证 to dict from dict roundtrip。."""
     s = Syllable(onset="x", nucleus="ü", coda="", attributes={"tone": "仄"})
     d = s.to_dict()
     # to_dict 原样输出存储的属性（不补默认空值）

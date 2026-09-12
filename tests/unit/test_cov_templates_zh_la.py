@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""补充中文(zh)/拉丁(la)模板单测，覆盖此前缺失的分支行。
+"""补充中文(zh)/拉丁(la)模板单测，覆盖此前缺失的分支行。.
 
 本文件只新增单元测试，不修改既有测试，也不修改任何源码。目标为把
 ``src/templates/zh.py`` 与 ``src/templates/la.py`` 的行覆盖率推到 100%
@@ -36,7 +36,7 @@ from src.templates.zh import (
 # 中文音节构造辅助                                                            #
 # --------------------------------------------------------------------------- #
 def _zs(nucleus: str, coda: str, tone: str) -> Syllable:
-    """构造中文音节（韵腹/韵尾 + 平仄）。
+    """构造中文音节（韵腹/韵尾 + 平仄）。.
 
     Args:
         nucleus: 韵腹。
@@ -45,6 +45,7 @@ def _zs(nucleus: str, coda: str, tone: str) -> Syllable:
 
     Returns:
         构造好的 Syllable 实例。
+
     """
     return Syllable(
         onset="",
@@ -55,19 +56,20 @@ def _zs(nucleus: str, coda: str, tone: str) -> Syllable:
 
 
 def _zline(specs: list[tuple[str, str, str]]) -> list[Syllable]:
-    """由 (韵腹, 韵尾, 平仄) 列表构造一行音节。
+    """由 (韵腹, 韵尾, 平仄) 列表构造一行音节。.
 
     Args:
         specs: 逐位 (nucleus, coda, tone) 三元组序列。
 
     Returns:
         该行音节列表。
+
     """
     return [_zs(n, c, t) for (n, c, t) in specs]
 
 
 def _ls(nucleus: str, coda: str, length: str) -> Syllable:
-    """构造拉丁语音节（韵腹/韵尾 + 长短）。
+    """构造拉丁语音节（韵腹/韵尾 + 长短）。.
 
     Args:
         nucleus: 韵腹。
@@ -76,6 +78,7 @@ def _ls(nucleus: str, coda: str, length: str) -> Syllable:
 
     Returns:
         构造好的 Syllable 实例。
+
     """
     return Syllable(
         onset="",
@@ -89,18 +92,18 @@ def _ls(nucleus: str, coda: str, length: str) -> Syllable:
 # zh.py: _make_syl / _check_guping / _check_alternation / _rhyme_key          #
 # --------------------------------------------------------------------------- #
 def test_zh_make_syl_non_dict_attrs() -> None:
-    """_make_syl 接受非 dict 的 attributes 时回落为空 dict（覆盖第 29 行）。"""
+    """_make_syl 接受非 dict 的 attributes 时回落为空 dict（覆盖第 29 行）。."""
     result = _make_syl(attributes="not-a-dict")
     assert result["attributes"] == {"tone": "", "stress": "", "length": ""}
 
 
 def test_zh_check_guping_empty() -> None:
-    """空行直接返回，不报错（覆盖第 88 行）。"""
+    """空行直接返回，不报错（覆盖第 88 行）。."""
     assert _check_guping([]) == []
 
 
 def test_zh_check_alternation_mismatch() -> None:
-    """偶数位平仄与期望不符时报错（覆盖 107-117 行）。"""
+    """偶数位平仄与期望不符时报错（覆盖 107-117 行）。."""
     syls = [
         _zs("a", "", "仄"),
         _zs("a", "", "平"),
@@ -111,19 +114,19 @@ def test_zh_check_alternation_mismatch() -> None:
 
 
 def test_zh_rhyme_key_branches() -> None:
-    """舌尖音 + i 归入「支」部；普通韵母查通韵表（覆盖 186/188 行）。"""
+    """舌尖音 + i 归入「支」部；普通韵母查通韵表（覆盖 186/188 行）。."""
     assert _rhyme_key(Syllable(onset="zh", nucleus="i", coda="")) == "支"
     assert _rhyme_key(Syllable(onset="", nucleus="a", coda="")) == "麻"
 
 
 def test_zh_check_rhyme_too_few_keys() -> None:
-    """参与押韵行不足两行时直接返回（覆盖 214 行）。"""
+    """参与押韵行不足两行时直接返回（覆盖 214 行）。."""
     syls = [[_zs("a", "ng", "平")]]
     assert _check_rhyme(syls, [0]) == []
 
 
 def test_zh_check_jinti_rhyme_ze_foot_and_few_keys() -> None:
-    """偶数行尾字非平声报错；有效韵脚不足两行时返回（覆盖 247/255 行）。"""
+    """偶数行尾字非平声报错；有效韵脚不足两行时返回（覆盖 247/255 行）。."""
     syls = [
         [_zs("a", "", "仄")],
         [_zs("a", "", "仄")],
@@ -136,7 +139,7 @@ def test_zh_check_jinti_rhyme_ze_foot_and_few_keys() -> None:
 
 
 def test_zh_jinti_structure_short_and_feet() -> None:
-    """行数不足直接返回；出句平脚、对句仄脚报错（覆盖 282/307/312 行）。"""
+    """行数不足直接返回；出句平脚、对句仄脚报错（覆盖 282/307/312 行）。."""
     assert _check_jinti_structure([[_zs("a", "", "仄")]]) == []
     syls = [
         _zline([("a", "", "仄")] * 5),
@@ -159,7 +162,7 @@ def test_zh_jinti_structure_short_and_feet() -> None:
 
 
 def test_zh_lv_alternation_helper() -> None:
-    """律诗二四六分明辅助检查（覆盖 356-368 行）。"""
+    """律诗二四六分明辅助检查（覆盖 356-368 行）。."""
     syls = [
         _zs("a", "", "仄"),
         _zs("a", "", "仄"),
@@ -185,7 +188,7 @@ def test_zh_lv_alternation_helper() -> None:
 # zh.py: 相见欢 validate_full（521/537/538/544/548）                          #
 # --------------------------------------------------------------------------- #
 def _xjh_mk(n: int, key: str | None, force_ping3: bool = False) -> list[Syllable]:
-    """构造相见欢某一行音节。
+    """构造相见欢某一行音节。.
 
     Args:
         n: 该行音节数。
@@ -194,6 +197,7 @@ def _xjh_mk(n: int, key: str | None, force_ping3: bool = False) -> list[Syllable
 
     Returns:
         该行音节列表。
+
     """
     out: list[Syllable] = []
     for i in range(n):
@@ -207,7 +211,7 @@ def _xjh_mk(n: int, key: str | None, force_ping3: bool = False) -> list[Syllable
 
 
 def test_xjh_last3_ping_and_huan_yun() -> None:
-    """下阕末句三平尾提示；平韵须转回上阕；仄韵须换韵（覆盖 521/537/544/548）。"""
+    """下阕末句三平尾提示；平韵须转回上阕；仄韵须换韵（覆盖 521/537/544/548）。."""
     syls = [
         _xjh_mk(6, "ang"),
         _xjh_mk(3, "ang"),
@@ -224,7 +228,7 @@ def test_xjh_last3_ping_and_huan_yun() -> None:
 
 
 def test_xjh_empty_line_tail() -> None:
-    """某行音节为空时 tail 返回空串（覆盖 538 行）。"""
+    """某行音节为空时 tail 返回空串（覆盖 538 行）。."""
     syls = [
         _xjh_mk(6, "ang"),
         _xjh_mk(3, "ang"),
@@ -242,7 +246,7 @@ def test_xjh_empty_line_tail() -> None:
 # zh.py: 如梦令 / 浪淘沙 / 清平乐（新增词牌）                                  #
 # --------------------------------------------------------------------------- #
 def test_rumengling_valid_and_constraints() -> None:
-    """如梦令：仄韵一韵到底、叠句通过；约束表逐位生成。"""
+    """如梦令：仄韵一韵到底、叠句通过；约束表逐位生成。."""
     syls = [
         _xjh_mk(6, "ang"),
         _xjh_mk(6, "ang"),
@@ -259,7 +263,7 @@ def test_rumengling_valid_and_constraints() -> None:
 
 
 def test_rumengling_dieju_mismatch() -> None:
-    """如梦令：第5、6句非叠句时报错。"""
+    """如梦令：第5、6句非叠句时报错。."""
     syls = [
         _xjh_mk(6, "ang"),
         _xjh_mk(6, "ang"),
@@ -275,7 +279,7 @@ def test_rumengling_dieju_mismatch() -> None:
 
 
 def test_rumengling_rhyme_mismatch() -> None:
-    """如梦令：韵脚不同部时报押韵错误。"""
+    """如梦令：韵脚不同部时报押韵错误。."""
     syls = [
         _xjh_mk(6, "ang"),
         _xjh_mk(6, "eng"),
@@ -290,7 +294,7 @@ def test_rumengling_rhyme_mismatch() -> None:
 
 
 def test_langtaosha_valid_and_constraints() -> None:
-    """浪淘沙：上下片平韵一韵到底；约束表逐位生成。"""
+    """浪淘沙：上下片平韵一韵到底；约束表逐位生成。."""
     syls = [
         _xjh_mk(5, "ang"),
         _xjh_mk(4, "ang"),
@@ -309,7 +313,7 @@ def test_langtaosha_valid_and_constraints() -> None:
 
 
 def test_qingpingyue_valid_and_constraints() -> None:
-    """清平乐：上片仄韵、下片平韵且换韵；约束表逐位生成。"""
+    """清平乐：上片仄韵、下片平韵且换韵；约束表逐位生成。."""
     syls = [
         _xjh_mk(4, "ang"),
         _xjh_mk(5, "ang"),
@@ -326,7 +330,7 @@ def test_qingpingyue_valid_and_constraints() -> None:
 
 
 def test_qingpingyue_same_rhyme_rejected() -> None:
-    """清平乐：上下片同部时提示换韵。"""
+    """清平乐：上下片同部时提示换韵。."""
     syls = [
         _xjh_mk(4, "ang"),
         _xjh_mk(5, "ang"),
@@ -342,12 +346,12 @@ def test_qingpingyue_same_rhyme_rejected() -> None:
 
 
 def test_qingpingyue_empty_syllables() -> None:
-    """清平乐：空音节列表时韵脚回退为空串（覆盖 else 分支）。"""
+    """清平乐：空音节列表时韵脚回退为空串（覆盖 else 分支）。."""
     assert QingpingyueTemplate().validate_full([], []) == []
 
 
 def test_ci_templates_meter_validate_canonical() -> None:
-    """三首典范词经 MeterValidator 全量校验（逐位谱 + 押韵）通过。"""
+    """三首典范词经 MeterValidator 全量校验（逐位谱 + 押韵）通过。."""
     from src.prosody.meter_validator import MeterValidator
 
     validator = MeterValidator()
@@ -399,7 +403,7 @@ def test_ci_templates_meter_validate_canonical() -> None:
 
 
 def test_rumengling_meter_rejects_bad_rhyme() -> None:
-    """如梦令韵脚不同部时 MeterValidator 拒绝。"""
+    """如梦令韵脚不同部时 MeterValidator 拒绝。."""
     from src.prosody.meter_validator import MeterValidator
 
     tpl = RumenglingTemplate()
@@ -421,19 +425,19 @@ def test_rumengling_meter_rejects_bad_rhyme() -> None:
 # la.py: _make_syl / _validate_hex                                            #
 # --------------------------------------------------------------------------- #
 def test_make_syl_non_dict_attrs() -> None:
-    """_make_syl 接受非 dict 的 attributes 时回落为空 dict（覆盖第 32 行）。"""
+    """_make_syl 接受非 dict 的 attributes 时回落为空 dict（覆盖第 32 行）。."""
     result = _make_syl(attributes="nondict")
     assert result["attributes"] == {"tone": "", "stress": "", "length": ""}
 
 
 def test_la_validate_hex_too_few() -> None:
-    """音节数不足 13 时报错并返回（覆盖 64-65 行）。"""
+    """音节数不足 13 时报错并返回（覆盖 64-65 行）。."""
     errs = _validate_hex([_ls("a", "", "short") for _ in range(5)])
     assert any("音节数不足" in e for e in errs)
 
 
 def test_la_validate_hex_first_short_and_second_short() -> None:
-    """首音步首音节非长、第二音步第二音节非长均报错（覆盖 99/109 行）。"""
+    """首音步首音节非长、第二音步第二音节非长均报错（覆盖 99/109 行）。."""
     syls = [
         _ls("a", "", "short"),
         _ls("a", "", "long"),
@@ -455,7 +459,7 @@ def test_la_validate_hex_first_short_and_second_short() -> None:
 
 
 def test_la_validate_hex_full_scan_valid() -> None:
-    """完整 6 音步扫描进入校验循环，前四音步含扬抑抑格（覆盖 103-106 行）。"""
+    """完整 6 音步扫描进入校验循环，前四音步含扬抑抑格（覆盖 103-106 行）。."""
     syls = [
         _ls("a", "", "long"),
         _ls("a", "", "short"),
@@ -478,7 +482,7 @@ def test_la_validate_hex_full_scan_valid() -> None:
 
 
 def test_la_validate_hex_sixth_foot_first_short() -> None:
-    """第六音步为两音节但首音节非长时报错（覆盖 124-125 行）。"""
+    """第六音步为两音节但首音节非长时报错（覆盖 124-125 行）。."""
     syls: list[Syllable] = []
     for _ in range(4):
         syls.append(_ls("a", "", "long"))
@@ -496,22 +500,22 @@ def test_la_validate_hex_sixth_foot_first_short() -> None:
 # la.py: caesura / Distichon / Hendecasyllabus                                #
 # --------------------------------------------------------------------------- #
 def test_la_pentameter_caesura_total_small() -> None:
-    """总音节不足 6 时直接判定无停顿（覆盖 189 行）。"""
+    """总音节不足 6 时直接判定无停顿（覆盖 189 行）。."""
     assert DistichonTemplate()._has_pentameter_caesura("arma", 3) is False
 
 
 def test_la_pentameter_caesura_punct_only() -> None:
-    """词界扫描遇到纯标点词时跳过（覆盖 195 行）。"""
+    """词界扫描遇到纯标点词时跳过（覆盖 195 行）。."""
     assert DistichonTemplate()._has_pentameter_caesura("...", 6) is False
 
 
 def test_la_distichon_few_lines() -> None:
-    """不足两行时直接返回（覆盖 210 行）。"""
+    """不足两行时直接返回（覆盖 210 行）。."""
     assert DistichonTemplate().validate_full(["x"], []) == []
 
 
 def test_la_distichon_pentameter_too_short() -> None:
-    """第二行（五步格）音节不足 6 时报不足（覆盖 228-229 行）。"""
+    """第二行（五步格）音节不足 6 时报不足（覆盖 228-229 行）。."""
     line0 = [_ls("a", "", "long") for _ in range(13)]
     line1 = [_ls("a", "", "long") for _ in range(4)]
     errs = DistichonTemplate().validate_full(["h", "h"], [line0, line1])
@@ -519,19 +523,19 @@ def test_la_distichon_pentameter_too_short() -> None:
 
 
 def test_la_hendeca_empty() -> None:
-    """无音节时直接返回（覆盖 276 行）。"""
+    """无音节时直接返回（覆盖 276 行）。."""
     assert HendecasyllabusTemplate().validate_full([], []) == []
 
 
 def test_la_hendeca_too_few() -> None:
-    """音节数不足 11 时报错（覆盖 279 行）。"""
+    """音节数不足 11 时报错（覆盖 279 行）。."""
     line = [_ls("a", "", "long") for _ in range(5)]
     errs = HendecasyllabusTemplate().validate_full(["x"], [line])
     assert any("音节数不足" in e for e in errs)
 
 
 def test_la_hendeca_boundary_punct() -> None:
-    """词界扫描遇到纯标点词时跳过（仍缺边界）（覆盖 300 行）。"""
+    """词界扫描遇到纯标点词时跳过（仍缺边界）（覆盖 300 行）。."""
     line = [_ls("a", "", "long") for _ in range(11)]
     errs = HendecasyllabusTemplate().validate_full(["..."], [line])
     assert any("边界" in e for e in errs)
