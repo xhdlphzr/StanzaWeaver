@@ -1145,6 +1145,50 @@ def test_refine_submit_punctuation_non_list_rejected() -> None:
     assert "标点必须是字符串列表" in detail
 
 
+def test_refine_submit_poem_wrong_line_count_rejected() -> None:
+    """submit 的 poem 行数与格律不符时被拒绝；后续合法整诗替换通过。"""
+    writer, _ = _make_writer()
+    _refine_seq(
+        writer,
+        [
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "1",
+                        "name": "submit",
+                        "arguments": {
+                            "title": "标题",
+                            "poem": ["一", "二", "三"],
+                        },
+                    }
+                ],
+            },
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "2",
+                        "name": "submit",
+                        "arguments": {
+                            "title": "标题",
+                            "poem": ["新一", "新二"],
+                        },
+                    }
+                ],
+            },
+        ],
+    )
+    msgs: list[dict[str, Any]] = []
+    poem, history, detail, _, _, _ = writer.refine(
+        "主题", ["旧一", "旧二"], {"language": "zh", "lines": 2}, msgs
+    )
+    submits = [h for h in history if h["tool"] == "submit"]
+    assert any("行数不匹配" in str(h["result"]) for h in submits)
+    assert "拒绝提交" in detail
+    assert poem == ["新一", "新二"]
+
+
 def test_refine_no_progress_guidance() -> None:
     """连续 3 轮无修改时注入空转引导提示（写入 messages）。"""
     writer, _ = _make_writer()

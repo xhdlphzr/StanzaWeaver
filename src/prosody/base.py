@@ -30,9 +30,11 @@ class SyllableAnalyzer(ABC):
             音节列表；空串或无有效音节时返回空列表。
         """
 
-    @abstractmethod
     def count_syllables(self, text: str) -> int:
-        """统计一段文本的音节总数。
+        """统计一段文本的音节总数（取整行分析的首个变体）。
+
+        默认委托 :meth:`analyze_line_variants`，使计数与格律校验使用同一
+        行级切分口径；子类只需实现 ``analyze_word``/``analyze_line_variants``。
 
         Args:
             text: 任意文本（可为多词或整行）。
@@ -40,6 +42,8 @@ class SyllableAnalyzer(ABC):
         Returns:
             音节数量（非负整数）。
         """
+        variants = self.analyze_line_variants(text)
+        return len(variants[0]) if variants else 0
 
     def tokenize_line(self, line: str) -> list[str]:
         """将一行文本切分为可分析的单元（词或字）。

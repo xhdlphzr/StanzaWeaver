@@ -3,6 +3,8 @@
 
 """中文音节分析器单元测试（符号层）。"""
 
+from typing import Any
+
 from src.models.syllable import Syllable
 from src.prosody.chinese import ChineseAnalyzer
 from src.templates.zh import QijueTemplate, WujueTemplate
@@ -82,6 +84,32 @@ def test_neutral_tone_maps_to_ping() -> None:
     a = ChineseAnalyzer()
     # 的 为轻声，应归为平声
     assert a.analyze_word("的")[0].attributes["tone"] == "平"
+
+
+def test_heteronym_no_invalid_mix() -> None:
+    """多音字只保留真实读音，不产生声母×韵母的非法混读。"""
+    a = ChineseAnalyzer()
+    variants = a.analyze_word_variants("长")
+    readings = {
+        (s.onset, s.nucleus, s.coda, s.attributes["tone"]) for v in variants for s in v
+    }
+    # 长只有 zhǎng(仄) 与 cháng(平) 两种真实读音
+    assert readings == {("zh", "a", "ng", "仄"), ("ch", "a", "ng", "平")}
+
+
+def test_heteronym_no_false_accept_in_meter() -> None:
+    """声母+声调组合不存在的读音不应被误判合律（回归：长 的 zh+平）。"""
+    from src.prosody.meter_validator import MeterValidator
+    from src.templates import _make_syl
+
+    tpl: dict[str, Any] = {
+        "language": "zh",
+        "lines": 1,
+        "syllables_per_line": [1],
+        "syllable_constraints": [[_make_syl(onset="zh", attributes={"tone": "平"})]],
+    }
+    result = MeterValidator().validate_line("长", 0, tpl)
+    assert result.passed is False
 
 
 def test_sanpingwei_flagged_sanzewei_removed() -> None:

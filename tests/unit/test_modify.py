@@ -59,7 +59,7 @@ def test_modify_line_constraints_mismatch() -> None:
     result = modify_module.execute_modify(
         list(POEM),
         ZH_TPL_CONSTRAINT,
-        {"modify_type": "line", "line": 0, "content": "去前明月光"},
+        {"modify_type": "line", "line": 0, "content": "望前明月光"},
     )
     assert "error" in result
     assert any("第1音节" in e for e in result["error"])
@@ -168,3 +168,21 @@ def test_modify_punctuation_wrong_length() -> None:
     )
     assert "error" in result
     assert "标点数量" in result["error"]
+
+
+def test_modify_punctuation_ci_length() -> None:
+    """词牌（7 句）标点长度须等于格律行数。"""
+    tpl: dict[str, Any] = {
+        "language": "zh",
+        "lines": 7,
+        "syllables_per_line": [6, 6, 5, 6, 2, 2, 6],
+    }
+    poem = [f"句{i}" for i in range(7)]
+    ok = modify_module.execute_modify(
+        poem, tpl, {"modify_type": "punctuation", "content": ["，"] * 7}
+    )
+    assert ok["punctuation"] == ["，"] * 7
+    bad = modify_module.execute_modify(
+        poem, tpl, {"modify_type": "punctuation", "content": ["，"] * 6}
+    )
+    assert "标点数量应为 7 个" in bad["error"]

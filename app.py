@@ -358,7 +358,11 @@ def _emit_done(session_id: str, result: Any) -> None:
 
 @socketio.on("generate")
 def handle_generate(data: dict[str, Any]) -> None:
-    """开始生成：后台线程跑四步流水线。"""
+    """开始生成：后台线程跑四步流水线。
+
+    Args:
+        data: 事件负载（topic 主题、template_key 模板键）。
+    """
     from src.pipeline.pipeline import PoetryPipeline
 
     topic = str(data.get("topic", ""))
@@ -410,7 +414,11 @@ def handle_generate(data: dict[str, Any]) -> None:
 
 @socketio.on("feedback")
 def handle_feedback(data: dict[str, Any]) -> None:
-    """用户反馈续跑：打回 Step 3 按反馈重新炼句。"""
+    """用户反馈续跑：打回 Step 3 按反馈重新炼句。
+
+    Args:
+        data: 事件负载（feedback 用户反馈文本）。
+    """
     from src.pipeline.pipeline import PoetryPipeline
 
     feedback = str(data.get("feedback", ""))

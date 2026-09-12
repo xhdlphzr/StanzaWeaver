@@ -6,7 +6,7 @@
 - 韵母拆解表 FINAL_TO_PARTS：将拼音韵母拆为韵腹 + 韵尾。
 - 整行分析时由调用方拼接全行后一次性交给 pypinyin，
   借助其词库按上下文消歧多音字（弹琴→tán、银行→háng）。
-- 声调映射：1/2 声 → 平，3/4 声 → 仄，轻声 → 空。
+- 声调映射：1/2 声与轻声（含无调号）→ 平，3/4 声 → 仄。
 """
 
 import warnings
@@ -195,28 +195,37 @@ class ChineseAnalyzer(SyllableAnalyzer):
             word, style=Style.FINALS_TONE3, strict=False, heteronym=True
         )
 
-        # 逐字候选 Syllable 列表
+        # 逐字候选 Syllable 列表：声母与韵母按读音配对，避免声母×韵母笛卡尔积
+        # 产生不存在的混读（如「长」的 zh+ang2）。pypinyin 在多个读音声母相同
+        # 时 INITIALS 会去重（如「中」只返回 ['zh']），故按长度广播对齐。
         candidates: list[list[Syllable]] = []
         for initials, finals in zip(initials_list, finals_list):
+            if len(initials) == len(finals):
+                pairs = list(zip(initials, finals))
+            elif len(initials) == 1:
+                pairs = [(initials[0], final) for final in finals]
+            elif len(finals) == 1:
+                pairs = [(onset, finals[0]) for onset in initials]
+            else:
+                pairs = list(zip(initials, finals))
             char_syls: list[Syllable] = []
-            for onset_r in initials:
-                for final_r in finals:
-                    onset = str(onset_r) if onset_r else ""
-                    final_raw = str(final_r) if final_r else ""
-                    nucleus, coda = _split_final(final_raw)
-                    tone_label = _tone_to_pingze(final_raw)
-                    char_syls.append(
-                        Syllable(
-                            onset=onset,
-                            nucleus=nucleus,
-                            coda=coda,
-                            attributes={
-                                "tone": tone_label,
-                                "stress": "",
-                                "length": "",
-                            },
-                        )
+            for onset_r, final_r in pairs:
+                onset = str(onset_r) if onset_r else ""
+                final_raw = str(final_r) if final_r else ""
+                nucleus, coda = _split_final(final_raw)
+                tone_label = _tone_to_pingze(final_raw)
+                char_syls.append(
+                    Syllable(
+                        onset=onset,
+                        nucleus=nucleus,
+                        coda=coda,
+                        attributes={
+                            "tone": tone_label,
+                            "stress": "",
+                            "length": "",
+                        },
                     )
+                )
             # 去重（按内容），保持顺序
             seen: set[tuple[str, str, str, str]] = set()
             deduped: list[Syllable] = []
@@ -284,24 +293,6 @@ class ChineseAnalyzer(SyllableAnalyzer):
             if len(result) > 64:
                 result = result[:64]
         return result
-
-    def count_syllables(self, text: str) -> int:
-        """中文字符数即音节数。
-
-        Args:
-            text: 任意文本。
-
-        Returns:
-            文本中汉字（CJK 统一表意文字）的数量。
-        """
-        if not text.strip():
-            return 0
-        chinese_chars = [
-            ch
-            for ch in text
-            if "\u4e00" <= ch <= "\u9fff" or "\u3400" <= ch <= "\u4dbf"
-        ]
-        return len(chinese_chars)
 
     def tokenize_line(self, line: str) -> list[str]:
         """逐字切分（仅保留汉字）。

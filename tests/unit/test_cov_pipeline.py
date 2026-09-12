@@ -72,7 +72,6 @@ class _FakeWriter(WriterAI):
         template: dict[str, Any],
         messages: list[dict[str, Any]],
         template_obj: Any = None,
-        max_attempts: int = 0,
         on_stream: ChunkCallback = None,
     ) -> tuple[list[str], str, list[str], str]:
         """返回固定初稿（Step 2）。
@@ -82,7 +81,6 @@ class _FakeWriter(WriterAI):
             template: 模板字典（未使用）。
             messages: 共享消息列表（未使用）。
             template_obj: 模板对象（未使用）。
-            max_attempts: 已废弃参数（接口兼容，未使用）。
             on_stream: 流式回调（未使用）。
 
         Returns:

@@ -3,12 +3,10 @@
 
 """多语言统一音节计数与整行分析入口。
 
-按语言路由到对应分析器；中文整行交给 pypinyin（上下文消歧多音字），
-意大利语整行做 sinalefe 合并，其余语言逐词切分。
+按语言路由到对应分析器，统一以 ``analyze_line_variants`` 为唯一行级口径：
+中文整行交给 pypinyin（上下文消歧多音字），意大利语整行做 sinalefe 合并，
+法语整行做跨词联诵，拉丁语整行做省音与跨词音长，其余语言逐词切分。
 """
-
-from collections.abc import Callable
-from typing import cast
 
 from ..models.syllable import Syllable
 from .base import SyllableAnalyzer
@@ -24,58 +22,6 @@ _ANALYZERS: dict[str, SyllableAnalyzer] = {
     "it": ItalianAnalyzer(),
     "fr": FrenchAnalyzer(),
     "la": LatinAnalyzer(),
-}
-
-_LineHandler = Callable[[SyllableAnalyzer, str], list[Syllable]]
-
-
-def _zh_line(analyzer: SyllableAnalyzer, line: str) -> list[Syllable]:
-    """中文整行分析：取多音字消歧后的首选变体。
-
-    Args:
-        analyzer: 中文分析器。
-        line: 一行诗。
-
-    Returns:
-        首选音节切分。
-    """
-    variants = analyzer.analyze_line_variants(line)
-    for v in variants:
-        if v:
-            return v
-    return []
-
-
-def _it_line(analyzer: SyllableAnalyzer, line: str) -> list[Syllable]:
-    """意大利语整行分析（含 sinalefe 合并）。
-
-    Args:
-        analyzer: 意大利语分析器。
-        line: 一行诗。
-
-    Returns:
-        整行音节列表。
-    """
-    return cast("list[Syllable]", analyzer.syllabify_line(line))  # type: ignore[attr-defined]
-
-
-def _la_line(analyzer: SyllableAnalyzer, line: str) -> list[Syllable]:
-    """拉丁语整行分析（跨词音长判定）。
-
-    Args:
-        analyzer: 拉丁语分析器。
-        line: 一行诗。
-
-    Returns:
-        整行音节列表。
-    """
-    return cast("list[Syllable]", analyzer.analyze_line(line))  # type: ignore[attr-defined]
-
-
-_LINE_HANDLERS: dict[str, _LineHandler] = {
-    "zh": _zh_line,
-    "it": _it_line,
-    "la": _la_line,
 }
 
 
@@ -107,7 +53,7 @@ def get_analyzer(language: str) -> SyllableAnalyzer:
 
 
 def count_syllables(text: str, language: str) -> int:
-    """统计文本音节数。
+    """统计文本音节数（与整行分析同口径）。
 
     Args:
         text: 任意文本。
@@ -116,29 +62,23 @@ def count_syllables(text: str, language: str) -> int:
     Returns:
         音节总数。
     """
-    return get_analyzer(language).count_syllables(text)
+    return len(analyze_line(text, language))
 
 
 def analyze_line(line: str, language: str) -> list[Syllable]:
-    """分析一行的全部音节。
+    """分析一行的音节（取 ``analyze_line_variants`` 的首个非空变体）。
 
-    中文整行分析（多音字按上下文消歧）；意大利语含 sinalefe 合并；
-    其余语言逐词分析后拼接。
+    各语言的行级特性（中文多音字消歧、意大利语 sinalefe、法语联诵、
+    拉丁语省音等）统一由各分析器的 ``analyze_line_variants`` 提供。
 
     Args:
         line: 一行诗。
         language: 语言代码。
 
     Returns:
-        整行音节列表。
+        整行音节列表；无有效音节时返回空列表。
     """
-    analyzer = get_analyzer(language)
-    handler = _LINE_HANDLERS.get(language)
-    if handler is not None:
-        return handler(analyzer, line)
-    words = analyzer.tokenize_line(line)
-    syllables: list[Syllable] = []
-    for w in words:
-        analyzed = analyzer.analyze_word(w)
-        syllables.extend(analyzed)
-    return syllables
+    for variant in get_analyzer(language).analyze_line_variants(line):
+        if variant:
+            return variant
+    return []
