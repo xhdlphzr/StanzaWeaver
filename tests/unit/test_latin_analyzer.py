@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""拉丁语音节分析器单元测试（符号层）。"""
+"""拉丁语音节分析器单元测试（符号层）。."""
 
 from src.models.syllable import Syllable
 from src.prosody.latin import LatinAnalyzer
@@ -9,25 +9,26 @@ from src.templates.la import DistichonTemplate, HendecasyllabusTemplate
 
 
 def _syls(lengths: list[str]) -> list[Syllable]:
-    """按给定长短构造音节列表。
+    """按给定长短构造音节列表。.
 
     Args:
         lengths: 每个音节的长短标记列表。
 
     Returns:
         构造好的 Syllable 列表。
+
     """
     return [Syllable(nucleus="a", attributes={"length": l}) for l in lengths]
 
 
 def test_count_syllables_amor() -> None:
-    """验证 count syllables amor。"""
+    """验证 count syllables amor。."""
     a = LatinAnalyzer()
     assert a.count_syllables("amor") == 2
 
 
 def test_mutua_cum_liquida_merges() -> None:
-    """验证 muta cum liquida merges。"""
+    """验证 muta cum liquida merges。."""
     a = LatinAnalyzer()
     # patris: pa-tris，辅音簇在音节间正确切分
     syls = a.analyze_word("patris")
@@ -38,7 +39,7 @@ def test_mutua_cum_liquida_merges() -> None:
 
 
 def test_diphthong_is_long() -> None:
-    """验证 diphthong is long。"""
+    """验证 diphthong is long。."""
     a = LatinAnalyzer()
     # au 为双元音 -> 长音
     syls = a.analyze_word("aurum")
@@ -47,7 +48,7 @@ def test_diphthong_is_long() -> None:
 
 
 def test_consonantal_u() -> None:
-    """验证 consonantal u。"""
+    """验证 consonantal u。."""
     a = LatinAnalyzer()
     # qu 中 u 为辅音性，不构成独立音节
     syls = a.analyze_word("aqua")
@@ -57,7 +58,7 @@ def test_consonantal_u() -> None:
 
 
 def test_leading_consonant_count() -> None:
-    """验证 leading consonant count。"""
+    """验证 leading consonant count。."""
     a = LatinAnalyzer()
     # muta cum liquida 仅算 1
     assert a._leading_consonant_count("tr") == 1
@@ -68,14 +69,14 @@ def test_leading_consonant_count() -> None:
 
 
 def test_analyze_line_cross_word_length() -> None:
-    """验证 analyze line cross word length。"""
+    """验证 analyze line cross word length。."""
     a = LatinAnalyzer()
     # arma(2) + virum(2) = 4 音节
     assert len(a.analyze_line("arma virum")) == 4
 
 
 def test_fl_fr_not_mutacumliquida() -> None:
-    """验证 fl fr not mutacumliquida。"""
+    """验证 fl fr not mutacumliquida。."""
     a = LatinAnalyzer()
     # 'f' 是擦音而非塞音，故 "fr" 不算 muta cum liquida；
     # 前接元音 "a" 后跟 f+r 两个辅音 -> 占位成位 -> 长音。
@@ -84,14 +85,14 @@ def test_fl_fr_not_mutacumliquida() -> None:
 
 
 def test_fuimus_three_syllables() -> None:
-    """验证 fuimus three syllables。"""
+    """验证 fuimus three syllables。."""
     a = LatinAnalyzer()
     # "ui" 不是双元音，须拆成 u+i -> fu-i-mus 共 3 音节。
     assert len(a.analyze_word("fuimus")) == 3
 
 
 def test_macron_diphthong_ae() -> None:
-    """验证 macron diphthong ae。"""
+    """验证 macron diphthong ae。."""
     a = LatinAnalyzer()
     # 带长音符号的 "āe" 仍应识别为双元音 ae 且为长音。
     syls = a.analyze_word("āe")
@@ -101,7 +102,7 @@ def test_macron_diphthong_ae() -> None:
 
 
 def test_elision_reduces_syllables() -> None:
-    """验证 elision reduces syllables。"""
+    """验证 elision reduces syllables。."""
     a = LatinAnalyzer()
     # vita 以元音 a 结尾，est 以元音 e 开头 -> 省音，末音节被吞。
     # 正常 vi-ta-est = 3，省音后 vi-test = 2。
@@ -109,7 +110,7 @@ def test_elision_reduces_syllables() -> None:
 
 
 def test_hendecasyllabic_syllable5_long() -> None:
-    """验证 hendecasyllabic syllable5 long。"""
+    """验证 hendecasyllabic syllable5 long。."""
     t = HendecasyllabusTemplate()
     # 约束表第 5 音节（index 4）必须为长。
     cons = t.get_syllable_constraints()
@@ -133,7 +134,7 @@ def test_hendecasyllabic_syllable5_long() -> None:
 
 
 def test_distichon_pentameter_caesura() -> None:
-    """验证 distichon pentameter caesura。"""
+    """验证 distichon pentameter caesura。."""
     t = DistichonTemplate()
     # 末 6 音节须为 long short short long short short。
     tail = ["long", "short", "short", "long", "short", "short"]

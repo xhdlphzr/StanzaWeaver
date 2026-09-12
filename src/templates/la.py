@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""拉丁语格律模板：六步格、哀歌双行体、十一音节诗。
+"""拉丁语格律模板：六步格、哀歌双行体、十一音节诗。.
 
 - 六步格：第 1-4 音步扬抑抑/扬扬自由替换，第 5 音步必须扬抑抑格，
   第 6 音步 2 音节（扬扬或扬抑）。
@@ -23,7 +23,7 @@ _S: dict[str, Any] = _make_syl(attributes={"length": "short"})
 
 
 def _validate_hex(syls: list[Syllable]) -> list[str]:
-    """六步格完整校验。
+    """六步格完整校验。.
 
     第 1-4 音步为扬抑抑格(长短短)或扬扬格(长长)自由替换；
     第 5 音步必须为扬抑抑格（长短短）；第 6 音步为扬扬格或扬抑格（2 音节）。
@@ -33,6 +33,7 @@ def _validate_hex(syls: list[Syllable]) -> list[str]:
 
     Returns:
         错误列表。
+
     """
     errors: list[str] = []
     n = len(syls)
@@ -96,7 +97,7 @@ def _validate_hex(syls: list[Syllable]) -> list[str]:
 
 
 class HexameterTemplate(PoetryTemplate):
-    """六步格：单行，可连续堆叠，逐行校验。"""
+    """六步格：单行，可连续堆叠，逐行校验。."""
 
     name = "六步格"
     language = "la"
@@ -109,17 +110,18 @@ class HexameterTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无固定位置约束（音步可替换，由 validate_full 贪心扫描）。
+        """无固定位置约束（音步可替换，由 validate_full 贪心扫描）。.
 
         Returns:
             逐位音节约束表。
+
         """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """逐音步校验六步格结构。
+        """逐音步校验六步格结构。.
 
         Args:
             poem: 诗行列表。
@@ -127,6 +129,7 @@ class HexameterTemplate(PoetryTemplate):
 
         Returns:
             错误信息列表（空列表表示通过）。
+
         """
         errors: list[str] = []
         if syllables and syllables[0]:
@@ -135,7 +138,7 @@ class HexameterTemplate(PoetryTemplate):
 
 
 class DistichonTemplate(PoetryTemplate):
-    """哀歌双行体：第 1 行六步格，第 2 行五步格（末 6 音节两完整扬抑抑格）。"""
+    """哀歌双行体：第 1 行六步格，第 2 行五步格（末 6 音节两完整扬抑抑格）。."""
 
     name = "哀歌双行体"
     language = "la"
@@ -149,16 +152,17 @@ class DistichonTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无固定位置约束（同六步格）。
+        """无固定位置约束（同六步格）。.
 
         Returns:
             逐位音节约束表。
+
         """
         return None
 
     @staticmethod
     def _has_pentameter_caesura(line: str, total: int) -> bool:
-        """判断五步格诗行前后两半之间（即倒数第 6 音节处）是否存在词界停顿。
+        """判断五步格诗行前后两半之间（即倒数第 6 音节处）是否存在词界停顿。.
 
         五步格后半固定为两个完整扬抑抑格（6 音节），故停顿须落在
         ``total - 6`` 个音节之后的词边界上。
@@ -169,6 +173,7 @@ class DistichonTemplate(PoetryTemplate):
 
         Returns:
             若在前半与后半之间存在词界返回 True，否则 False。
+
         """
         if total < 6:
             return False
@@ -187,7 +192,7 @@ class DistichonTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：第 1 行六步格、第 2 行末 6 音节扬抑抑×2、中部 caesura、AA 押韵。
+        """完整检查：第 1 行六步格、第 2 行末 6 音节扬抑抑×2、中部 caesura、AA 押韵。.
 
         Args:
             poem: 诗行列表。
@@ -195,6 +200,7 @@ class DistichonTemplate(PoetryTemplate):
 
         Returns:
             错误信息列表（空列表表示通过）。
+
         """
         errors: list[str] = []
         if not syllables or len(syllables) < 2:
@@ -227,7 +233,7 @@ class DistichonTemplate(PoetryTemplate):
 
 
 class HendecasyllabusTemplate(PoetryTemplate):
-    """十一音节诗：5 音步，第 5/6 音节间须为词边界。"""
+    """十一音节诗：5 音步，第 5/6 音节间须为词边界。."""
 
     name = "十一音节诗"
     language = "la"
@@ -241,10 +247,11 @@ class HendecasyllabusTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
-        """固定音步模式约束（第1音步首音节必长）。
+        """固定音步模式约束（第1音步首音节必长）。.
 
         Returns:
             逐位音节约束表。
+
         """
         return [
             [
@@ -265,7 +272,7 @@ class HendecasyllabusTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：固定长音位 + 第 5/6 音节间词边界。
+        """完整检查：固定长音位 + 第 5/6 音节间词边界。.
 
         Args:
             poem: 诗行列表。
@@ -273,6 +280,7 @@ class HendecasyllabusTemplate(PoetryTemplate):
 
         Returns:
             错误信息列表（空列表表示通过）。
+
         """
         errors: list[str] = []
         if not syllables or not syllables[0]:
@@ -312,7 +320,7 @@ class HendecasyllabusTemplate(PoetryTemplate):
 
 
 def register_latin_templates() -> None:
-    """注册全部拉丁语模板。"""
+    """注册全部拉丁语模板。."""
     register("la_hexameter", HexameterTemplate())
     register("la_distichon", DistichonTemplate())
     register("la_hendecasyllabus", HendecasyllabusTemplate())

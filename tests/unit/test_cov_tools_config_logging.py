@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""针对 search_words / logging_setup / config 的覆盖补全测试。
+"""针对 search_words / logging_setup / config 的覆盖补全测试。.
 
 仅用于把这几个模块的 LINE 覆盖率补到 100%，不修改既有测试文件。
 """
@@ -18,14 +18,14 @@ from src.tools import search_words as search_words_module
 
 
 class _FakeDB:
-    """桩替换词库查询，避免触碰真实 SQLite。"""
+    """桩替换词库查询，避免触碰真实 SQLite。."""
 
     def __init__(self) -> None:
-        """初始化桩。"""
+        """初始化桩。."""
         self.words: list[dict[str, Any]] = [{"word": "明月"}]
 
     def __call__(self, **kwargs: Any) -> list[dict[str, Any]]:
-        """返回固定词条列表。
+        """返回固定词条列表。.
 
         Args:
             **kwargs: 透传的查询参数（此处忽略）。
@@ -33,6 +33,7 @@ class _FakeDB:
         Returns:
             预置词条列表。
             固定词条列表。
+
         """
         return self.words
 
@@ -40,7 +41,7 @@ class _FakeDB:
 def test_execute_search_words_non_int_limit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """limit 无法转为 int 时回退为 20（覆盖 36-37）。"""
+    """Limit 无法转为 int 时回退为 20（覆盖 36-37）。."""
     fake = _FakeDB()
     monkeypatch.setattr(search_words_module, "db_search", fake)
     result = search_words_module.execute_search_words(
@@ -52,20 +53,20 @@ def test_execute_search_words_non_int_limit(
 def test_get_logs_dir_env_override(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """环境变量覆盖日志目录（覆盖 39）。"""
+    """环境变量覆盖日志目录（覆盖 39）。."""
     monkeypatch.setenv("STANZAWEAVER_LOG_DIR", str(tmp_path))
     assert logging_setup_module.get_logs_dir() == tmp_path
 
 
 def test_setup_logging_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:
-    """已配置时直接返回命名 logger（覆盖 65）。"""
+    """已配置时直接返回命名 logger（覆盖 65）。."""
     monkeypatch.setattr(logging_setup_module, "_configured", True)
     logger = logging_setup_module.setup_logging()
     assert logger.name == "stanzaweaver"
 
 
 def test_config_invalid_json_falls_back(tmp_path: Path) -> None:
-    """配置文件存在但损坏时按空配置处理（覆盖 59-60）。"""
+    """配置文件存在但损坏时按空配置处理（覆盖 59-60）。."""
     path = tmp_path / "config.json"
     path.write_text("not valid json {", encoding="utf-8")
     cfg = config_module.Config(config_path=path)
@@ -73,7 +74,7 @@ def test_config_invalid_json_falls_back(tmp_path: Path) -> None:
 
 
 def test_config_save_writes_file(tmp_path: Path) -> None:
-    """save 写入配置文件且内容正确（覆盖 65-69）。"""
+    """Save 写入配置文件且内容正确（覆盖 65-69）。."""
     import json as _json
 
     cfg = config_module.Config(config_path=tmp_path / "c.json")
@@ -89,10 +90,10 @@ def test_config_save_writes_file(tmp_path: Path) -> None:
 def test_config_save_chmod_oserror(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """save 时 chmod 失败被吞掉（覆盖 70-71）。"""
+    """Save 时 chmod 失败被吞掉（覆盖 70-71）。."""
 
     def _raise_oserror(*args: Any, **kwargs: Any) -> None:
-        """模拟 chmod 失败。
+        """模拟 chmod 失败。.
 
         Args:
             *args: 透传参数（忽略）。
@@ -100,6 +101,7 @@ def test_config_save_chmod_oserror(
 
         Raises:
             OSError: 始终抛出。
+
         """
         raise OSError("denied")
 
@@ -112,7 +114,7 @@ def test_config_save_chmod_oserror(
 
 
 def test_config_writer_non_dict(tmp_path: Path) -> None:
-    """writer 字段非 dict 时回退为空 dict（覆盖 83）。"""
+    """Writer 字段非 dict 时回退为空 dict（覆盖 83）。."""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     cfg._data = {"writer": "bad"}
     cfg._loaded = True
@@ -120,14 +122,14 @@ def test_config_writer_non_dict(tmp_path: Path) -> None:
 
 
 def test_config_writer_setter(tmp_path: Path) -> None:
-    """writer setter 写入数据（覆盖 97-98）。"""
+    """Writer setter 写入数据（覆盖 97-98）。."""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     cfg.writer = {"base_url": "u", "api_key": "k", "model": "m"}
     assert cfg._data["writer"] == {"base_url": "u", "api_key": "k", "model": "m"}
 
 
 def test_config_checker_non_dict(tmp_path: Path) -> None:
-    """checker 字段非 dict 时回退为空 dict（覆盖 110）。"""
+    """Checker 字段非 dict 时回退为空 dict（覆盖 110）。."""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     cfg._data = {"checker": 123}
     cfg._loaded = True
@@ -135,14 +137,14 @@ def test_config_checker_non_dict(tmp_path: Path) -> None:
 
 
 def test_config_checker_setter(tmp_path: Path) -> None:
-    """checker setter 写入数据（覆盖 124-125）。"""
+    """Checker setter 写入数据（覆盖 124-125）。."""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     cfg.checker = {"base_url": "u", "api_key": "k", "model": "m"}
     assert cfg._data["checker"] == {"base_url": "u", "api_key": "k", "model": "m"}
 
 
 def test_config_data_property(tmp_path: Path) -> None:
-    """data 属性惰性加载后返回原始字典（覆盖 134-135）。"""
+    """Data 属性惰性加载后返回原始字典（覆盖 134-135）。."""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     cfg._data = {"k": "v"}
     cfg._loaded = True
@@ -150,7 +152,7 @@ def test_config_data_property(tmp_path: Path) -> None:
 
 
 def test_config_update(tmp_path: Path) -> None:
-    """update 合并配置数据（覆盖 143-144）。"""
+    """Update 合并配置数据（覆盖 143-144）。."""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     cfg._data = {"a": 1}
     cfg._loaded = True
@@ -159,13 +161,13 @@ def test_config_update(tmp_path: Path) -> None:
 
 
 def test_config_language_default(tmp_path: Path) -> None:
-    """language 属性默认返回 en。"""
+    """Language 属性默认返回 en。."""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     assert cfg.language == "en"
 
 
 def test_config_language_zh(tmp_path: Path) -> None:
-    """language 属性返回 zh。"""
+    """Language 属性返回 zh。."""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     cfg._data = {"language": "zh"}
     cfg._loaded = True
@@ -173,7 +175,7 @@ def test_config_language_zh(tmp_path: Path) -> None:
 
 
 def test_config_language_en(tmp_path: Path) -> None:
-    """language 属性返回 en。"""
+    """Language 属性返回 en。."""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     cfg._data = {"language": "en"}
     cfg._loaded = True
@@ -181,7 +183,7 @@ def test_config_language_en(tmp_path: Path) -> None:
 
 
 def test_config_language_invalid_fallback(tmp_path: Path) -> None:
-    """language 属性无效值回退 en（覆盖 137）。"""
+    """Language 属性无效值回退 en（覆盖 137）。."""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     cfg._data = {"language": "fr"}
     cfg._loaded = True
@@ -189,14 +191,14 @@ def test_config_language_invalid_fallback(tmp_path: Path) -> None:
 
 
 def test_config_language_setter(tmp_path: Path) -> None:
-    """language setter 写入数据（覆盖 147-148）。"""
+    """Language setter 写入数据（覆盖 147-148）。."""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     cfg.language = "en"
     assert cfg._data["language"] == "en"
 
 
 def test_reset_config(tmp_path: Path) -> None:
-    """reset_config 清空全局单例（覆盖 165）。"""
+    """reset_config 清空全局单例（覆盖 165）。."""
     config_module.get_config()
     config_module.reset_config()
     assert config_module._config is None

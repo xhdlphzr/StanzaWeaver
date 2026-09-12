@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""法语格律模板：回旋诗、三韵叠句诗、叙事歌。
+"""法语格律模板：回旋诗、三韵叠句诗、叙事歌。.
 
 押韵采用 FrenchAnalyzer.rhyme_key：取词末发音元音核（鼻化归并），
 并丢弃词尾静音辅音（s/t/x/p 等）。
@@ -17,13 +17,14 @@ _FR = FrenchAnalyzer()
 
 
 def _fr_last_word(line: str) -> str:
-    """取行末词（去标点、小写）。
+    """取行末词（去标点、小写）。.
 
     Args:
         line: 一行诗。
 
     Returns:
         行末词；空行返回空串。
+
     """
     return _last_word(line, "a-zA-Zàâäéèêëîïôöùûüÿœ'-")
 
@@ -31,13 +32,14 @@ def _fr_last_word(line: str) -> str:
 def _check_rhyme_group(
     poem: list[str], indices: list[int], label: str, errors: list[str]
 ) -> None:
-    """检查一组行末词法语韵脚一致。
+    """检查一组行末词法语韵脚一致。.
 
     Args:
         poem: 诗行列表。
         indices: 参与该韵组的行号（0-based）。
         label: 韵组名。
         errors: 错误列表（就地追加）。
+
     """
     keys: list[tuple[int, str]] = []
     for idx in indices:
@@ -57,7 +59,7 @@ def _check_rhyme_group(
 
 
 class RondeauTemplate(PoetryTemplate):
-    """回旋诗：15 行三节，韵式 AABBA AAB AABBA，叠句在第 9、15 行。"""
+    """回旋诗：15 行三节，韵式 AABBA AAB AABBA，叠句在第 9、15 行。."""
 
     name = "回旋诗"
     language = "fr"
@@ -72,17 +74,18 @@ class RondeauTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束。
+        """无逐位约束。.
 
         Returns:
             逐位音节约束表。
+
         """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：AABBA AAB AABBA 韵式 + 叠句开头 4 词一致。
+        """完整检查：AABBA AAB AABBA 韵式 + 叠句开头 4 词一致。.
 
         Args:
             poem: 诗行列表。
@@ -90,6 +93,7 @@ class RondeauTemplate(PoetryTemplate):
 
         Returns:
             错误信息列表（空列表表示通过）。
+
         """
         errors: list[str] = []
         rhyme_groups = [
@@ -111,7 +115,7 @@ class RondeauTemplate(PoetryTemplate):
 
 
 class TrioletTemplate(PoetryTemplate):
-    """三韵叠句诗：8 行，韵式 ABaAabAB，第 1/4/7 行与 2/8 行为叠句。"""
+    """三韵叠句诗：8 行，韵式 ABaAabAB，第 1/4/7 行与 2/8 行为叠句。."""
 
     name = "三韵叠句诗"
     language = "fr"
@@ -124,17 +128,18 @@ class TrioletTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束。
+        """无逐位约束。.
 
         Returns:
             逐位音节约束表。
+
         """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：叠句原文重复（1=4=7、2=8）+ ABaAabAB 韵式。
+        """完整检查：叠句原文重复（1=4=7、2=8）+ ABaAabAB 韵式。.
 
         Args:
             poem: 诗行列表。
@@ -142,6 +147,7 @@ class TrioletTemplate(PoetryTemplate):
 
         Returns:
             错误信息列表（空列表表示通过）。
+
         """
         errors: list[str] = []
         if len(poem) >= 8:
@@ -161,7 +167,7 @@ class TrioletTemplate(PoetryTemplate):
 
 
 class BalladeTemplate(PoetryTemplate):
-    """叙事歌：28 行（3 节 8 行 + 4 行跋），ababbcbc 韵式，末行叠句。"""
+    """叙事歌：28 行（3 节 8 行 + 4 行跋），ababbcbc 韵式，末行叠句。."""
 
     name = "叙事歌"
     language = "fr"
@@ -176,17 +182,18 @@ class BalladeTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束（音节数在 validate_full 中统一判定）。
+        """无逐位约束（音节数在 validate_full 中统一判定）。.
 
         Returns:
             逐位音节约束表。
+
         """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：全诗音节统一（8 或 10）、ababbcbc 韵式、叠句一致。
+        """完整检查：全诗音节统一（8 或 10）、ababbcbc 韵式、叠句一致。.
 
         Args:
             poem: 诗行列表。
@@ -194,6 +201,7 @@ class BalladeTemplate(PoetryTemplate):
 
         Returns:
             错误信息列表（空列表表示通过）。
+
         """
         errors: list[str] = []
         counts = [len(s) for s in syllables if s]
@@ -225,7 +233,7 @@ class BalladeTemplate(PoetryTemplate):
 
 
 def register_french_templates() -> None:
-    """注册全部法语模板。"""
+    """注册全部法语模板。."""
     register("fr_rondeau", RondeauTemplate())
     register("fr_triolet", TrioletTemplate())
     register("fr_ballade", BalladeTemplate())

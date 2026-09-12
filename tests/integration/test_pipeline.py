@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""Pipeline 集成测试：用桩 LLM 客户端替代 OpenAI，验证四步流水线闭环。
+"""Pipeline 集成测试：用桩 LLM 客户端替代 OpenAI，验证四步流水线闭环。.
 
 不发起任何真实网络请求——描述/初稿/炼句/终审均由预置脚本驱动。
 """
@@ -19,10 +19,11 @@ REVISED_LINE = "远岸栖云树"
 
 
 def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
-    """注入桩 LLM 客户端，使 Pipeline 完全离线运行。
+    """注入桩 LLM 客户端，使 Pipeline 完全离线运行。.
 
     Args:
         monkeypatch: pytest monkeypatch 实例。
+
     """
     writer_stub = make_stub(
         stream=[DESC, DRAFT],
@@ -52,7 +53,7 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_pipeline_full_run(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 pipeline full run。"""
+    """验证 pipeline full run。."""
     _patch_llm(monkeypatch)
     pipeline = PoetryPipeline(
         writer_config={"base_url": "x", "api_key": "x", "model": "x"},
@@ -70,7 +71,7 @@ def test_pipeline_full_run(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_pipeline_continue_with_feedback(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 pipeline continue with feedback。"""
+    """验证 pipeline continue with feedback。."""
     _patch_llm(monkeypatch)
     pipeline = PoetryPipeline(
         writer_config={"base_url": "x", "api_key": "x", "model": "x"},

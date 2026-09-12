@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""英语音节分析器（基于 CMUdict）。
+"""英语音节分析器（基于 CMUdict）。.
 
 - CMUdict 音素串 → 音节切分，采用英语常规划音规则分配跨音节辅音。
 - 主重音(1)与次重音(2)均视为重读（诗歌格律中次重音同样承担重音位置）。
@@ -53,7 +53,7 @@ _cmudict_lock = threading.Lock()
 
 
 def _load_cmudict() -> None:
-    """惰性加载 CMUdict 到内存（线程安全，仅加载一次）。
+    """惰性加载 CMUdict 到内存（线程安全，仅加载一次）。.
 
     保留每个词的全部发音变体。
     """
@@ -75,12 +75,12 @@ def _load_cmudict() -> None:
 
 
 class EnglishAnalyzer(SyllableAnalyzer):
-    """英语音节分析器：音节切分 + 重音标注 + 多音变体 + 押韵尾串。"""
+    """英语音节分析器：音节切分 + 重音标注 + 多音变体 + 押韵尾串。."""
 
     language = "en"
 
     def _get_pronunciations(self, word: str) -> list[list[str]]:
-        """查询词的全部音素发音。
+        """查询词的全部音素发音。.
 
         优先从本地 SQLite 词库（en_pron 表）读取，离线场景亦可工作；
         未命中时回退到 CMUdict（首次使用会联网下载并缓存到内存）。
@@ -90,6 +90,7 @@ class EnglishAnalyzer(SyllableAnalyzer):
 
         Returns:
             音素列表的列表（每个元素是一个发音）；未知词返回空列表。
+
         """
         lowered = word.lower()
         from ..knowledge import vocabulary
@@ -101,7 +102,7 @@ class EnglishAnalyzer(SyllableAnalyzer):
         return _ARPABET_TO_PHONEMES.get(lowered, [])
 
     def rhyme_tail(self, word: str) -> str | None:
-        """最后一个重读元音（主/次重音）起到词尾的音素串（含重音层级）。
+        """最后一个重读元音（主/次重音）起到词尾的音素串（含重音层级）。.
 
         押韵须为严格重音匹配：韵脚必须落在主/次重音音节，且该音节起的
         全部音素（含重音数字）完全一致。
@@ -111,12 +112,13 @@ class EnglishAnalyzer(SyllableAnalyzer):
 
         Returns:
             押韵尾串（如 "AY1 T"）；无重读音节时返回 None（不能作韵脚）。
+
         """
         tails = self.rhyme_tails(word)
         return tails[0] if tails else None
 
     def rhyme_tails(self, word: str) -> list[str]:
-        """返回该词全部发音中所有可用于押韵的尾串（含重音层级）。
+        """返回该词全部发音中所有可用于押韵的尾串（含重音层级）。.
 
         每个发音取最后一个主/次重读音节起到词尾的音素序列；同一词的
         多个发音会全部返回（去重），用于押韵校验时"任一发音押韵即通过"。
@@ -126,6 +128,7 @@ class EnglishAnalyzer(SyllableAnalyzer):
 
         Returns:
             押韵尾串列表（可能包含多个）；无重读音节时返回空列表。
+
         """
         prons = self._get_pronunciations(word)
         if not prons:
@@ -148,13 +151,14 @@ class EnglishAnalyzer(SyllableAnalyzer):
         return result
 
     def analyze_variants(self, word: str) -> list[list[Syllable]]:
-        """返回该词全部发音的音节切分结果。
+        """返回该词全部发音的音节切分结果。.
 
         Args:
             word: 英文单词。
 
         Returns:
             每种发音对应一个音节列表；未知词退回启发式切分。
+
         """
         prons = self._get_pronunciations(word)
         if not prons:
@@ -162,24 +166,26 @@ class EnglishAnalyzer(SyllableAnalyzer):
         return [self._parse_phones(p) for p in prons]
 
     def analyze_word(self, word: str) -> list[Syllable]:
-        """分析单词（取第一个发音，即 CMUdict 中最常见读音）。
+        """分析单词（取第一个发音，即 CMUdict 中最常见读音）。.
 
         Args:
             word: 英文单词。
 
         Returns:
             音节列表。
+
         """
         return self.analyze_variants(word)[0]
 
     def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-        """整行的候选音节切分：逐词取全部发音变体组合（上限 64 种）。
+        """整行的候选音节切分：逐词取全部发音变体组合（上限 64 种）。.
 
         Args:
             line: 一行诗（可为多词）。
 
         Returns:
             候选切分列表（至少含一个元素）。
+
         """
         words = [w for w in re.split(r"[^a-zA-Z0-9'-]+", line.lower()) if w]
         combos: list[list[Syllable]] = [[]]
@@ -197,7 +203,7 @@ class EnglishAnalyzer(SyllableAnalyzer):
         return combos or [[]]
 
     def _parse_phones(self, phones: list[str]) -> list[Syllable]:
-        """CMUdict 音素串 → 音节切分。
+        """CMUdict 音素串 → 音节切分。.
 
         跨音节辅音归属规则（英语常规划音）：
         - 两个元音之间的单个辅音：前一元音为主重音、后一元音非主重音时
@@ -209,6 +215,7 @@ class EnglishAnalyzer(SyllableAnalyzer):
 
         Returns:
             音节列表。
+
         """
         vpos = [
             i for i, p in enumerate(phones) if _NUMBERS_RE.sub("", p) in _VOWEL_PHONEMES
@@ -255,13 +262,14 @@ class EnglishAnalyzer(SyllableAnalyzer):
         return syllables
 
     def _fallback_analyze(self, word: str) -> list[Syllable]:
-        """未知词启发式切分：按元音字母组数估音节数。
+        """未知词启发式切分：按元音字母组数估音节数。.
 
         Args:
             word: 不在 CMUdict 中的词。
 
         Returns:
             每个元音组一个占位音节（nucleus="?"，无重音）。
+
         """
         vowel_groups = re.findall(r"[aeiouy]+", word.lower())
         count = len(vowel_groups)

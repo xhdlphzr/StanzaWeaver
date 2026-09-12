@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""单元测试：补齐 pipeline.py 的缺失行覆盖。
+"""单元测试：补齐 pipeline.py 的缺失行覆盖。.
 
 通过轻量假的 Writer/Checker 代理（子类化真实代理但绕过 LLMClient，绝不访问网络）
 触发各类错误与边界分支：
@@ -34,13 +34,14 @@ CheckPlan = list[dict[str, Any] | Exception]
 
 
 class _FakeWriter(WriterAI):
-    """假 WriterAI：按预置 refine 结果返回，绝不构造/调用 LLMClient。"""
+    """假 WriterAI：按预置 refine 结果返回，绝不构造/调用 LLMClient。."""
 
     def __init__(self, refine_plan: RefinePlan) -> None:
-        """记录预置的 refine 返回序列，不初始化任何真实 LLM 客户端。
+        """记录预置的 refine 返回序列，不初始化任何真实 LLM 客户端。.
 
         Args:
             refine_plan: 依次返回的 RefineResult 列表；耗尽后再调用会抛 IndexError。
+
         """
         self._refine_plan: RefinePlan = list(refine_plan)
         self.generate_description_calls: int = 0
@@ -53,7 +54,7 @@ class _FakeWriter(WriterAI):
         messages: list[dict[str, Any]],
         on_stream: ChunkCallback = None,
     ) -> str:
-        """返回固定描述（Step 1）。
+        """返回固定描述（Step 1）。.
 
         Args:
             topic: 主题（未使用）。
@@ -62,6 +63,7 @@ class _FakeWriter(WriterAI):
 
         Returns:
             描述文本。
+
         """
         self.generate_description_calls += 1
         return "现代文描述"
@@ -74,7 +76,7 @@ class _FakeWriter(WriterAI):
         template_obj: Any = None,
         on_stream: ChunkCallback = None,
     ) -> tuple[list[str], str, list[str], str]:
-        """返回固定初稿（Step 2）。
+        """返回固定初稿（Step 2）。.
 
         Args:
             description: 主题描述（未使用）。
@@ -85,6 +87,7 @@ class _FakeWriter(WriterAI):
 
         Returns:
             (诗稿, 标题, 标点, 日志文本)。
+
         """
         self.generate_draft_calls += 1
         return ["床前明月光", "疑是地上霜"], "测试标题", [], "初稿详情"
@@ -103,7 +106,7 @@ class _FakeWriter(WriterAI):
         title: str = "",
         punctuation: list[str] | None = None,
     ) -> RefineResult:
-        """按预置序列返回一次炼句结果，并触发 on_step 回调。
+        """按预置序列返回一次炼句结果，并触发 on_step 回调。.
 
         Args:
             description: 主题描述（未使用）。
@@ -120,6 +123,7 @@ class _FakeWriter(WriterAI):
 
         Returns:
             预置的 RefineResult（标题/标点沿用传入值）。
+
         """
         self.feedback_log.append(feedback)
         result = self._refine_plan.pop(0)
@@ -140,20 +144,21 @@ class _FakeWriter(WriterAI):
 
 
 class _FakeChecker(CheckerAI):
-    """假 CheckerAI：按预置结果/异常返回，绝不构造/调用 LLMClient。"""
+    """假 CheckerAI：按预置结果/异常返回，绝不构造/调用 LLMClient。."""
 
     def __init__(self, check_results: CheckPlan) -> None:
-        """记录预置的 check 返回序列（可为异常）。
+        """记录预置的 check 返回序列（可为异常）。.
 
         Args:
             check_results: 依次返回的结果；异常元素会被原样抛出。
+
         """
         self._check_results: CheckPlan = list(check_results)
 
     def check(
         self, description: str, poem: list[str], template: dict[str, Any]
     ) -> dict[str, Any]:
-        """按预置序列返回一次终审结果；若是异常则抛出。
+        """按预置序列返回一次终审结果；若是异常则抛出。.
 
         Args:
             description: 主题描述（未使用）。
@@ -165,6 +170,7 @@ class _FakeChecker(CheckerAI):
 
         Raises:
             预置的任意异常（用于覆盖 except 兜底分支）。
+
         """
         item = self._check_results.pop(0)
         if isinstance(item, Exception):
@@ -173,10 +179,11 @@ class _FakeChecker(CheckerAI):
 
 
 def _make_state() -> PipelineState:
-    """构造一个已加载模板、可直接进入炼句循环的最小状态。
+    """构造一个已加载模板、可直接进入炼句循环的最小状态。.
 
     Returns:
         PipelineState（仅含炼句循环所需字段）。
+
     """
     return PipelineState(
         topic="静夜思",
@@ -189,7 +196,7 @@ def _make_state() -> PipelineState:
 
 
 def _make_pipeline(writer: _FakeWriter, checker: _FakeChecker) -> PoetryPipeline:
-    """构造流水线并注入假代理，避免任何真实 LLM 调用。
+    """构造流水线并注入假代理，避免任何真实 LLM 调用。.
 
     Args:
         writer: 假 WriterAI。
@@ -197,6 +204,7 @@ def _make_pipeline(writer: _FakeWriter, checker: _FakeChecker) -> PoetryPipeline
 
     Returns:
         已注入假代理的 PoetryPipeline。
+
     """
     pipeline = PoetryPipeline(
         writer_config={"base_url": "x", "api_key": "x", "model": "x"},
@@ -208,7 +216,7 @@ def _make_pipeline(writer: _FakeWriter, checker: _FakeChecker) -> PoetryPipeline
 
 
 def test_run_full_with_fakes() -> None:
-    """验证注入假代理后完整 run() 闭环（覆盖 run/step1/step2/refine 主路径）。"""
+    """验证注入假代理后完整 run() 闭环（覆盖 run/step1/step2/refine 主路径）。."""
     writer = _FakeWriter(
         [
             (["窗前明月光", "疑是地上霜"], [], "炼句详情", 1),
@@ -227,7 +235,7 @@ def test_run_full_with_fakes() -> None:
 
 
 def test_refine_checker_exception() -> None:
-    """CheckerAI.check 抛出异常时触发 except 兜底并续跑成功。"""
+    """CheckerAI.check 抛出异常时触发 except 兜底并续跑成功。."""
     writer = _FakeWriter(
         [
             (["床前明月光", "疑是地上霜"], [], "炼句详情", 1),
@@ -249,7 +257,7 @@ def test_refine_checker_exception() -> None:
 
 
 def test_refine_checker_false_then_true() -> None:
-    """CheckerAI 先 False 后 True 触发续跑反馈赋值并成功定稿。"""
+    """CheckerAI 先 False 后 True 触发续跑反馈赋值并成功定稿。."""
     writer = _FakeWriter(
         [
             (["床前明月光", "疑是地上霜"], [], "炼句详情一", 1),
@@ -274,14 +282,14 @@ def test_refine_checker_false_then_true() -> None:
 
 
 def test_json_dumps_safe_fallback() -> None:
-    """不可序列化对象触发 str 兜底分支。"""
+    """不可序列化对象触发 str 兜底分支。."""
     bad = {1, 2, 3}
     assert json_dumps_safe(bad) == str(bad)
     assert json_dumps_safe("ok") == '"ok"'
 
 
 def test_refine_zero_rounds_fallback() -> None:
-    """refine 返回 tool_rounds=0 时触发未执行优化分支。"""
+    """Refine 返回 tool_rounds=0 时触发未执行优化分支。."""
     writer = _FakeWriter(
         [
             (["床前明月光", "疑是地上霜"], [], "炼句日志末尾", 0),
@@ -300,7 +308,7 @@ def test_refine_zero_rounds_fallback() -> None:
 
 
 def test_run_zero_rounds_triggers_format_fallback() -> None:
-    """run() 中 refine 返回 tool_rounds=0 时触发 line 391-402 的 format_poem 兜底。"""
+    """run() 中 refine 返回 tool_rounds=0 时触发 line 391-402 的 format_poem 兜底。."""
     writer = _FakeWriter(
         [
             (["床前明月光", "疑是地上霜"], [], "炼句日志末尾", 0),
@@ -318,7 +326,7 @@ def test_run_zero_rounds_triggers_format_fallback() -> None:
 
 
 def test_fallback_formatted_poem_with_template_obj() -> None:
-    """checker_pass=False 且 _template_obj 有 format_poem 时走分支。"""
+    """checker_pass=False 且 _template_obj 有 format_poem 时走分支。."""
     writer = _FakeWriter(
         [
             (
@@ -354,7 +362,7 @@ def test_fallback_formatted_poem_with_template_obj() -> None:
 # P2-6: _load_template 无效 key
 # --------------------------------------------------------------------------- #
 def test_load_template_invalid_key() -> None:
-    """无效模板键应抛出 KeyError。"""
+    """无效模板键应抛出 KeyError。."""
     with pytest.raises(KeyError):
         get_template("nonexistent_key_xyz")
 
@@ -363,7 +371,7 @@ def test_load_template_invalid_key() -> None:
 # P2-7: checker_pass=True + _template_obj=None → else 分支
 # --------------------------------------------------------------------------- #
 def test_checker_pass_no_template_obj_uses_newline_join() -> None:
-    """checker_pass=True 且 _template_obj=None 时走 else 分支（换行拼接）。"""
+    """checker_pass=True 且 _template_obj=None 时走 else 分支（换行拼接）。."""
     writer = _FakeWriter(
         [
             (["床前明月光", "疑是地上霜"], [], "日志", 1),
@@ -385,7 +393,7 @@ def test_checker_pass_no_template_obj_uses_newline_join() -> None:
 # P2-8: state.title 为空时 final_poem 不含标题
 # --------------------------------------------------------------------------- #
 def test_empty_title_excluded_from_final_poem() -> None:
-    """state.title 为空时 final_poem 不包含标题行。"""
+    """state.title 为空时 final_poem 不包含标题行。."""
     writer = _FakeWriter(
         [
             (["床前明月光", "疑是地上霜"], [], "日志", 1),
@@ -413,7 +421,7 @@ def test_empty_title_excluded_from_final_poem() -> None:
 # P2-9: json_dumps_safe 的 ValueError / RecursionError 分支
 # --------------------------------------------------------------------------- #
 def test_json_dumps_safe_value_error() -> None:
-    """循环引用触发 ValueError 分支。"""
+    """循环引用触发 ValueError 分支。."""
     a: Any = [1]
     a.append(a)
     result = json_dumps_safe(a)
@@ -422,7 +430,7 @@ def test_json_dumps_safe_value_error() -> None:
 
 
 def test_json_dumps_safe_recursion_error() -> None:
-    """超深嵌套触发 RecursionError 分支。"""
+    """超深嵌套触发 RecursionError 分支。."""
     deep: Any = "x"
     for _ in range(2000):
         deep = [deep]

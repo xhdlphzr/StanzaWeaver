@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""测试夹具（pytest）。
+"""测试夹具（pytest）。.
 
 - 注册全部格律模板（供 MeterValidator / Pipeline 使用）；
 - 离线播种 CMUdict，使英语分析器无需联网即可测试；
@@ -30,7 +30,7 @@ from src.templates.zh import register_chinese_templates
 
 @pytest.fixture(autouse=True, scope="session")
 def _register_all_templates() -> None:
-    """会话级：注册全部内置模板。"""
+    """会话级：注册全部内置模板。."""
     register_chinese_templates()
     register_english_templates()
     register_italian_templates()
@@ -40,7 +40,7 @@ def _register_all_templates() -> None:
 
 @pytest.fixture(autouse=True, scope="session")
 def _init_session_db() -> Iterator[None]:
-    """会话级：确保词库数据库已初始化（含 en_pron 表），防止 CI 无词库时崩溃。"""
+    """会话级：确保词库数据库已初始化（含 en_pron 表），防止 CI 无词库时崩溃。."""
     prev = vocabulary._DB_PATH
     tmp = Path(tempfile.mkdtemp(prefix="stanza_weaver_test_"))
     vocabulary.set_db_path(tmp / "test_vocab.db")
@@ -51,7 +51,7 @@ def _init_session_db() -> Iterator[None]:
 
 @pytest.fixture(autouse=True, scope="session")
 def _redirect_history_db() -> Iterator[None]:
-    """会话级：把历史记录数据库重定向到临时文件，避免污染用户真实数据。"""
+    """会话级：把历史记录数据库重定向到临时文件，避免污染用户真实数据。."""
     import app as app_module
 
     prev = app_module._HISTORY_DB_PATH
@@ -63,7 +63,7 @@ def _redirect_history_db() -> Iterator[None]:
 
 @pytest.fixture(autouse=True, scope="session")
 def _seed_offline_cmudict() -> None:
-    """会话级：离线播种少量 CMUdict 词条，避免英语分析器联网下载。"""
+    """会话级：离线播种少量 CMUdict 词条，避免英语分析器联网下载。."""
     english_module._cmudict_loaded = True
     english_module._ARPABET_TO_PHONEMES = {
         "test": [["T", "EH1", "S", "T"]],
@@ -83,7 +83,7 @@ def make_zh_template(
     per_line: int = 5,
     constraints: list[Any] | None = None,
 ) -> dict[str, Any]:
-    """构造一个最小中文模板字典（仅含数量约束）。
+    """构造一个最小中文模板字典（仅含数量约束）。.
 
     Args:
         lines: 行数。
@@ -92,6 +92,7 @@ def make_zh_template(
 
     Returns:
         模板字典（to_dict 同构）。
+
     """
     return {
         "name": "测试模板",

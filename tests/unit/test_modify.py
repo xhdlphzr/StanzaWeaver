@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""modify 工具执行单元测试（符号层，纯格律校验）。"""
+"""modify 工具执行单元测试（符号层，纯格律校验）。."""
 
 from typing import Any
 
@@ -27,7 +27,7 @@ POEM = ["床前明月光", "疑是地上霜", "举头望明月", "低头思故�
 
 
 def test_modify_line_valid() -> None:
-    """line 类型：合法新行原位替换。"""
+    """Line 类型：合法新行原位替换。."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "line", "line": 0, "content": "窗前明月光"}
     )
@@ -37,7 +37,7 @@ def test_modify_line_valid() -> None:
 
 
 def test_modify_line_wrong_syllable_count() -> None:
-    """line 类型：音节数不符返回错误。"""
+    """Line 类型：音节数不符返回错误。."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "line", "line": 0, "content": "窗前明月"}
     )
@@ -46,7 +46,7 @@ def test_modify_line_wrong_syllable_count() -> None:
 
 
 def test_modify_line_out_of_range() -> None:
-    """line 类型：行号越界返回错误。"""
+    """Line 类型：行号越界返回错误。."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "line", "line": 10, "content": "窗前明月光"}
     )
@@ -55,7 +55,7 @@ def test_modify_line_out_of_range() -> None:
 
 
 def test_modify_line_constraints_mismatch() -> None:
-    """line 类型：逐位约束不符返回错误。"""
+    """Line 类型：逐位约束不符返回错误。."""
     result = modify_module.execute_modify(
         list(POEM),
         ZH_TPL_CONSTRAINT,
@@ -66,7 +66,7 @@ def test_modify_line_constraints_mismatch() -> None:
 
 
 def test_modify_line_missing_line_param() -> None:
-    """line 类型：缺少 line 参数时提示需提供行数。"""
+    """Line 类型：缺少 line 参数时提示需提供行数。."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "line", "content": "窗前明月光"}
     )
@@ -75,7 +75,7 @@ def test_modify_line_missing_line_param() -> None:
 
 
 def test_modify_line_non_int_line() -> None:
-    """line 类型：line 无法转 int 时返回错误。"""
+    """Line 类型：line 无法转 int 时返回错误。."""
     result = modify_module.execute_modify(
         list(POEM),
         ZH_TPL,
@@ -86,7 +86,7 @@ def test_modify_line_non_int_line() -> None:
 
 
 def test_modify_line_content_not_str() -> None:
-    """line 类型：content 非字符串时返回错误。"""
+    """Line 类型：content 非字符串时返回错误。."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "line", "line": 0, "content": ["x"]}
     )
@@ -95,7 +95,7 @@ def test_modify_line_content_not_str() -> None:
 
 
 def test_modify_unknown_type() -> None:
-    """未知 modify_type 返回错误。"""
+    """未知 modify_type 返回错误。."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "unknown", "content": "x"}
     )
@@ -104,7 +104,7 @@ def test_modify_unknown_type() -> None:
 
 
 def test_modify_title_valid() -> None:
-    """title 类型：替换标题。"""
+    """Title 类型：替换标题。."""
     result = modify_module.execute_modify(
         list(POEM),
         ZH_TPL,
@@ -116,7 +116,7 @@ def test_modify_title_valid() -> None:
 
 
 def test_modify_title_not_str() -> None:
-    """title 类型：content 非字符串返回错误。"""
+    """Title 类型：content 非字符串返回错误。."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "title", "content": ["x"]}
     )
@@ -124,7 +124,7 @@ def test_modify_title_not_str() -> None:
 
 
 def test_modify_title_empty() -> None:
-    """title 类型：空标题返回错误。"""
+    """Title 类型：空标题返回错误。."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "title", "content": "   "}
     )
@@ -133,7 +133,7 @@ def test_modify_title_empty() -> None:
 
 
 def test_modify_punctuation_valid() -> None:
-    """punctuation 类型：合法标点列表。"""
+    """Punctuation 类型：合法标点列表。."""
     marks = ["，", "。", "，", "。"]
     result = modify_module.execute_modify(
         list(POEM),
@@ -146,7 +146,7 @@ def test_modify_punctuation_valid() -> None:
 
 
 def test_modify_punctuation_not_list() -> None:
-    """punctuation 类型：content 非列表返回错误。"""
+    """Punctuation 类型：content 非列表返回错误。."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "punctuation", "content": "，"}
     )
@@ -154,7 +154,7 @@ def test_modify_punctuation_not_list() -> None:
 
 
 def test_modify_punctuation_non_str_items() -> None:
-    """punctuation 类型：列表元素非字符串返回错误。"""
+    """Punctuation 类型：列表元素非字符串返回错误。."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "punctuation", "content": [1, 2, 3, 4]}
     )
@@ -162,7 +162,7 @@ def test_modify_punctuation_non_str_items() -> None:
 
 
 def test_modify_punctuation_wrong_length() -> None:
-    """punctuation 类型：数量与格律行数不符返回错误。"""
+    """Punctuation 类型：数量与格律行数不符返回错误。."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "punctuation", "content": ["，", "。"]}
     )
@@ -171,7 +171,7 @@ def test_modify_punctuation_wrong_length() -> None:
 
 
 def test_modify_punctuation_ci_length() -> None:
-    """词牌（7 句）标点长度须等于格律行数。"""
+    """词牌（7 句）标点长度须等于格律行数。."""
     tpl: dict[str, Any] = {
         "language": "zh",
         "lines": 7,

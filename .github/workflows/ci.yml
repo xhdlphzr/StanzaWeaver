@@ -10,6 +10,7 @@
 #                               （单测+集成，桩 LLM 无网络；强制 src + app.py 覆盖率 100%）
 #   - ruff check ./             静态检查
 #   - mypy --strict ./          类型检查（零容忍）
+#   - ruff check --select D ./  Google 风格 Docstring 检查
 #   - ruff format --check ./    代码格式
 #
 # CD  (持续交付): Release 发布时触发，三平台打包并上传分卷 zip 到 Release 附件
@@ -72,6 +73,9 @@ jobs:
 
       - name: mypy (strict)
         run: uv run mypy --strict ./
+
+      - name: ruff docstring (D)
+        run: uv run ruff check --select D ./
 
       - name: ruff format --check
         run: uv run ruff format --check ./

@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""法语音节分析器。
+"""法语音节分析器。.
 
 - 按正字法切分音节：二合/三合元音（ou/eau/ain 等）、鼻化元音、静音 e。
 - 撇号仅作分隔符移除，不剥离词首字母前缀：aujourd'hui / quelqu'un /
@@ -97,24 +97,25 @@ _SILENT_GU_FOLLOW: set[str] = set("eéèêëiîïy")
 
 
 def _is_vowel(ch: str) -> bool:
-    """判断字符是否为法语元音（含重音与 œ/æ/y）。
+    """判断字符是否为法语元音（含重音与 œ/æ/y）。.
 
     Args:
         ch: 单个字符。
 
     Returns:
         是元音返回 True。
+
     """
     return ch in _VOWELS
 
 
 class FrenchAnalyzer(SyllableAnalyzer):
-    """法语音节分析器：真实音节结构（韵腹/韵尾）+ 韵脚 key。"""
+    """法语音节分析器：真实音节结构（韵腹/韵尾）+ 韵脚 key。."""
 
     language = "fr"
 
     def _is_silent_u(self, w: str, i: int) -> bool:
-        """判断位置 i 的 'u' 是否静音（不构成音节）。
+        """判断位置 i 的 'u' 是否静音（不构成音节）。.
 
         qu 后的 u 恒静音；gu 后接 e/i/y 时 u 静音。其余情况（gu 后接
         a/o/u、独立元音、词首等）u 正常发音或参与二合元音。
@@ -125,6 +126,7 @@ class FrenchAnalyzer(SyllableAnalyzer):
 
         Returns:
             静音返回 True。
+
         """
         if w[i] != "u" or i == 0:
             return False
@@ -134,7 +136,7 @@ class FrenchAnalyzer(SyllableAnalyzer):
         return prev == "g" and i + 1 < len(w) and w[i + 1] in _SILENT_GU_FOLLOW
 
     def _clean_word(self, word: str) -> str:
-        """去标点并转小写。
+        """去标点并转小写。.
 
         省音撇号一并去除（l'amour → lamour），但不剥离词首字母前缀，
         以免破坏 aujourd'hui / quelqu'un / presqu'île 等内嵌撇号词的切分。
@@ -144,6 +146,7 @@ class FrenchAnalyzer(SyllableAnalyzer):
 
         Returns:
             清洗后的小写词；空串表示无实际内容。
+
         """
         w = word.lower().strip()
         w = _PUNCT_RE.sub("", w)
@@ -152,7 +155,7 @@ class FrenchAnalyzer(SyllableAnalyzer):
     def _build_syllables(
         self, w: str, nuclei: list[tuple[int, int, str]]
     ) -> list[Syllable]:
-        """根据元音核位置组装音节（辅音在核间归 onset，核后归 coda）。
+        """根据元音核位置组装音节（辅音在核间归 onset，核后归 coda）。.
 
         Args:
             w: 清洗后的词。
@@ -160,6 +163,7 @@ class FrenchAnalyzer(SyllableAnalyzer):
 
         Returns:
             音节列表。
+
         """
         attrs: dict[str, str] = {"tone": "", "stress": "", "length": ""}
         syls: list[Syllable] = []
@@ -177,7 +181,7 @@ class FrenchAnalyzer(SyllableAnalyzer):
     def _apply_final_e(
         self, syls: list[Syllable], w: str, nuclei: list[tuple[int, int, str]]
     ) -> list[Syllable]:
-        """省略词尾静音 e（e muet）。
+        """省略词尾静音 e（e muet）。.
 
         省略条件：末元音核恰为单字母 "e"，且 e 之后（词尾）仅含静音辅音
         （s/t/x/p）或为空；只要词中还有其它元音核即省略。唯一元音时保留
@@ -190,6 +194,7 @@ class FrenchAnalyzer(SyllableAnalyzer):
 
         Returns:
             处理后的音节列表。
+
         """
         if not syls:
             return syls
@@ -204,13 +209,14 @@ class FrenchAnalyzer(SyllableAnalyzer):
         return syls[:-1]
 
     def _syllabify_word(self, word: str) -> list[Syllable]:
-        """按词切分音节（处理二/三合元音与词尾静音 e）。
+        """按词切分音节（处理二/三合元音与词尾静音 e）。.
 
         Args:
             word: 法语单词（可含省音前缀与标点）。
 
         Returns:
             音节列表（nucleus 为真实元音核，coda 为尾辅音）。
+
         """
         w = self._clean_word(word)
         if not w:
@@ -243,13 +249,14 @@ class FrenchAnalyzer(SyllableAnalyzer):
         return self._apply_final_e(syls, w, nuclei)
 
     def _normalize_nucleus(self, nuc: str) -> str:
-        """将元音核归并到押韵等价类（鼻化合并）。
+        """将元音核归并到押韵等价类（鼻化合并）。.
 
         Args:
             nuc: 原始元音核（可能为二/三合元音或鼻化元音）。
 
         Returns:
             归并后的韵脚核（前部鼻化 -> "an"，后部鼻化 -> "on"）。
+
         """
         if nuc in _NASAL_FRONT:
             return "an"
@@ -258,13 +265,14 @@ class FrenchAnalyzer(SyllableAnalyzer):
         return nuc
 
     def rhyme_key(self, word: str) -> str:
-        """法语韵脚 key：词末发音元音核（鼻化归并），词尾静音辅音已丢弃。
+        """法语韵脚 key：词末发音元音核（鼻化归并），词尾静音辅音已丢弃。.
 
         Args:
             word: 行末词。
 
         Returns:
             韵脚串（如 parle -> "e"，an/en -> "an"）；无法切分时返回空串。
+
         """
         syls = self._syllabify_word(word)
         if not syls:
@@ -275,29 +283,31 @@ class FrenchAnalyzer(SyllableAnalyzer):
         return self._normalize_nucleus(last.nucleus)
 
     def count_syllables_in_word(self, word: str) -> int:
-        """单词语节数（含二/三合元音合并与词尾静音 e 规则）。
+        """单词语节数（含二/三合元音合并与词尾静音 e 规则）。.
 
         Args:
             word: 法语单词。
 
         Returns:
             音节数。
+
         """
         return len(self._syllabify_word(word))
 
     def analyze_word(self, word: str) -> list[Syllable]:
-        """分析单词的音节。
+        """分析单词的音节。.
 
         Args:
             word: 法语单词。
 
         Returns:
             音节列表。
+
         """
         return self._syllabify_word(word)
 
     def syllabify_line(self, text: str) -> list[Syllable]:
-        """整行切分：逐词切分并应用跨词联诵（liaison）。
+        """整行切分：逐词切分并应用跨词联诵（liaison）。.
 
         前词以辅音结尾、后词以元音开头时，该辅音作为联诵 onset 并入后词
         首音节（不改变音节总数）。跨词元音相遇不省音（法语省音仅由撇号
@@ -308,6 +318,7 @@ class FrenchAnalyzer(SyllableAnalyzer):
 
         Returns:
             整行音节列表。
+
         """
         words = text.split()
         all_syls: list[Syllable] = []
@@ -326,12 +337,13 @@ class FrenchAnalyzer(SyllableAnalyzer):
         return all_syls
 
     def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-        """整行切分变体（法语标准音节划分下仅返回一种切分）。
+        """整行切分变体（法语标准音节划分下仅返回一种切分）。.
 
         Args:
             line: 一行法语诗。
 
         Returns:
             仅含标准切分的变体列表。
+
         """
         return [self.syllabify_line(line)]

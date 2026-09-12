@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""中文音节分析器（基于 pypinyin）。
+"""中文音节分析器（基于 pypinyin）。.
 
 - 韵母拆解表 FINAL_TO_PARTS：将拼音韵母拆为韵腹 + 韵尾。
 - 整行分析时由调用方拼接全行后一次性交给 pypinyin，
@@ -100,13 +100,14 @@ _ZE_TONES = {"3", "4"}
 
 
 def _split_final(final_str: str) -> tuple[str, str]:
-    """将带声调的韵母串拆为 (韵腹, 韵尾)。
+    """将带声调的韵母串拆为 (韵腹, 韵尾)。.
 
     Args:
         final_str: 如 "iao3"、"ang"、"üe4"。
 
     Returns:
         (韵腹, 韵尾)；无法识别时原样返回 (final_str, "")。
+
     """
     if not final_str:
         return "", ""
@@ -122,7 +123,7 @@ def _split_final(final_str: str) -> tuple[str, str]:
 
 
 def _tone_to_pingze(tone_str: str) -> str:
-    """声调 → 平仄标签。
+    """声调 → 平仄标签。.
 
     一声、二声与轻声（含无调号）均归为平声；三声、四声归为仄声。
 
@@ -132,6 +133,7 @@ def _tone_to_pingze(tone_str: str) -> str:
 
     Returns:
         "平" 或 "仄"。
+
     """
     if not tone_str:
         return "平"
@@ -149,7 +151,7 @@ def _tone_to_pingze(tone_str: str) -> str:
 
 
 class ChineseAnalyzer(SyllableAnalyzer):
-    """中文音节分析器：逐字输出声母/韵腹/韵尾 + 平仄。
+    """中文音节分析器：逐字输出声母/韵腹/韵尾 + 平仄。.
 
     analyze_word 接受任意长度文本（含整行），pypinyin 会按短语上下文
     自动选择多音字的正确读音。
@@ -158,7 +160,7 @@ class ChineseAnalyzer(SyllableAnalyzer):
     language = "zh"
 
     def analyze_word(self, word: str) -> list[Syllable]:
-        """分析中文文本（可多字）的音节，返回首选（第一）读音。
+        """分析中文文本（可多字）的音节，返回首选（第一）读音。.
 
         为向后兼容保留单读音接口：返回 :meth:`analyze_word_variants` 的首个变体。
 
@@ -167,6 +169,7 @@ class ChineseAnalyzer(SyllableAnalyzer):
 
         Returns:
             每字一个 Syllable（平仄标在 attributes["tone"]）。
+
         """
         variants = self.analyze_word_variants(word)
         if not variants:
@@ -174,7 +177,7 @@ class ChineseAnalyzer(SyllableAnalyzer):
         return variants[0]
 
     def analyze_word_variants(self, word: str) -> list[list[Syllable]]:
-        """返回某词的全部多音字读音组合（笛卡尔积）。
+        """返回某词的全部多音字读音组合（笛卡尔积）。.
 
         对每个字调用 pypinyin 的 heteronym 模式，得到该字的候选
         (声母, 韵母) 列表，再对所有字做笛卡尔积，得到整词的全部读音。
@@ -186,6 +189,7 @@ class ChineseAnalyzer(SyllableAnalyzer):
 
         Returns:
             读音列表；每个元素是一整词的 Syllable 序列（一种读法）。
+
         """
         if not word:
             return []
@@ -263,7 +267,7 @@ class ChineseAnalyzer(SyllableAnalyzer):
         return result
 
     def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-        """返回整行诗的全部读音组合（逐字笛卡尔积）。
+        """返回整行诗的全部读音组合（逐字笛卡尔积）。.
 
         先按 :meth:`tokenize_line` 将行拆为汉字，逐字调用
         :meth:`analyze_word_variants` 得到候选读音，再对整行做笛卡尔积。
@@ -275,6 +279,7 @@ class ChineseAnalyzer(SyllableAnalyzer):
 
         Returns:
             读音列表；每个元素是一整行的 Syllable 序列（一种读法）。
+
         """
         chars = self.tokenize_line(line)
         if not chars:
@@ -295,13 +300,14 @@ class ChineseAnalyzer(SyllableAnalyzer):
         return result
 
     def tokenize_line(self, line: str) -> list[str]:
-        """逐字切分（仅保留汉字）。
+        """逐字切分（仅保留汉字）。.
 
         Args:
             line: 一行诗。
 
         Returns:
             汉字字符列表。
+
         """
         return [
             ch

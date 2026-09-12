@@ -119,6 +119,9 @@ dev = [
 [tool.uv]
 package = false
 
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]

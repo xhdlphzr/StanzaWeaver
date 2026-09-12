@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""中文音节分析器覆盖补全测试（针对 100% 行覆盖的残留分支）。"""
+"""中文音节分析器覆盖补全测试（针对 100% 行覆盖的残留分支）。."""
 
 from unittest.mock import patch
 
@@ -16,35 +16,35 @@ from src.prosody.chinese import (
 
 
 def test_split_final_empty_returns_empty_pair() -> None:
-    """验证 _split_final 空输入返回 ("", "")。"""
+    """验证 _split_final 空输入返回 ("", "")。."""
     assert _split_final("") == ("", "")
 
 
 def test_tone_to_pingze_empty_returns_ping() -> None:
-    """验证 _tone_to_pingze 空串归为平声。"""
+    """验证 _tone_to_pingze 空串归为平声。."""
     assert _tone_to_pingze("") == "平"
 
 
 def test_tone_to_pingze_unusual_digit_returns_ping() -> None:
-    """验证 _tone_to_pingze 非常规数字（如 5 声）归为平声。"""
+    """验证 _tone_to_pingze 非常规数字（如 5 声）归为平声。."""
     assert _tone_to_pingze("iao5") == "平"
     assert _tone_to_pingze("x5") == "平"
 
 
 def test_analyze_word_empty_returns_empty() -> None:
-    """验证 analyze_word 空输入返回空列表（line 173）。"""
+    """验证 analyze_word 空输入返回空列表（line 173）。."""
     a = ChineseAnalyzer()
     assert a.analyze_word("") == []
 
 
 def test_analyze_word_variants_empty_returns_empty() -> None:
-    """验证 analyze_word_variants 空输入返回空列表（line 191）。"""
+    """验证 analyze_word_variants 空输入返回空列表（line 191）。."""
     a = ChineseAnalyzer()
     assert a.analyze_word_variants("") == []
 
 
 def test_analyze_word_variants_fallback_empty_char_syls() -> None:
-    """验证某字无候选读音时补空 Syllable（line 239）。
+    """验证某字无候选读音时补空 Syllable（line 239）。.
 
     通过 mock pinyin，使某个字的 finals 候选为空，使内层双循环
     不产出任何 Syllable，从而触发 ``if not char_syls`` 回退。
@@ -59,7 +59,7 @@ def test_analyze_word_variants_fallback_empty_char_syls() -> None:
         strict: bool = True,
         heteronym: bool = False,
     ) -> list[list[str]]:
-        """mock 的 pinyin 替身：按 style 返回预设的 initials/finals 列表。"""
+        """Mock 的 pinyin 替身：按 style 返回预设的 initials/finals 列表。."""
         if style == Style.INITIALS:
             return initials_list
         return finals_list
@@ -72,7 +72,7 @@ def test_analyze_word_variants_fallback_empty_char_syls() -> None:
 
 
 def test_analyze_word_variants_truncates_to_64() -> None:
-    """验证笛卡尔积超过 64 时按序截断（line 253）。
+    """验证笛卡尔积超过 64 时按序截断（line 253）。.
 
     通过 mock pinyin，使单个字产生 65 个候选读音（不同韵腹），
     触发 ``if len(result) > 64`` 截断到前 64 种。
@@ -88,7 +88,7 @@ def test_analyze_word_variants_truncates_to_64() -> None:
         strict: bool = True,
         heteronym: bool = False,
     ) -> list[list[str]]:
-        """mock 的 pinyin 替身：按 style 返回预设的 initials/finals 列表。"""
+        """Mock 的 pinyin 替身：按 style 返回预设的 initials/finals 列表。."""
         if style == Style.INITIALS:
             return initials_list
         return finals_list
@@ -99,7 +99,7 @@ def test_analyze_word_variants_truncates_to_64() -> None:
 
 
 def test_analyze_line_variants_empty_word_variant() -> None:
-    """验证某字读音为空时回退为 [[]]（line 278）。
+    """验证某字读音为空时回退为 [[]]（line 278）。.
 
     通过 mock ``analyze_word_variants`` 返回空列表，使 per-char 循环中
     ``if not wv: wv = [[]]`` 分支被执行。
@@ -112,7 +112,7 @@ def test_analyze_line_variants_empty_word_variant() -> None:
 
 
 def test_analyze_word_variants_mismatched_lengths_fallback() -> None:
-    """声母/韵母候选数均 >1 且不等时回退 zip 配对（覆盖 294 行）。"""
+    """声母/韵母候选数均 >1 且不等时回退 zip 配对（覆盖 294 行）。."""
     a = ChineseAnalyzer()
     initials_list: list[list[str]] = [["x", "y"]]
     finals_list: list[list[str]] = [["a1", "b1", "c1"]]
@@ -123,7 +123,7 @@ def test_analyze_word_variants_mismatched_lengths_fallback() -> None:
         strict: bool = True,
         heteronym: bool = False,
     ) -> list[list[str]]:
-        """mock 的 pinyin 替身：按 style 返回预设的 initials/finals 列表。"""
+        """Mock 的 pinyin 替身：按 style 返回预设的 initials/finals 列表。."""
         if style == Style.INITIALS:
             return initials_list
         return finals_list
@@ -135,7 +135,7 @@ def test_analyze_word_variants_mismatched_lengths_fallback() -> None:
 
 
 def test_analyze_line_variants_truncates_to_64() -> None:
-    """整行读音组合超过 64 时截断到前 64 种（覆盖 294 行）。"""
+    """整行读音组合超过 64 时截断到前 64 种（覆盖 294 行）。."""
     a = ChineseAnalyzer()
     many = [
         [Syllable(onset="", nucleus="a", coda="", attributes={})] for _ in range(10)

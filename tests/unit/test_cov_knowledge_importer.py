@@ -32,6 +32,7 @@ def _mk_syl(nucleus: str = "?") -> Syllable:
 
     Returns:
         Placeholder Syllable instance.
+
     """
     return Syllable(
         nucleus=nucleus,
@@ -47,6 +48,7 @@ def _urlopen_returning(data: bytes) -> mock.MagicMock:
 
     Returns:
         A MagicMock usable as a ``urllib.request.urlopen`` replacement.
+
     """
     resp = mock.MagicMock()
     resp.read.return_value = data
@@ -68,6 +70,7 @@ def _alpha(n: int) -> str:
 
     Returns:
         Alphabetic-only string.
+
     """
     s = ""
     while n > 0:
@@ -198,7 +201,7 @@ def test_import_skip_when_dataset_present() -> None:
 
 
 def test_import_all_runs_to_completion() -> None:
-    """import_all 在数据集已存在时全部走跳过分支（覆盖 508-517 及各 skip return）。
+    """import_all 在数据集已存在时全部走跳过分支（覆盖 508-517 及各 skip return）。.
 
     直接驱动 ``import_all``，确保其在干净环境下也能完整执行（不经 app 后台
     线程且不受网络影响），从而覆盖 import_all 函数体本身。
@@ -220,6 +223,7 @@ def _chinese_text() -> str:
 
     Returns:
         CC-CEDICT 格式的词典文本。
+
     """
     lines = [
         "# this is a comment",
@@ -275,6 +279,7 @@ def _english_dict() -> dict[str, list[tuple[str, ...]]]:
 
     Returns:
         模拟 CMUdict 的字典数据。
+
     """
     data: dict[str, list[tuple[str, ...]]] = {
         "hello": [("B", "AE1", "T"), ("HH", "EH1", "L", "OW1")],
@@ -296,6 +301,7 @@ def _patch_nltk(data: dict[str, list[tuple[str, ...]]]) -> Any:
 
     Returns:
         mock.patch.dict 上下文管理器。
+
     """
     nltk_mod = types.ModuleType("nltk")
     nltk_mod.data = mock.MagicMock()  # type: ignore[attr-defined]
@@ -368,13 +374,14 @@ def test_import_english_no_download() -> None:
 
 
 def _fr_syl(w: str) -> list[Syllable]:
-    """Controlled French syllable splitter stub.
+    """Stub a controlled French syllable splitter.
 
     Args:
         w: 待分音节的单词。
 
     Returns:
         分音节后的 Syllable 列表。
+
     """
     if w == "we":
         return []
@@ -390,6 +397,7 @@ def _french_text() -> str:
 
     Returns:
         Lexique382 格式的词典文本。
+
     """
     rows = [
         "junk\tortho\tnbsyl\tphon",
@@ -455,13 +463,14 @@ def test_import_french_header_only() -> None:
 
 
 def _it_syl(w: str) -> list[Syllable]:
-    """Controlled Italian syllable splitter stub.
+    """Stub a controlled Italian syllable splitter.
 
     Args:
         w: 待分音节的单词。
 
     Returns:
         分音节后的 Syllable 列表。
+
     """
     if w in ("bb", "fbad"):
         return []
@@ -473,6 +482,7 @@ def _italian_text() -> str:
 
     Returns:
         GLAW-IT 格式的词典文本。
+
     """
     parts = [
         "<txt>pre</txt><title>aa</title><txt>post</txt><title>bb</title>",
@@ -541,13 +551,14 @@ def test_import_italian_oserror() -> None:
 
 
 def _la_analyze(clean: str) -> list[Syllable]:
-    """Controlled Latin analyzer stub.
+    """Stub a controlled Latin analyzer.
 
     Args:
         clean: 清理后的拉丁文单词。
 
     Returns:
         分析后的 Syllable 列表。
+
     """
     if clean == "zzz":
         return []
@@ -559,6 +570,7 @@ def _latin_text() -> str:
 
     Returns:
         Lewis-Short 格式的词典文本。
+
     """
     lines = [
         "",

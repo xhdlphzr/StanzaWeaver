@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""StanzaWeaver 应用入口（Flask + SocketIO + pywebview）。
+"""StanzaWeaver 应用入口（Flask + SocketIO + pywebview）。.
 
 - HTTP API：模板列表、LLM 配置、历史记录、自定义模板、导入状态；
 - SocketIO：generate / feedback 事件驱动四步流水线，progress/done/error 推送；
@@ -43,7 +43,7 @@ _vocab_importing = True
 
 
 def _auto_import() -> None:
-    """后台线程：首次运行自动导入词库。"""
+    """后台线程：首次运行自动导入词库。."""
     global _vocab_importing
     from src.knowledge.vocabulary import init_db
 
@@ -61,10 +61,11 @@ def _auto_import() -> None:
 
 
 def _ping_one_endpoint(endpoint_name: str) -> None:
-    """探测单个 LLM 端点连通性。
+    """探测单个 LLM 端点连通性。.
 
     Args:
         endpoint_name: 端点名称（"writer" 或 "checker"）。
+
     """
     from src.agents.base import LLMClient
     from src.config import get_config
@@ -87,7 +88,7 @@ def _ping_one_endpoint(endpoint_name: str) -> None:
 
 
 def _auto_ping() -> None:
-    """后台线程：启动时探测一次 LLM 端点，之后仅在配置保存/词库导入后重探。
+    """后台线程：启动时探测一次 LLM 端点，之后仅在配置保存/词库导入后重探。.
 
     不再定时轮询：避免用户点击"取消设置"等操作后被误认为重新检测连接性；
     连通性只在保存配置（或词库导入完成、手动点击检查）时刷新。
@@ -103,7 +104,7 @@ def _auto_ping() -> None:
 
 
 def _start_background_threads() -> None:
-    """按需启动后台导入/连通性探测线程。
+    """按需启动后台导入/连通性探测线程。.
 
     仅在 ``start_server`` 启动 HTTP 服务时调用；测试环境下不启动（由
     conftest 注入 STANZA_WEAVER_TEST=1），避免异步线程读取被测试重定向的
@@ -124,7 +125,7 @@ _llm_ping_event = threading.Event()
 
 
 def _register_custom_templates() -> None:
-    """注册 src/templates/custom_*.py 中的自定义模板（重启自动恢复）。"""
+    """注册 src/templates/custom_*.py 中的自定义模板（重启自动恢复）。."""
     import importlib
 
     tpl_dir = Path(__file__).parent / "src" / "templates"
@@ -145,10 +146,11 @@ _register_custom_templates()
 
 @app.before_request
 def _guard_local_access() -> Any:
-    """仅允许本机访问（Host 校验）。
+    """仅允许本机访问（Host 校验）。.
 
     Returns:
         None 表示通过；jsonify Response 表示拒绝（403）。
+
     """
     host = request.host or ""
     if not host.startswith(("127.0.0.1", "localhost")):
@@ -157,41 +159,45 @@ def _guard_local_access() -> Any:
 
 
 def _require_csrf() -> bool:
-    """校验 CSRF 令牌。
+    """校验 CSRF 令牌。.
 
     Returns:
         令牌匹配返回 True。
+
     """
     return request.headers.get("X-CSRF-Token", "") == _CSRF_TOKEN
 
 
 @app.route("/api/import-status")
 def api_import_status() -> Any:
-    """查询词库导入状态。
+    """查询词库导入状态。.
 
     Returns:
         JSON Response，含 importing 布尔字段。
+
     """
     return jsonify({"importing": _vocab_importing})
 
 
 @app.route("/api/llm-status")
 def api_llm_status() -> Any:
-    """查询 LLM 端点连通状态。
+    """查询 LLM 端点连通状态。.
 
     Returns:
         JSON Response，含 writer 和 checker 状态
        （"unknown" / "checking" / "ok" / "error"）。
+
     """
     return jsonify(dict(_llm_status))
 
 
 @app.route("/api/llm-ping", methods=["POST"])
 def api_llm_ping() -> Any:
-    """手动触发 LLM 端点连通性探测。
+    """手动触发 LLM 端点连通性探测。.
 
     Returns:
         JSON Response，含 writer 和 checker 最新状态。
+
     """
     if not _require_csrf():
         return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
@@ -208,13 +214,14 @@ _I18N_DIR = Path(__file__).parent / "i18n"
 
 @app.route("/api/i18n/<lang>")
 def api_i18n(lang: str) -> Any:
-    """返回指定语言的翻译 JSON。
+    """返回指定语言的翻译 JSON。.
 
     Args:
         lang: 语言代码（"zh" 或 "en"）。
 
     Returns:
         JSON Response，翻译字典。
+
     """
     if lang not in ("zh", "en"):
         lang = "zh"
@@ -228,30 +235,33 @@ def api_i18n(lang: str) -> Any:
 
 @app.route("/")
 def index() -> str:
-    """主页面（注入 CSRF 令牌）。
+    """主页面（注入 CSRF 令牌）。.
 
     Returns:
         渲染后的 HTML 字符串。
+
     """
     return render_template("index.html", csrf_token=_CSRF_TOKEN)
 
 
 @app.route("/api/templates")
 def api_templates() -> Any:
-    """模板列表接口。
+    """模板列表接口。.
 
     Returns:
         JSON Response，模板字典列表。
+
     """
     return jsonify(list_dicts())
 
 
 @app.route("/api/templates/meta")
 def api_templates_meta() -> Any:
-    """自定义模板编辑器的逐语言约束元数据。
+    """自定义模板编辑器的逐语言约束元数据。.
 
     Returns:
         JSON Response：{语言: {"attribute", "values", "helpers"}}。
+
     """
     meta: dict[str, dict[str, Any]] = {}
     for lang, (attribute, values) in custom_template_schemes().items():
@@ -265,13 +275,14 @@ def api_templates_meta() -> Any:
 
 @app.route("/api/config", methods=["GET"])
 def api_get_config() -> Any:
-    """读取 LLM 配置。
+    """读取 LLM 配置。.
 
     Returns:
         JSON Response，含 writer 和 checker 端点配置。
 
     Raises:
         403: CSRF 令牌校验失败。
+
     """
     if not _require_csrf():
         return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
@@ -289,7 +300,7 @@ def api_get_config() -> Any:
 
 @app.route("/api/config", methods=["POST"])
 def api_save_config() -> Any:
-    """保存 LLM 配置。
+    """保存 LLM 配置。.
 
     Returns:
         JSON Response（成功或错误）。
@@ -297,6 +308,7 @@ def api_save_config() -> Any:
     Raises:
         400: 请求格式错误。
         403: CSRF 令牌校验失败。
+
     """
     if not _require_csrf():
         return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
@@ -332,18 +344,19 @@ def api_save_config() -> Any:
 
 @socketio.on("connect")
 def handle_connect() -> None:
-    """Socket 连接建立。
+    """Socket 连接建立。.
 
     无返回值，无副作用。
     """
 
 
 def _emit_done(session_id: str, result: Any) -> None:
-    """向会话推送 done 事件。
+    """向会话推送 done 事件。.
 
     Args:
         session_id: SocketIO 会话 ID。
         result: 流水线结果状态。
+
     """
     socketio.emit(
         "done",
@@ -362,10 +375,11 @@ def _emit_done(session_id: str, result: Any) -> None:
 
 @socketio.on("generate")
 def handle_generate(data: dict[str, Any]) -> None:
-    """开始生成：后台线程跑四步流水线。
+    """开始生成：后台线程跑四步流水线。.
 
     Args:
         data: 事件负载（topic 主题、template_key 模板键）。
+
     """
     from src.pipeline.pipeline import PoetryPipeline
 
@@ -383,15 +397,16 @@ def handle_generate(data: dict[str, Any]) -> None:
     pipeline = PoetryPipeline()
 
     def on_progress(state_dict: dict[str, Any]) -> None:
-        """推送流水线进度到该会话。
+        """推送流水线进度到该会话。.
 
         Args:
             state_dict: 流水线状态字典。
+
         """
         socketio.emit("progress", state_dict, to=session_id)
 
     def run() -> None:
-        """在后台线程执行四步流水线并推送 done/error 事件。"""
+        """在后台线程执行四步流水线并推送 done/error 事件。."""
         try:
             result = pipeline.run(
                 topic=topic,
@@ -418,10 +433,11 @@ def handle_generate(data: dict[str, Any]) -> None:
 
 @socketio.on("feedback")
 def handle_feedback(data: dict[str, Any]) -> None:
-    """用户反馈续跑：打回 Step 3 按反馈重新炼句。
+    """用户反馈续跑：打回 Step 3 按反馈重新炼句。.
 
     Args:
         data: 事件负载（feedback 用户反馈文本）。
+
     """
     from src.pipeline.pipeline import PoetryPipeline
 
@@ -437,15 +453,16 @@ def handle_feedback(data: dict[str, Any]) -> None:
     pipeline = PoetryPipeline()
 
     def on_progress(state_dict: dict[str, Any]) -> None:
-        """推送流水线进度到该会话。
+        """推送流水线进度到该会话。.
 
         Args:
             state_dict: 流水线状态字典。
+
         """
         socketio.emit("progress", state_dict, to=session_id)
 
     def run() -> None:
-        """在后台线程按用户反馈续跑流水线并推送 done/error 事件。"""
+        """在后台线程按用户反馈续跑流水线并推送 done/error 事件。."""
         try:
             result = pipeline.continue_with_feedback(
                 state=pipeline_state,
@@ -472,7 +489,7 @@ def handle_feedback(data: dict[str, Any]) -> None:
 
 @socketio.on("disconnect")
 def handle_disconnect() -> None:
-    """连接断开：清理会话状态。"""
+    """连接断开：清理会话状态。."""
     _active_states.pop(request.sid, None)  # type: ignore[attr-defined]  # flask_socketio 注入
 
 
@@ -487,7 +504,7 @@ def _build_custom_template_code(
     class_name: str,
     file_key: str,
 ) -> str:
-    """生成自定义模板的 Python 源码（供 /api/templates/custom 落盘）。
+    """生成自定义模板的 Python 源码（供 /api/templates/custom 落盘）。.
 
     Args:
         name: 模板显示名。
@@ -502,6 +519,7 @@ def _build_custom_template_code(
 
     Returns:
         可直接写入 src/templates/custom_*.py 的源码文本。
+
     """
     constraints_code: list[str] = []
     for line_c in constraints:
@@ -551,7 +569,7 @@ def _build_custom_template_code(
 
 @app.route("/api/templates/custom", methods=["POST"])
 def api_create_custom_template() -> Any:
-    """创建自定义格律模板（落盘为 src/templates/custom_*.py 并热注册）。
+    """创建自定义格律模板（落盘为 src/templates/custom_*.py 并热注册）。.
 
     Returns:
         JSON Response（成功含模板 key，或错误信息）。
@@ -559,6 +577,7 @@ def api_create_custom_template() -> Any:
     Raises:
         400: 请求格式错误或模板代码无效。
         403: CSRF 令牌校验失败。
+
     """
     import importlib
     import re
@@ -653,20 +672,22 @@ _HISTORY_DB_PATH: Path | None = None
 
 
 def set_history_db_path(path: Path) -> None:
-    """覆盖历史记录数据库路径（主要供测试使用）。
+    """覆盖历史记录数据库路径（主要供测试使用）。.
 
     Args:
         path: 新的数据库文件路径。
+
     """
     global _HISTORY_DB_PATH
     _HISTORY_DB_PATH = path
 
 
 def get_history_db_path() -> Path:
-    """返回历史记录数据库路径（默认 ~/.stanza_weaver/history.db）。
+    """返回历史记录数据库路径（默认 ~/.stanza_weaver/history.db）。.
 
     Returns:
         数据库文件路径。
+
     """
     global _HISTORY_DB_PATH
     if _HISTORY_DB_PATH is None:
@@ -675,7 +696,7 @@ def get_history_db_path() -> Path:
 
 
 def _init_history_db() -> None:
-    """初始化历史记录表（幂等）。"""
+    """初始化历史记录表（幂等）。."""
     import sqlite3
 
     hdb = get_history_db_path()
@@ -696,10 +717,11 @@ def _init_history_db() -> None:
 
 @app.route("/api/history", methods=["GET"])
 def api_get_history() -> Any:
-    """读取历史记录（最近 50 条）。
+    """读取历史记录（最近 50 条）。.
 
     Returns:
         JSON Response，历史记录列表。
+
     """
     import sqlite3
 
@@ -726,7 +748,7 @@ def api_get_history() -> Any:
 
 @app.route("/api/history", methods=["POST"])
 def api_save_history() -> Any:
-    """保存历史记录（定稿后由前端调用）。
+    """保存历史记录（定稿后由前端调用）。.
 
     Returns:
         JSON Response（成功或错误）。
@@ -734,6 +756,7 @@ def api_save_history() -> Any:
     Raises:
         400: 请求格式错误。
         403: CSRF 令牌校验失败。
+
     """
     import sqlite3
 
@@ -764,7 +787,7 @@ def api_save_history() -> Any:
 
 
 def start_server() -> None:
-    """启动 SocketIO 服务。
+    """启动 SocketIO 服务。.
 
     监听地址/端口可用环境变量 STANZAWEAVER_HOST / STANZAWEAVER_PORT 覆盖
     （Docker 部署时设 STANZAWEAVER_HOST=0.0.0.0 配合端口映射）。
@@ -780,13 +803,14 @@ def start_server() -> None:
 
 
 def main() -> None:
-    """入口：优先 pywebview 桌面窗口，否则纯 HTTP 服务。
+    """入口：优先 pywebview 桌面窗口，否则纯 HTTP 服务。.
 
     桌面窗口初始化失败（如无显示环境/缺 GUI 库）时自动回退到 HTTP 服务，
     保证 Docker 等无头环境可用。
 
     Returns:
         None。
+
     """
     try:
         import webview

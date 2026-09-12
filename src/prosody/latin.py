@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""拉丁语音节分析器。
+"""拉丁语音节分析器。.
 
 - 支持长音符号（āēīōūȳ）与短音符号（ăĕĭŏŭ）标注。
 - 音长判定：词典/符号标注优先；无标注时双元音（ae/oe/au/eu/ei/ui）为长音，
@@ -64,7 +64,7 @@ _VOWEL_BASE: set[str] = set("aeiouy")
 
 
 def _strip_macron(text: str) -> str:
-    """去除组合音标（macron/短音符号），仅保留 ASCII 小写字母。
+    """去除组合音标（macron/短音符号），仅保留 ASCII 小写字母。.
 
     用于把 "āe" 等带长音符号的双元音归一为 "ae" 后再查表。
 
@@ -73,6 +73,7 @@ def _strip_macron(text: str) -> str:
 
     Returns:
         去组合音标后的纯 ASCII 小写形式。
+
     """
     return "".join(
         c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c)
@@ -80,12 +81,12 @@ def _strip_macron(text: str) -> str:
 
 
 class LatinAnalyzer(SyllableAnalyzer):
-    """拉丁语音节分析器：音节切分 + 音长判定（符号/双元音/辅音位置）。"""
+    """拉丁语音节分析器：音节切分 + 音长判定（符号/双元音/辅音位置）。."""
 
     language = "la"
 
     def analyze_word(self, word: str) -> list[Syllable]:
-        """分析单词的音节与音长。
+        """分析单词的音节与音长。.
 
         音节 = (onset 辅音) + 元音核(可含双元音) + (coda 辅音)。
         - 辅音性 u（qu/gu/su 后接元音）整簇作为当前音节的 onset，不构成独立音节。
@@ -98,6 +99,7 @@ class LatinAnalyzer(SyllableAnalyzer):
 
         Returns:
             音节列表（长度标在 attributes["length"]）。
+
         """
         word = word.strip(".,;:!?\"'()[]{}")
         if not word:
@@ -109,7 +111,7 @@ class LatinAnalyzer(SyllableAnalyzer):
         length_val = ""
 
         def _close() -> None:
-            """关闭当前挂起音节并追加到音节列表，随后重置本地的 onset/nucleus/coda/length。"""
+            """关闭当前挂起音节并追加到音节列表，随后重置本地的 onset/nucleus/coda/length。."""
             syllables.append(
                 Syllable(
                     onset=onset,
@@ -223,7 +225,7 @@ class LatinAnalyzer(SyllableAnalyzer):
         )
 
     def analyze_line(self, text: str) -> list[Syllable]:
-        """整行分析（含跨词音长与拉丁省音 elision）。
+        """整行分析（含跨词音长与拉丁省音 elision）。.
 
         跨词音长：前词末元音后接后词首 ≥2 辅音则为长音。
         省音：前词以元音（或 m）结尾、后词以元音（或 h）开头时，
@@ -234,6 +236,7 @@ class LatinAnalyzer(SyllableAnalyzer):
 
         Returns:
             音节列表。
+
         """
         words = [w for w in re.split(r"[^A-Za-zāēīōūȳăĕĭŏŭ'-]+", text) if w]
         result: list[Syllable] = []
@@ -262,7 +265,7 @@ class LatinAnalyzer(SyllableAnalyzer):
 
     @staticmethod
     def _leading_consonant_count(w: str) -> int:
-        """统计词首辅音序列的「有效辅音位」数（含 x 计2、qu/gu/su 的 u 为辅音性、
+        """统计词首辅音序列的「有效辅音位」数（含 x 计2、qu/gu/su 的 u 为辅音性、.
 
         muta cum liquida 仅算1）。
 
@@ -271,6 +274,7 @@ class LatinAnalyzer(SyllableAnalyzer):
 
         Returns:
             有效辅音位数；无前导辅音返回 0。
+
         """
         w = w.strip(".,;:!?\"'()[]{}").lower()
         n = len(w)
@@ -292,12 +296,13 @@ class LatinAnalyzer(SyllableAnalyzer):
         return eff
 
     def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-        """整行切分变体（拉丁语标准切分下 muta cum liquida 并入一节拍，故仅返回标准切分）。
+        """整行切分变体（拉丁语标准切分下 muta cum liquida 并入一节拍，故仅返回标准切分）。.
 
         Args:
             line: 一行拉丁语诗。
 
         Returns:
             仅含标准切分的变体列表。
+
         """
         return [self.analyze_line(line)]

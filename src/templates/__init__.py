@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""格律模板基类与注册表。
+"""格律模板基类与注册表。.
 
 模板（PoetryTemplate）定义一种诗体的全部格律规则：
 - syllables_per_line: 每行音节数（int 或 (min, max) 区间）；
@@ -24,13 +24,14 @@ ConstraintTable = list[ConstraintLine]
 
 
 def _make_syl(**kwargs: Any) -> dict[str, Any]:
-    """构造逐位约束字典。
+    """构造逐位约束字典。.
 
     Args:
         **kwargs: 可含 onset/nucleus/coda 及 attributes 子字典。
 
     Returns:
         约束字典（含完整 attributes 三键）。
+
     """
     attrs = kwargs.pop("attributes", {})
     if not isinstance(attrs, dict):
@@ -48,7 +49,7 @@ def _make_syl(**kwargs: Any) -> dict[str, Any]:
 
 
 def _last_word(line: str, allowed_chars: str) -> str:
-    """取行末词（去标点、小写）。
+    """取行末词（去标点、小写）。.
 
     Args:
         line: 一行诗。
@@ -56,6 +57,7 @@ def _last_word(line: str, allowed_chars: str) -> str:
 
     Returns:
         行末词；空行返回空串。
+
     """
     if not line.strip():
         return ""
@@ -63,13 +65,14 @@ def _last_word(line: str, allowed_chars: str) -> str:
 
 
 def describe_template_from_dict(template_dict: dict[str, Any]) -> str:
-    """从模板字典生成格律描述（无模板对象时的降级方案）。
+    """从模板字典生成格律描述（无模板对象时的降级方案）。.
 
     Args:
         template_dict: 含 lines/syllables_per_line/syllable_constraints 的字典。
 
     Returns:
         多行格律描述文本。
+
     """
     lines_spec = template_dict.get("syllables_per_line", [])
     lines_desc = f"共 {template_dict.get('lines', len(lines_spec))} 行"
@@ -99,7 +102,7 @@ def describe_template_from_dict(template_dict: dict[str, Any]) -> str:
 
 
 class PoetryTemplate(ABC):
-    """格律模板基类（每种诗体一个子类）。"""
+    """格律模板基类（每种诗体一个子类）。."""
 
     name: ClassVar[str] = ""
     language: ClassVar[str] = ""
@@ -109,17 +112,18 @@ class PoetryTemplate(ABC):
     rule_description: ClassVar[str] = ""
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """返回逐位音节约束表（每行一个约束列表）。
+        """返回逐位音节约束表（每行一个约束列表）。.
 
         Returns:
             约束表；不限定时返回 None。
+
         """
         return None
 
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """执行模板专属的完整规则检查。
+        """执行模板专属的完整规则检查。.
 
         Args:
             poem: 诗行列表。
@@ -127,15 +131,17 @@ class PoetryTemplate(ABC):
 
         Returns:
             错误信息列表（空列表表示通过）。
+
         """
         return []
 
     def to_dict(self) -> dict[str, Any]:
-        """序列化为字典（供校验器与前端使用）。
+        """序列化为字典（供校验器与前端使用）。.
 
         Returns:
             {"name", "language", "lines", "syllables_per_line",
              "syllable_constraints"}。
+
         """
         return {
             "name": self.name,
@@ -146,10 +152,11 @@ class PoetryTemplate(ABC):
         }
 
     def describe(self) -> str:
-        """生成给 AI 提示的人类可读格律描述。
+        """生成给 AI 提示的人类可读格律描述。.
 
         Returns:
             多行文本：行数、每行音节数、逐位约束、自然语言规则。
+
         """
         lines_desc = describe_template_from_dict(
             {
@@ -165,7 +172,7 @@ class PoetryTemplate(ABC):
     def _punctuated_content(
         self, poem: list[str], punctuation: list[str]
     ) -> tuple[str, list[str]]:
-        """给正文行逐行加标点（标题不加标点）。
+        """给正文行逐行加标点（标题不加标点）。.
 
         Args:
             poem: 诗行列表（首元素为标题）。
@@ -173,6 +180,7 @@ class PoetryTemplate(ABC):
 
         Returns:
             (标题, 已加标点的正文行列表)。
+
         """
         title = poem[0] if poem else ""
         content = poem[1:] if len(poem) > 1 else poem
@@ -183,7 +191,7 @@ class PoetryTemplate(ABC):
         return title, marked
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """将无标点诗行格式化为可展示文本。
+        """将无标点诗行格式化为可展示文本。.
 
         子类可覆写以实现诗体专属格式（如标点、缩进、分段）。
         AI 生成的原始诗稿无标点、句间换行，本方法负责加上标点与排版。
@@ -195,6 +203,7 @@ class PoetryTemplate(ABC):
 
         Returns:
             格式化后的展示文本。
+
         """
         if punctuation:
             title, marked = self._punctuated_content(poem, punctuation)
@@ -207,23 +216,25 @@ _registry: dict[str, PoetryTemplate] = {}
 
 
 def register(key: str, template: PoetryTemplate) -> None:
-    """注册模板到全局注册表。
+    """注册模板到全局注册表。.
 
     Args:
         key: 模板键（如 "zh_wujue"）。
         template: 模板实例。
+
     """
     _registry[key] = template
 
 
 def format_count(cnt: SyllableCount) -> str:
-    """格式化音节数供提示/报错使用。
+    """格式化音节数供提示/报错使用。.
 
     Args:
         cnt: int 定值或 (min, max) 区间。
 
     Returns:
         "5" 或 "15-17"。
+
     """
     if isinstance(cnt, (tuple, list)) and len(cnt) == 2:
         return f"{cnt[0]}-{cnt[1]}"
@@ -231,7 +242,7 @@ def format_count(cnt: SyllableCount) -> str:
 
 
 def get(key: str) -> PoetryTemplate:
-    """按键获取模板。
+    """按键获取模板。.
 
     Args:
         key: 模板键。
@@ -241,15 +252,17 @@ def get(key: str) -> PoetryTemplate:
 
     Raises:
         KeyError: 键未注册。
+
     """
     return _registry[key]
 
 
 def list_all() -> list[PoetryTemplate]:
-    """返回全部已注册模板。
+    """返回全部已注册模板。.
 
     Returns:
         模板实例列表。
+
     """
     return list(_registry.values())
 
@@ -275,17 +288,18 @@ _CUSTOM_SCHEMES: dict[str, tuple[str, tuple[str, ...]]] = {
 
 
 def custom_template_schemes() -> dict[str, tuple[str, tuple[str, ...]]]:
-    """返回自定义模板各语言的逐位约束方案（含受支持语言清单）。
+    """返回自定义模板各语言的逐位约束方案（含受支持语言清单）。.
 
     Returns:
         {"zh": ("tone", ("平", "仄")), ...}；键即受支持语言，
         值为 (属性维度键, 可选值元组)。
+
     """
     return dict(_CUSTOM_SCHEMES)
 
 
 def template_helpers(language: str) -> tuple[str, ...]:
-    """列出某语言模板模块中可复用的 ``_check_*`` 辅助函数名。
+    """列出某语言模板模块中可复用的 ``_check_*`` 辅助函数名。.
 
     用于自定义代码编辑器的提示：生成的模板会以 ``rules`` 别名导入对应
     语言模块，自定义代码可通过 ``rules.<函数名>`` 复用这些整体规则函数。
@@ -295,6 +309,7 @@ def template_helpers(language: str) -> tuple[str, ...]:
 
     Returns:
         按字母排序的辅助函数名元组；语言模块不存在时抛出 ModuleNotFoundError。
+
     """
     import importlib
 
@@ -303,11 +318,12 @@ def template_helpers(language: str) -> tuple[str, ...]:
 
 
 def list_dicts() -> list[dict[str, Any]]:
-    """返回全部模板的字典形式（含显示名），供前端下拉列表使用。
+    """返回全部模板的字典形式（含显示名），供前端下拉列表使用。.
 
     Returns:
         [{"key", "name", "language", "lines", "syllables_per_line",
           "syllable_constraints", "display_name"}, ...]。
+
     """
     return [
         {

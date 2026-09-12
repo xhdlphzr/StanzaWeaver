@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""词库数据集导入（CC-CEDICT / CMUdict / Lexique / GLAW-IT / Lewis & Short）。
+"""词库数据集导入（CC-CEDICT / CMUdict / Lexique / GLAW-IT / Lewis & Short）。.
 
 首次运行自动执行：下载数据集 → 解析为 Word 列表 → 写入 SQLite。
 同一数据集已导入时跳过（meta 表记录版本）。
@@ -47,7 +47,7 @@ logger: Logger = get_logger(__name__)
 
 
 def _download_text(url: str, timeout: int = 10) -> str | None:
-    """下载文本资源（失败返回 None）。
+    """下载文本资源（失败返回 None）。.
 
     网络错误（URLError/HTTPError/超时）均为 OSError 子类。
 
@@ -57,6 +57,7 @@ def _download_text(url: str, timeout: int = 10) -> str | None:
 
     Returns:
         文本内容；失败时 None。
+
     """
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -68,19 +69,20 @@ def _download_text(url: str, timeout: int = 10) -> str | None:
 
 
 def _dataset_key(name: str) -> str:
-    """数据集 meta 键。
+    """数据集 meta 键。.
 
     Args:
         name: 语言代码。
 
     Returns:
         "dataset_{lang}"。
+
     """
     return f"dataset_{name}"
 
 
 def _check_dataset(lang: str, expected: str) -> bool:
-    """判断数据集是否已导入。
+    """判断数据集是否已导入。.
 
     Args:
         lang: 语言代码。
@@ -88,6 +90,7 @@ def _check_dataset(lang: str, expected: str) -> bool:
 
     Returns:
         已导入返回 True。
+
     """
     import sqlite3
 
@@ -105,11 +108,12 @@ def _check_dataset(lang: str, expected: str) -> bool:
 
 
 def _set_dataset(lang: str, name: str) -> None:
-    """记录已导入的数据集版本。
+    """记录已导入的数据集版本。.
 
     Args:
         lang: 语言代码。
         name: 数据集名。
+
     """
     import sqlite3
 
@@ -123,7 +127,7 @@ def _set_dataset(lang: str, name: str) -> None:
 
 
 def _import_chinese() -> None:
-    """导入 CC-CEDICT（中文词条，多音字每个读音独立成条）。"""
+    """导入 CC-CEDICT（中文词条，多音字每个读音独立成条）。."""
     if _check_dataset("zh", "CC-CEDICT"):
         logger.info("[zh] 已有数据，跳过")
         return
@@ -191,13 +195,14 @@ def _import_chinese() -> None:
 
 
 def _parse_pinyin(raw_list: list[str]) -> list[Syllable]:
-    """解析拼音音节列表（含声调数字）。
+    """解析拼音音节列表（含声调数字）。.
 
     Args:
         raw_list: 如 ["ni3", "hao3"]。
 
     Returns:
         音节列表（平仄标在 tone）。
+
     """
     tone_map: dict[str, str] = {"1": "平", "2": "平", "3": "仄", "4": "仄", "5": "平"}
     results: list[Syllable] = []
@@ -233,10 +238,11 @@ def _parse_pinyin(raw_list: list[str]) -> list[Syllable]:
 
 
 def _sqlite_delete(lang: str) -> None:
-    """删除某语言的词条。
+    """删除某语言的词条。.
 
     Args:
         lang: 语言代码。
+
     """
     import sqlite3
 
@@ -250,7 +256,7 @@ def _sqlite_delete(lang: str) -> None:
 
 
 def _import_english() -> None:
-    """导入 CMUdict（英文，全部发音变体独立成条，次重音记 heavy）。"""
+    """导入 CMUdict（英文，全部发音变体独立成条，次重音记 heavy）。."""
     if _check_dataset("en", "CMUdict"):
         logger.info("[en] 已有数据，跳过")
         return
@@ -300,7 +306,7 @@ def _import_english() -> None:
 
 
 def _import_french() -> None:
-    """导入 Lexique382（法语词形，真实音节结构由 FrenchAnalyzer 推导）。"""
+    """导入 Lexique382（法语词形，真实音节结构由 FrenchAnalyzer 推导）。."""
     from ..prosody.french import FrenchAnalyzer
 
     _fr_analyzer = FrenchAnalyzer()
@@ -375,7 +381,7 @@ _GLAWIT_URL = "http://redac.univ-tlse2.fr/lexicons/glawit/glawit_2017-06-09.xml.
 
 
 def _import_italian() -> None:
-    """导入 GLAW-IT（意大利语词形与释义）。"""
+    """导入 GLAW-IT（意大利语词形与释义）。."""
     if _check_dataset("it", "GLAW-IT"):
         logger.info("[it] 已有数据，跳过")
         return
@@ -458,7 +464,7 @@ _LS_URL = "https://raw.githubusercontent.com/telemachus/plaintext-lewis-short/ma
 
 
 def _import_latin() -> None:
-    """导入 Lewis & Short（拉丁语词条，音长按正字法启发式判定）。"""
+    """导入 Lewis & Short（拉丁语词条，音长按正字法启发式判定）。."""
     if _check_dataset("la", "Lewis-Short"):
         logger.info("[la] 已有数据，跳过")
         return
@@ -506,7 +512,7 @@ def _import_latin() -> None:
 
 
 def import_all() -> None:
-    """导入全部语言词库（幂等，已导入的数据集自动跳过）。"""
+    """导入全部语言词库（幂等，已导入的数据集自动跳过）。."""
     init_db()
     logger.info("[StanzaWeaver] 导入词库...")
     _import_chinese()
