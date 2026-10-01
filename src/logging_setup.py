@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""应用日志系统（logging + RotatingFileHandler）。.
+"""应用日志系统（logging + RotatingFileHandler）.
 
 - 文件输出：~/.stanza_weaver/logs/stanza.log，RotatingFileHandler 轮转——
   单个日志文件达到 max_bytes 后自动轮转，保留 backup_count 个备份文件
@@ -29,7 +29,7 @@ _configured = False
 
 
 def get_logs_dir() -> Path:
-    """返回日志目录（可用环境变量 STANZAWEAVER_LOG_DIR 覆盖）。.
+    """返回日志目录（可用环境变量 STANZAWEAVER_LOG_DIR 覆盖）.
 
     Returns:
         日志目录路径。
@@ -47,7 +47,7 @@ def setup_logging(
     max_bytes: int = DEFAULT_MAX_BYTES,
     backup_count: int = DEFAULT_BACKUP_COUNT,
 ) -> logging.Logger:
-    """配置全局日志系统（幂等，仅首次调用生效）。.
+    """配置全局日志系统（幂等，仅首次调用生效）.
 
     同时挂载文件 RotatingFileHandler 与控制台 StreamHandler 到 root logger；
     各模块的命名 logger 通过传播输出到两者。
@@ -100,7 +100,7 @@ def setup_logging(
 
 
 def get_logger(name: str) -> logging.Logger:
-    """获取命名 logger（自动按模块名组织）。.
+    """获取命名 logger（自动按模块名组织）.
 
     Args:
         name: logger 名，惯例传 __name__。

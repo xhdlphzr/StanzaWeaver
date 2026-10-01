@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""应用配置（LLM 多端点）。.
+"""应用配置（LLM 多端点）.
 
 配置文件位于 ~/.stanza_weaver/config.json（权限 0600）。
 """
@@ -27,7 +27,7 @@ LLMEndpoint = dict[str, str]
 
 
 def _default_config_path() -> Path:
-    """默认配置文件路径。.
+    """默认配置文件路径.
 
     Returns:
         ~/.stanza_weaver/config.json。
@@ -37,10 +37,10 @@ def _default_config_path() -> Path:
 
 
 class Config:
-    """JSON 配置文件读写（惰性加载 + 0600 权限）。."""
+    """JSON 配置文件读写（惰性加载 + 0600 权限）."""
 
     def __init__(self, config_path: Path | None = None):
-        """初始化配置对象。.
+        """初始化配置对象.
 
         Args:
             config_path: 配置文件路径（缺省用默认路径）。
@@ -51,7 +51,7 @@ class Config:
         self._loaded = False
 
     def _ensure_loaded(self) -> None:
-        """惰性加载配置文件（损坏时按空配置处理）。."""
+        """惰性加载配置文件（损坏时按空配置处理）."""
         if self._loaded:
             return
         if self._path.exists():
@@ -63,7 +63,7 @@ class Config:
         self._loaded = True
 
     def save(self) -> None:
-        """写回配置文件（0600 权限）。."""
+        """写回配置文件（0600 权限）."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with open(self._path, "w", encoding="utf-8") as f:
             json.dump(self._data, f, indent=2, ensure_ascii=False)
@@ -74,7 +74,7 @@ class Config:
 
     @property
     def writer(self) -> LLMEndpoint:
-        """编写 AI 端点配置（缺省回退默认值）。.
+        """编写 AI 端点配置（缺省回退默认值）.
 
         Returns:
             {"base_url", "api_key", "model"}。
@@ -92,7 +92,7 @@ class Config:
 
     @writer.setter
     def writer(self, value: dict[str, Any]) -> None:
-        """设置编写 AI 端点配置。.
+        """设置编写 AI 端点配置.
 
         Args:
             value: 配置字典。
@@ -103,7 +103,7 @@ class Config:
 
     @property
     def checker(self) -> LLMEndpoint:
-        """检查 AI 端点配置（缺省回退默认值）。.
+        """检查 AI 端点配置（缺省回退默认值）.
 
         Returns:
             {"base_url", "api_key", "model"}。
@@ -121,7 +121,7 @@ class Config:
 
     @checker.setter
     def checker(self, value: dict[str, Any]) -> None:
-        """设置检查 AI 端点配置。.
+        """设置检查 AI 端点配置.
 
         Args:
             value: 配置字典。
@@ -132,7 +132,7 @@ class Config:
 
     @property
     def language(self) -> str:
-        """界面语言（"zh" 或 "en"，缺省 "en"）。.
+        """界面语言（"zh" 或 "en"，缺省 "en"）.
 
         Returns:
             语言代码。
@@ -146,7 +146,7 @@ class Config:
 
     @language.setter
     def language(self, value: str) -> None:
-        """设置界面语言。.
+        """设置界面语言.
 
         Args:
             value: 语言代码（"zh" 或 "en"）。
@@ -157,7 +157,7 @@ class Config:
 
     @property
     def data(self) -> dict[str, Any]:
-        """原始配置数据。.
+        """原始配置数据.
 
         Returns:
             配置字典（惰性加载）。
@@ -167,7 +167,7 @@ class Config:
         return self._data
 
     def update(self, d: dict[str, Any]) -> None:
-        """合并更新配置。.
+        """合并更新配置.
 
         Args:
             d: 要合并的配置字典。
@@ -181,7 +181,7 @@ _config: Config | None = None
 
 
 def get_config() -> Config:
-    """获取全局配置单例。.
+    """获取全局配置单例.
 
     Returns:
         Config 实例。
@@ -194,6 +194,6 @@ def get_config() -> Config:
 
 
 def reset_config() -> None:
-    """重置配置单例（测试用）。."""
+    """重置配置单例（测试用）."""
     global _config
     _config = None

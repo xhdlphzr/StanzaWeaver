@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""数据模型：词条（Word）。.
+"""数据模型：词条（Word）.
 
 词库（SQLite）中一个词条的表示：文本、语言、音节切分及释义。
 中文/英文导入的词条各占一条记录，多音字每个读音单独成条。
@@ -17,7 +17,7 @@ SyllableInput = Syllable | dict[str, Any]
 
 @dataclass
 class Word:
-    """一个词条。.
+    """一个词条.
 
     Attributes:
         text: 词条文本（英文为大写，中文原样）。
@@ -34,7 +34,7 @@ class Word:
 
     @property
     def syllable_count(self) -> int:
-        """返回音节数。.
+        """返回音节数.
 
         Returns:
             syllables 列表长度。
@@ -43,7 +43,7 @@ class Word:
         return len(self.syllables)
 
     def to_dict(self) -> dict[str, Any]:
-        """序列化为字典（含 syllables 列表的字典形式）。.
+        """序列化为字典（含 syllables 列表的字典形式）.
 
         Returns:
             {"text": ..., "language": ..., "syllables": [...], "meaning": ...}。
@@ -60,7 +60,7 @@ class Word:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Word:
-        """从字典重建词条（to_dict 的逆操作）。.
+        """从字典重建词条（to_dict 的逆操作）.
 
         Args:
             d: to_dict() 产生的字典。

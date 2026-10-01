@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""SocketIO 集成测试：用桩 LLM 驱动 generate 事件，验证进度/定稿推送。.
+"""SocketIO 集成测试：用桩 LLM 驱动 generate 事件，验证进度/定稿推送.
 
 不发起真实网络请求；emit 被替换为录制器，便于断言推送的事件。
 """
@@ -23,7 +23,7 @@ REVISED_LINE = "远岸栖云树"
 
 
 def _make_emitter(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Any]]:
-    """构造事件收集器，拦截所有 socketio.emit 调用。.
+    """构造事件收集器，拦截所有 socketio.emit 调用.
 
     Args:
         monkeypatch: pytest monkeypatch 实例。
@@ -42,7 +42,7 @@ def _make_emitter(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Any]]:
 
 
 def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
-    """注入桩 LLM 客户端，使 SocketIO 流程完全离线运行。.
+    """注入桩 LLM 客户端，使 SocketIO 流程完全离线运行.
 
     Args:
         monkeypatch: pytest monkeypatch 实例。
@@ -76,7 +76,7 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_generate_emits_progress_and_done(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 generate emits progress and done。."""
+    """验证 generate emits progress and done."""
     _patch_llm(monkeypatch)
     emitted = _make_emitter(monkeypatch)
 
@@ -101,7 +101,7 @@ def test_generate_emits_progress_and_done(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_generate_empty_input_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 generate empty input errors。."""
+    """验证 generate empty input errors."""
     emitted = _make_emitter(monkeypatch)
     client = socketio.test_client(app_module.app)
     client.emit("generate", {"topic": "", "template_key": ""})

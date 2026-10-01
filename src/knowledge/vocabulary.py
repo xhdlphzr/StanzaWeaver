@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""词库访问层（SQLite）。.
+"""词库访问层（SQLite）.
 
 - 词条表 words：文本、语言、释义、音节 JSON、音节数；
 - search_words：按语言/音节数/逐位约束查询，支持向量相似度重排；
@@ -22,7 +22,7 @@ _DB_PATH: Path | None = None
 
 
 def set_db_path(path: Path) -> None:
-    """覆盖数据库路径（主要供测试使用）。.
+    """覆盖数据库路径（主要供测试使用）.
 
     Args:
         path: 新的数据库文件路径。
@@ -33,7 +33,7 @@ def set_db_path(path: Path) -> None:
 
 
 def get_db_path() -> Path:
-    """返回数据库路径（默认 ~/.stanza_weaver/vocabulary.db）。.
+    """返回数据库路径（默认 ~/.stanza_weaver/vocabulary.db）.
 
     Returns:
         数据库文件路径。
@@ -46,7 +46,7 @@ def get_db_path() -> Path:
 
 
 def init_db() -> None:
-    """初始化数据库（建表与索引，幂等）。."""
+    """初始化数据库（建表与索引，幂等）."""
     db_path = get_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
@@ -56,7 +56,7 @@ def init_db() -> None:
 
 
 def _get_conn() -> sqlite3.Connection:
-    """打开数据库连接。.
+    """打开数据库连接.
 
     Returns:
         sqlite3 连接。
@@ -66,7 +66,7 @@ def _get_conn() -> sqlite3.Connection:
 
 
 def insert_word(word: Word) -> None:
-    """插入单个词条（便捷封装，主要供测试使用）。.
+    """插入单个词条（便捷封装，主要供测试使用）.
 
     Args:
         word: 词条。
@@ -76,7 +76,7 @@ def insert_word(word: Word) -> None:
 
 
 def insert_words(words: list[Word]) -> None:
-    """批量插入词条。.
+    """批量插入词条.
 
     Args:
         words: 词条列表。
@@ -102,7 +102,7 @@ def insert_words(words: list[Word]) -> None:
 
 
 def _syl_from_json(d: dict[str, Any]) -> Syllable:
-    """从字典还原音节。.
+    """从字典还原音节.
 
     Args:
         d: 音节字典。
@@ -123,7 +123,7 @@ def _syl_matches(
     stress: str = "",
     length: str = "",
 ) -> bool:
-    """判断音节是否满足约束（空字段不限）。.
+    """判断音节是否满足约束（空字段不限）.
 
     Args:
         syl: 音节。
@@ -163,7 +163,7 @@ def search_words(
     length: str = "",
     limit: int = 20,
 ) -> list[dict[str, Any]]:
-    """按约束搜索候选词。.
+    """按约束搜索候选词.
 
     约束匹配词内任一音节位（结果标注 matched_syllable）；
     提供 query 时用向量相似度重排。
@@ -268,7 +268,7 @@ def search_words(
 
 
 def word_count(language: str = "") -> int:
-    """统计词条数量（主要供 has_words 与测试使用）。.
+    """统计词条数量（主要供 has_words 与测试使用）.
 
     Args:
         language: 语言代码（空=全部）。
@@ -289,7 +289,7 @@ def word_count(language: str = "") -> int:
 
 
 def has_words(language: str = "") -> bool:
-    """判断词库是否非空（主要供测试使用）。.
+    """判断词库是否非空（主要供测试使用）.
 
     Args:
         language: 语言代码（空=全部）。
@@ -302,7 +302,7 @@ def has_words(language: str = "") -> bool:
 
 
 def set_en_pron(word: str, prons: list[list[str]]) -> None:
-    """写入英文词的 CMUdict 全部发音（本地缓存，供 EnglishAnalyzer 离线使用）。.
+    """写入英文词的 CMUdict 全部发音（本地缓存，供 EnglishAnalyzer 离线使用）.
 
     Args:
         word: 小写英文词。
@@ -319,7 +319,7 @@ def set_en_pron(word: str, prons: list[list[str]]) -> None:
 
 
 def get_en_pron(word: str) -> list[list[str]] | None:
-    """读取英文词的 CMUdict 全部发音（本地缓存）。.
+    """读取英文词的 CMUdict 全部发音（本地缓存）.
 
     Args:
         word: 小写英文词。

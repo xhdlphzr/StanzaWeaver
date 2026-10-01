@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""agents 包单元测试：覆盖 src/agents 下全部代码（mock LLM 调用层，无真实网络）。."""
+"""agents 包单元测试：覆盖 src/agents 下全部代码（mock LLM 调用层，无真实网络）."""
 
 import json
 from types import SimpleNamespace
@@ -23,7 +23,7 @@ from src.agents.writer_ai import (
 def _msg(
     content: str = "", tool_calls: Any = None, reasoning: str | None = None
 ) -> Any:
-    """构造 fake 的 OpenAI message 对象。.
+    """构造 fake 的 OpenAI message 对象.
 
     Args:
         content: 消息文本。
@@ -40,7 +40,7 @@ def _msg(
 
 
 def _resp(message: Any) -> Any:
-    """构造 fake 的 chat.completions.create 返回值（含 choices[0].message）。.
+    """构造 fake 的 chat.completions.create 返回值（含 choices[0].message）.
 
     Args:
         message: 模拟 message 对象。
@@ -53,7 +53,7 @@ def _resp(message: Any) -> Any:
 
 
 def _tc(name: str, args_json: str, tid: str = "1") -> Any:
-    """构造 fake 的 tool_call 对象（arguments 为 JSON 字符串）。.
+    """构造 fake 的 tool_call 对象（arguments 为 JSON 字符串）.
 
     Args:
         name: 工具名称。
@@ -70,7 +70,7 @@ def _tc(name: str, args_json: str, tid: str = "1") -> Any:
 
 
 def _chunk(content: str) -> Any:
-    """构造流式 chunk（含 delta.content）。.
+    """构造流式 chunk（含 delta.content）.
 
     Args:
         content: 文本块内容。
@@ -85,7 +85,7 @@ def _chunk(content: str) -> Any:
 
 
 def _chunk_empty() -> Any:
-    """构造空 delta 的流式 chunk。.
+    """构造空 delta 的流式 chunk.
 
     Returns:
         choices 为空列表的 SimpleNamespace 对象。
@@ -95,7 +95,7 @@ def _chunk_empty() -> Any:
 
 
 def _make_llm(base_url: str) -> tuple[LLMClient, MagicMock]:
-    """构造 LLMClient（OpenAI 被 mock），返回 (client, mock_httpx_client)。.
+    """构造 LLMClient（OpenAI 被 mock），返回 (client, mock_httpx_client).
 
     Args:
         base_url: API 基础地址。
@@ -116,14 +116,14 @@ def _make_llm(base_url: str) -> tuple[LLMClient, MagicMock]:
 # _is_loopback
 # --------------------------------------------------------------------------- #
 def test_is_loopback_true() -> None:
-    """回环地址（127.0.0.1 / localhost / ::1）应返回 True。."""
+    """回环地址（127.0.0.1 / localhost / ::1）应返回 True."""
     assert _is_loopback("http://127.0.0.1:11434/v1") is True
     assert _is_loopback("http://localhost:8000/v1") is True
     assert _is_loopback("http://[::1]:11434/v1") is True
 
 
 def test_is_loopback_false() -> None:
-    """非回环地址应返回 False。."""
+    """非回环地址应返回 False."""
     assert _is_loopback("https://api.openai.com/v1") is False
     assert _is_loopback("http://192.168.1.1/v1") is False
 
@@ -132,7 +132,7 @@ def test_is_loopback_false() -> None:
 # LLMClient.__init__ / _raise_with_hint
 # --------------------------------------------------------------------------- #
 def test_init_creates_http_client_for_loopback() -> None:
-    """回环地址下应创建绕过代理的 httpx2.Client（trust_env=False）。."""
+    """回环地址下应创建绕过代理的 httpx2.Client（trust_env=False）."""
     with patch("httpx2.Client") as httpx_cls:
         httpx_cls.return_value = MagicMock(trust_env=False)
         _c, _ = _make_llm("http://127.0.0.1:11434/v1")
@@ -140,14 +140,14 @@ def test_init_creates_http_client_for_loopback() -> None:
 
 
 def test_init_non_loopback_no_special_client() -> None:
-    """非回环地址下正常初始化（不抛错，不创建 trust_env=False 的 client）。."""
+    """非回环地址下正常初始化（不抛错，不创建 trust_env=False 的 client）."""
     with patch("httpx2.Client") as httpx_cls:
         _c, _ = _make_llm("https://api.openai.com/v1")
         httpx_cls.assert_not_called()
 
 
 def test_raise_with_hint_loopback() -> None:
-    """回环地址的错误应附带本地服务排障提示。."""
+    """回环地址的错误应附带本地服务排障提示."""
     c, _ = _make_llm("http://127.0.0.1:11434/v1")
     err = c._raise_with_hint(ValueError("boom"))
     assert isinstance(err, RuntimeError)
@@ -155,7 +155,7 @@ def test_raise_with_hint_loopback() -> None:
 
 
 def test_raise_with_hint_non_loopback() -> None:
-    """非回环地址的错误不附带本地提示。."""
+    """非回环地址的错误不附带本地提示."""
     c, _ = _make_llm("https://api.openai.com/v1")
     err = c._raise_with_hint(ValueError("boom"))
     assert "127.0.0.1" not in str(err)
@@ -165,7 +165,7 @@ def test_raise_with_hint_non_loopback() -> None:
 # LLMClient.chat
 # --------------------------------------------------------------------------- #
 def test_chat_plain() -> None:
-    """无工具的普通对话返回 content。."""
+    """无工具的普通对话返回 content."""
     c, client = _make_llm("https://api.openai.com/v1")
     client.chat.completions.create = MagicMock(return_value=_resp(_msg(content="你好")))
     res = c.chat([{"role": "user", "content": "x"}])
@@ -174,7 +174,7 @@ def test_chat_plain() -> None:
 
 
 def test_chat_with_tools_and_reasoning() -> None:
-    """带工具调用且含 reasoning_content 时正确解析。."""
+    """带工具调用且含 reasoning_content 时正确解析."""
     c, client = _make_llm("https://api.openai.com/v1")
     msg = _msg(
         content="",
@@ -189,7 +189,7 @@ def test_chat_with_tools_and_reasoning() -> None:
 
 
 def test_chat_tool_call_invalid_json() -> None:
-    """工具参数非法 JSON 时回退为空字典。."""
+    """工具参数非法 JSON 时回退为空字典."""
     c, client = _make_llm("https://api.openai.com/v1")
     msg = _msg(content="", tool_calls=[_tc("submit", "not-json")])
     client.chat.completions.create = MagicMock(return_value=_resp(msg))
@@ -198,7 +198,7 @@ def test_chat_tool_call_invalid_json() -> None:
 
 
 def test_chat_raises() -> None:
-    """底层调用抛错时包装为 RuntimeError。."""
+    """底层调用抛错时包装为 RuntimeError."""
     c, client = _make_llm("https://api.openai.com/v1")
     client.chat.completions.create = MagicMock(side_effect=RuntimeError("down"))
     with pytest.raises(RuntimeError):
@@ -209,7 +209,7 @@ def test_chat_raises() -> None:
 # LLMClient.chat_stream
 # --------------------------------------------------------------------------- #
 def test_chat_stream_collects() -> None:
-    """流式对话逐 token 累积，空 delta 被跳过，on_chunk 被回调。."""
+    """流式对话逐 token 累积，空 delta 被跳过，on_chunk 被回调."""
     c, client = _make_llm("https://api.openai.com/v1")
     chunks = [_chunk("a"), _chunk("b"), _chunk_empty()]
     client.chat.completions.create = MagicMock(return_value=chunks)
@@ -222,7 +222,7 @@ def test_chat_stream_collects() -> None:
 
 
 def test_chat_stream_no_callback() -> None:
-    """无 on_chunk 时仅累积文本。."""
+    """无 on_chunk 时仅累积文本."""
     c, client = _make_llm("https://api.openai.com/v1")
     client.chat.completions.create = MagicMock(return_value=[_chunk("xy")])
     res = c.chat_stream([{"role": "user", "content": "x"}])
@@ -230,7 +230,7 @@ def test_chat_stream_no_callback() -> None:
 
 
 def test_chat_stream_raises() -> None:
-    """流式底层抛错时包装为 RuntimeError。."""
+    """流式底层抛错时包装为 RuntimeError."""
     c, client = _make_llm("https://api.openai.com/v1")
     client.chat.completions.create = MagicMock(side_effect=RuntimeError("down"))
     with pytest.raises(RuntimeError):
@@ -241,7 +241,7 @@ def test_chat_stream_raises() -> None:
 # LLMClient.count_tokens
 # --------------------------------------------------------------------------- #
 def test_count_tokens_basic() -> None:
-    """count_tokens 返回正整数。."""
+    """count_tokens 返回正整数."""
     c, _ = _make_llm("https://api.openai.com/v1")
     msgs = [
         {"role": "user", "content": "hello"},
@@ -253,7 +253,7 @@ def test_count_tokens_basic() -> None:
 
 
 def test_count_tokens_with_tool_calls() -> None:
-    """含 tool_calls 的消息也计入 token。."""
+    """含 tool_calls 的消息也计入 token."""
     c, _ = _make_llm("https://api.openai.com/v1")
     msgs = [
         {
@@ -267,14 +267,14 @@ def test_count_tokens_with_tool_calls() -> None:
 
 
 def test_count_tokens_empty() -> None:
-    """空消息列表返回少量 token（仅 overhead）。."""
+    """空消息列表返回少量 token（仅 overhead）."""
     c, _ = _make_llm("https://api.openai.com/v1")
     tokens = c.count_tokens([])
     assert tokens == 0
 
 
 def test_count_tokens_unknown_model_fallback() -> None:
-    """未知模型名触发 KeyError 分支，回退到 cl100k_base。."""
+    """未知模型名触发 KeyError 分支，回退到 cl100k_base."""
     c, _ = _make_llm("https://api.openai.com/v1")
     c.model = "totally_unknown_model_xyz"
     msgs = [{"role": "user", "content": "hello"}]
@@ -286,7 +286,7 @@ def test_count_tokens_unknown_model_fallback() -> None:
 # LLMClient.assistant_to_message
 # --------------------------------------------------------------------------- #
 def test_assistant_to_message_full() -> None:
-    """含 content / reasoning / tool_calls 时正确转换。."""
+    """含 content / reasoning / tool_calls 时正确转换."""
     resp = {
         "content": "诗",
         "reasoning_content": "思",
@@ -299,7 +299,7 @@ def test_assistant_to_message_full() -> None:
 
 
 def test_assistant_to_message_no_content() -> None:
-    """无 content 时 content 置 None。."""
+    """无 content 时 content 置 None."""
     msg = LLMClient.assistant_to_message({"content": "", "tool_calls": []})
     assert msg["content"] is None
 
@@ -308,14 +308,14 @@ def test_assistant_to_message_no_content() -> None:
 # _fire_stream
 # --------------------------------------------------------------------------- #
 def test_fire_stream_normal() -> None:
-    """回调正常时被调用。."""
+    """回调正常时被调用."""
     seen: list[str] = []
     _fire_stream(seen.append, "x")
     assert seen == ["x"]
 
 
 def test_fire_stream_swallows_exception() -> None:
-    """回调抛错时被吞掉，不中断主流程。."""
+    """回调抛错时被吞掉，不中断主流程."""
 
     def boom(_: str) -> None:
         raise ValueError("cb failed")
@@ -327,7 +327,7 @@ def test_fire_stream_swallows_exception() -> None:
 # _build_checker_system
 # --------------------------------------------------------------------------- #
 def test_build_checker_system_parallelism() -> None:
-    """五言律诗/七言律诗模板应包含对仗检查说明。."""
+    """五言律诗/七言律诗模板应包含对仗检查说明."""
     text = _build_checker_system(
         "主题", ["a", "b"], {"name": "五言律诗", "language": "zh", "lines": 8}
     )
@@ -335,7 +335,7 @@ def test_build_checker_system_parallelism() -> None:
 
 
 def test_build_checker_system_no_parallelism() -> None:
-    """非中文或不足 8 行时不包含对仗说明。."""
+    """非中文或不足 8 行时不包含对仗说明."""
     text = _build_checker_system("主题", ["a"], {"language": "en", "lines": 4})
     assert "对仗" not in text
 
@@ -344,20 +344,20 @@ def test_build_checker_system_no_parallelism() -> None:
 # _build_draft_system / _build_refine_system
 # --------------------------------------------------------------------------- #
 def test_build_draft_system_basic() -> None:
-    """_build_draft_system 包含语言和格律描述。."""
+    """_build_draft_system 包含语言和格律描述."""
     text = _build_draft_system("zh", "语言: zh\n行数: 4")
     assert "zh" in text
     assert "语言: zh\n行数: 4" in text
 
 
 def test_build_refine_system_basic() -> None:
-    """_build_refine_system 包含格律描述。."""
+    """_build_refine_system 包含格律描述."""
     text = _build_refine_system("语言: zh\n行数: 4")
     assert "语言: zh\n行数: 4" in text
 
 
 def test_build_refine_system_with_feedback() -> None:
-    """_build_refine_system 带 feedback 时拼装反馈段落。."""
+    """_build_refine_system 带 feedback 时拼装反馈段落."""
     text = _build_refine_system("语言: zh\n行数: 4", feedback="请更婉约")
     assert "请更婉约" in text
 
@@ -366,7 +366,7 @@ def test_build_refine_system_with_feedback() -> None:
 # CheckerAI
 # --------------------------------------------------------------------------- #
 def _make_checker() -> tuple[CheckerAI, MagicMock]:
-    """创建 CheckerAI 用于测试（OpenAI 被 mock）。.
+    """创建 CheckerAI 用于测试（OpenAI 被 mock）.
 
     Returns:
         (checker, mock_chat) 元组。
@@ -382,7 +382,7 @@ def _make_checker() -> tuple[CheckerAI, MagicMock]:
 
 
 def test_checker_pass_true() -> None:
-    """Submit 返回 pass=True 时通过。."""
+    """Submit 返回 pass=True 时通过."""
     checker, chat = _make_checker()
     chat.chat.return_value = {
         "content": "",
@@ -393,7 +393,7 @@ def test_checker_pass_true() -> None:
 
 
 def test_checker_pass_false() -> None:
-    """Submit 返回 pass=False 时附带建议。."""
+    """Submit 返回 pass=False 时附带建议."""
     checker, chat = _make_checker()
     chat.chat.return_value = {
         "content": "",
@@ -411,7 +411,7 @@ def test_checker_pass_false() -> None:
 
 
 def test_checker_tool_calls_no_submit() -> None:
-    """有工具调用但无 submit 时追加提示并继续，直至 3 轮后放弃。."""
+    """有工具调用但无 submit 时追加提示并继续，直至 3 轮后放弃."""
     checker, chat = _make_checker()
     chat.chat.return_value = {
         "content": "",
@@ -423,7 +423,7 @@ def test_checker_tool_calls_no_submit() -> None:
 
 
 def test_checker_no_tool_calls() -> None:
-    """模型未调用工具时追加提醒，3 轮后放弃。."""
+    """模型未调用工具时追加提醒，3 轮后放弃."""
     checker, chat = _make_checker()
     chat.chat.return_value = {"content": "我看看", "tool_calls": []}
     res = checker.check("主题", ["line"], {"language": "zh", "lines": 4})
@@ -431,7 +431,7 @@ def test_checker_no_tool_calls() -> None:
 
 
 def test_checker_exception_fallback() -> None:
-    """调用抛错时兜底为未通过。."""
+    """调用抛错时兜底为未通过."""
     checker, chat = _make_checker()
     chat.chat.side_effect = RuntimeError("boom")
     res = checker.check("主题", ["line"], {"language": "zh", "lines": 4})
@@ -443,7 +443,7 @@ def test_checker_exception_fallback() -> None:
 # WriterAI.generate_description
 # --------------------------------------------------------------------------- #
 def _make_writer() -> tuple[WriterAI, MagicMock]:
-    """创建 WriterAI 用于测试（OpenAI 被 mock）。.
+    """创建 WriterAI 用于测试（OpenAI 被 mock）.
 
     Returns:
         (writer, mock_chat) 元组。
@@ -460,7 +460,7 @@ def _make_writer() -> tuple[WriterAI, MagicMock]:
 
 
 def test_generate_description_stream() -> None:
-    """带 on_stream 时走 chat_stream。."""
+    """带 on_stream 时走 chat_stream."""
     writer, chat = _make_writer()
     chat.chat_stream.return_value = {"content": "描述文本", "tool_calls": []}
     msgs: list[dict[str, Any]] = []
@@ -469,7 +469,7 @@ def test_generate_description_stream() -> None:
 
 
 def test_generate_description_plain() -> None:
-    """无 on_stream 时走普通 chat。."""
+    """无 on_stream 时走普通 chat."""
     writer, chat = _make_writer()
     chat.chat.return_value = {"content": "描述文本", "tool_calls": []}
     msgs: list[dict[str, Any]] = []
@@ -481,7 +481,7 @@ def test_generate_description_plain() -> None:
 # WriterAI.generate_draft
 # --------------------------------------------------------------------------- #
 def test_generate_draft_template_obj_describe() -> None:
-    """提供模板对象时使用其 describe() 生成约束描述。."""
+    """提供模板对象时使用其 describe() 生成约束描述."""
     from src.templates.zh import WujueTemplate
 
     writer, chat = _make_writer()
@@ -499,7 +499,7 @@ def test_generate_draft_template_obj_describe() -> None:
 
 
 def test_generate_draft_submit_wrong_lines_then_retry() -> None:
-    """Submit 时行数不对→提示重试；最终通过。."""
+    """Submit 时行数不对→提示重试；最终通过."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
         # 第一次 submit: 行数不对
@@ -529,7 +529,7 @@ def test_generate_draft_submit_wrong_lines_then_retry() -> None:
 
 
 def test_generate_draft_stream_retry() -> None:
-    """on_stream 回调被触发。."""
+    """on_stream 回调被触发."""
     writer, chat = _make_writer()
     chat.chat.return_value = {
         "content": "一二三四五\n六七八九十",
@@ -553,7 +553,7 @@ def test_generate_draft_stream_retry() -> None:
 
 
 def test_generate_draft_submit_poem_arg_and_bad_punct() -> None:
-    """Submit 提供 poem 整首替换；标点数量不符先拒绝再通过。."""
+    """Submit 提供 poem 整首替换；标点数量不符先拒绝再通过."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
         {
@@ -615,7 +615,7 @@ def test_generate_draft_submit_poem_arg_and_bad_punct() -> None:
 # WriterAI.refine
 # --------------------------------------------------------------------------- #
 def _refine_seq(writer: WriterAI, seq: list[dict[str, Any]]) -> Any:
-    """生成 modify 序列。.
+    """生成 modify 序列.
 
     Args:
         writer: WriterAI 实例。
@@ -630,7 +630,7 @@ def _refine_seq(writer: WriterAI, seq: list[dict[str, Any]]) -> Any:
 
 
 def test_refine_no_tool_calls_then_submit() -> None:
-    """无工具调用轮→提醒；随后 modify 修改；submit 提交。."""
+    """无工具调用轮→提醒；随后 modify 修改；submit 提交."""
     writer, _ = _make_writer()
     with patch("src.agents.writer_ai.execute_modify", return_value={"poem": ["改"]}):
         _refine_seq(
@@ -666,7 +666,7 @@ def test_refine_no_tool_calls_then_submit() -> None:
 
 
 def test_refine_submit_without_modification_allowed() -> None:
-    """未修改直接 submit 现在被允许（不再强制修改后才能提交）。."""
+    """未修改直接 submit 现在被允许（不再强制修改后才能提交）."""
     writer, _ = _make_writer()
     _refine_seq(
         writer,
@@ -689,11 +689,11 @@ def test_refine_submit_without_modification_allowed() -> None:
 
 
 def test_refine_submit_rejected_when_meter_invalid() -> None:
-    """Submit 时全量格律未通过→拒绝并把错误返回给模型，通过后才提交。."""
+    """Submit 时全量格律未通过→拒绝并把错误返回给模型，通过后才提交."""
     from src.prosody.meter_validator import ValidationResult
 
     class _SeqValidator:
-        """按序返回预置校验结果的假校验器。.
+        """按序返回预置校验结果的假校验器.
 
         Args:
             results: validate 依次返回的 ValidationResult。
@@ -759,7 +759,7 @@ def test_refine_submit_rejected_when_meter_invalid() -> None:
 
 
 def test_refine_submit_gate_end_to_end() -> None:
-    """真实五绝模板：不合律 submit 被拒；随后 modify 修正后以全量校验通过收尾。."""
+    """真实五绝模板：不合律 submit 被拒；随后 modify 修正后以全量校验通过收尾."""
     valid_first_line = "远岸栖云树"
     # 首句与对句“相对”被破坏（首句第2字改平），全诗不合律
     invalid_poem = ["西窗残月冷", "溪流伴月明", "桃红迷柳岸", "古道远山风"]
@@ -822,7 +822,7 @@ def test_refine_submit_gate_end_to_end() -> None:
 
 
 def test_refine_modify_validation_errors_recorded() -> None:
-    """Modify 修改后全量校验未通过时记录 validation_errors 并继续。."""
+    """Modify 修改后全量校验未通过时记录 validation_errors 并继续."""
     invalid_first_line = "西窗残月冷"
     valid_first_line = "远岸栖云树"
     initial_poem = ["远岫依烟岭", "溪流伴月明", "桃红迷柳岸", "古道远山风"]
@@ -884,7 +884,7 @@ def test_refine_modify_validation_errors_recorded() -> None:
 
 
 def test_refine_search_words_branch() -> None:
-    """search_words 工具分支被处理并写入历史。."""
+    """search_words 工具分支被处理并写入历史."""
     writer, _ = _make_writer()
     with (
         patch(
@@ -940,7 +940,7 @@ def test_refine_search_words_branch() -> None:
 
 
 def test_refine_modify_error_branch() -> None:
-    """Modify 返回错误时记录失败详情；修正后再次提交通过。."""
+    """Modify 返回错误时记录失败详情；修正后再次提交通过."""
     writer, _ = _make_writer()
     with patch(
         "src.agents.writer_ai.execute_modify",
@@ -996,7 +996,7 @@ def test_refine_modify_error_branch() -> None:
 
 
 def test_refine_modify_title_and_punctuation() -> None:
-    """Modify 的 title / punctuation 分支更新标题与标点。."""
+    """Modify 的 title / punctuation 分支更新标题与标点."""
     writer, _ = _make_writer()
     _refine_seq(
         writer,
@@ -1043,7 +1043,7 @@ def test_refine_modify_title_and_punctuation() -> None:
 
 
 def test_refine_submit_replaces_whole_poem_and_punctuation() -> None:
-    """Submit 的 poem 整首替换与 punctuation 设置。."""
+    """Submit 的 poem 整首替换与 punctuation 设置."""
     writer, _ = _make_writer()
     _refine_seq(
         writer,
@@ -1075,7 +1075,7 @@ def test_refine_submit_replaces_whole_poem_and_punctuation() -> None:
 
 
 def test_refine_submit_punctuation_length_rejected() -> None:
-    """Submit 标点数量与格律行数不符时拒绝提交。."""
+    """Submit 标点数量与格律行数不符时拒绝提交."""
     writer, _ = _make_writer()
     _refine_seq(
         writer,
@@ -1121,7 +1121,7 @@ def test_refine_submit_punctuation_length_rejected() -> None:
 
 
 def test_refine_submit_punctuation_non_list_rejected() -> None:
-    """Submit 标点非列表时拒绝提交。."""
+    """Submit 标点非列表时拒绝提交."""
     writer, _ = _make_writer()
     _refine_seq(
         writer,
@@ -1156,7 +1156,7 @@ def test_refine_submit_punctuation_non_list_rejected() -> None:
 
 
 def test_refine_submit_poem_wrong_line_count_rejected() -> None:
-    """Submit 的 poem 行数与格律不符时被拒绝；后续合法整诗替换通过。."""
+    """Submit 的 poem 行数与格律不符时被拒绝；后续合法整诗替换通过."""
     writer, _ = _make_writer()
     _refine_seq(
         writer,
@@ -1200,7 +1200,7 @@ def test_refine_submit_poem_wrong_line_count_rejected() -> None:
 
 
 def test_refine_no_progress_guidance() -> None:
-    """连续 3 轮无修改时注入空转引导提示（写入 messages）。."""
+    """连续 3 轮无修改时注入空转引导提示（写入 messages）."""
     writer, _ = _make_writer()
     template = {
         "language": "zh",
@@ -1239,7 +1239,7 @@ def test_refine_no_progress_guidance() -> None:
     captured: list[list[dict[str, Any]]] = []
 
     def fake_chat(messages: list[dict[str, Any]], tools: Any = None) -> dict[str, Any]:
-        """捕获消息并按序返回预设响应。.
+        """捕获消息并按序返回预设响应.
 
         Args:
             messages: 对话消息列表。
@@ -1273,7 +1273,7 @@ def test_refine_no_progress_guidance() -> None:
 # Token compression
 # --------------------------------------------------------------------------- #
 def test_check_and_compress_no_op_below_threshold() -> None:
-    """Token 数低于阈值时不压缩。."""
+    """Token 数低于阈值时不压缩."""
     writer, chat = _make_writer()
     chat.count_tokens.return_value = 100
     msgs: list[dict[str, Any]] = [{"role": "user", "content": "test"}]
@@ -1282,7 +1282,7 @@ def test_check_and_compress_no_op_below_threshold() -> None:
 
 
 def test_check_and_compress_triggers_at_threshold() -> None:
-    """Token 数达到阈值时触发压缩。."""
+    """Token 数达到阈值时触发压缩."""
     from src.agents.writer_ai import COMPRESS_THRESHOLD
 
     writer, chat = _make_writer()
@@ -1299,7 +1299,7 @@ def test_check_and_compress_triggers_at_threshold() -> None:
 # Coverage gaps: _extract_poem_from_messages, generate_draft branches
 # --------------------------------------------------------------------------- #
 def test_extract_poem_from_messages_finds_assistant() -> None:
-    """从 assistant 消息中提取诗行。."""
+    """从 assistant 消息中提取诗行."""
     from src.agents.writer_ai import _extract_poem_from_messages
 
     msgs: list[dict[str, Any]] = [
@@ -1311,7 +1311,7 @@ def test_extract_poem_from_messages_finds_assistant() -> None:
 
 
 def test_extract_poem_from_messages_empty() -> None:
-    """无 assistant 消息时返回空列表。."""
+    """无 assistant 消息时返回空列表."""
     from src.agents.writer_ai import _extract_poem_from_messages
 
     msgs: list[dict[str, Any]] = [{"role": "user", "content": "hi"}]
@@ -1320,7 +1320,7 @@ def test_extract_poem_from_messages_empty() -> None:
 
 
 def test_generate_draft_submit_empty_content_fallback() -> None:
-    """Submit 时 content 为空，从历史消息提取诗稿。."""
+    """Submit 时 content 为空，从历史消息提取诗稿."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
         # 第一次: AI 返回空 content + submit tool call
@@ -1345,7 +1345,7 @@ def test_generate_draft_submit_empty_content_fallback() -> None:
 
 
 def test_generate_draft_submit_syllable_fail_then_pass() -> None:
-    """Submit 行数正确但音节错→重试；第二次通过。."""
+    """Submit 行数正确但音节错→重试；第二次通过."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
         # 第一次: 行数正确但音节错
@@ -1375,7 +1375,7 @@ def test_generate_draft_submit_syllable_fail_then_pass() -> None:
 
 
 def test_generate_draft_no_tool_calls_retry() -> None:
-    """AI 不调工具→重试；第二次调 submit 通过。."""
+    """AI 不调工具→重试；第二次调 submit 通过."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
         # 第一次: 无 tool_calls
@@ -1400,7 +1400,7 @@ def test_generate_draft_no_tool_calls_retry() -> None:
 
 
 def test_generate_draft_no_tool_calls_wrong_lines_retry() -> None:
-    """AI 不调工具且行数错→提示重试；第二次通过。."""
+    """AI 不调工具且行数错→提示重试；第二次通过."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
         # 第一次: 行数错
@@ -1425,7 +1425,7 @@ def test_generate_draft_no_tool_calls_wrong_lines_retry() -> None:
 
 
 def test_generate_draft_no_tool_calls_syllable_fail_retry() -> None:
-    """AI 不调工具但音节错→提示重试；第二次通过。."""
+    """AI 不调工具但音节错→提示重试；第二次通过."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
         # 第一次: 行数对但音节错
@@ -1450,7 +1450,7 @@ def test_generate_draft_no_tool_calls_syllable_fail_retry() -> None:
 
 
 def test_generate_draft_empty_title_retry() -> None:
-    """Submit 时 title 为空→提示重试；第二次通过。."""
+    """Submit 时 title 为空→提示重试；第二次通过."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
         # 第一次: 空 title
@@ -1482,7 +1482,7 @@ def test_generate_draft_empty_title_retry() -> None:
 # format_poem (Chinese templates)
 # --------------------------------------------------------------------------- #
 def test_format_poem_wujue() -> None:
-    """五言绝句格式：一句一行，联内逗号、联末句号。."""
+    """五言绝句格式：一句一行，联内逗号、联末句号."""
     from src.templates.zh import WujueTemplate
 
     t = WujueTemplate()
@@ -1496,7 +1496,7 @@ def test_format_poem_wujue() -> None:
 
 
 def test_format_poem_qijue() -> None:
-    """七言绝句格式：一句一行，联内逗号、联末句号。."""
+    """七言绝句格式：一句一行，联内逗号、联末句号."""
     from src.templates.zh import QijueTemplate
 
     t = QijueTemplate()
@@ -1506,7 +1506,7 @@ def test_format_poem_qijue() -> None:
 
 
 def test_format_poem_wulv() -> None:
-    """五言律诗格式：一联一行，联间逗号，末联句号。."""
+    """五言律诗格式：一联一行，联间逗号，末联句号."""
     from src.templates.zh import WulvTemplate
 
     t = WulvTemplate()
@@ -1518,7 +1518,7 @@ def test_format_poem_wulv() -> None:
 
 
 def test_format_poem_xiangjianhuan() -> None:
-    """相见欢格式：开头Tab，阙间Tab，默认标点，。。，，。。."""
+    """相见欢格式：开头Tab，阙间Tab，默认标点，。。，，."""
     from src.templates.zh import XiangjianhuanTemplate
 
     t = XiangjianhuanTemplate()
@@ -1531,7 +1531,7 @@ def test_format_poem_xiangjianhuan() -> None:
 
 
 def test_format_poem_qilv() -> None:
-    """七言律诗格式：一联一行，联间逗号，末联句号。."""
+    """七言律诗格式：一联一行，联间逗号，末联句号."""
     from src.templates.zh import QilvTemplate
 
     t = QilvTemplate()
@@ -1543,7 +1543,7 @@ def test_format_poem_qilv() -> None:
 
 
 def test_format_poem_qilv_odd_content() -> None:
-    """七言律诗奇数内容行触发 odd-content 分支。."""
+    """七言律诗奇数内容行触发 odd-content 分支."""
     from src.templates.zh import QilvTemplate
 
     t = QilvTemplate()
@@ -1554,7 +1554,7 @@ def test_format_poem_qilv_odd_content() -> None:
 
 
 def test_format_poem_wulv_odd_content() -> None:
-    """五言律诗奇数内容行触发 odd-content 分支。."""
+    """五言律诗奇数内容行触发 odd-content 分支."""
     from src.templates.zh import WulvTemplate
 
     t = WulvTemplate()
@@ -1565,7 +1565,7 @@ def test_format_poem_wulv_odd_content() -> None:
 
 
 def test_format_poem_base() -> None:
-    """基类 format_poem 默认用换行连接。."""
+    """基类 format_poem 默认用换行连接."""
     from src.templates.en import ShakespeareSonnetTemplate
 
     t = ShakespeareSonnetTemplate()
@@ -1574,7 +1574,7 @@ def test_format_poem_base() -> None:
 
 
 def test_format_poem_en_haiku() -> None:
-    """英文模板使用基类 format_poem（换行连接）。."""
+    """英文模板使用基类 format_poem（换行连接）."""
     from src.templates.en import VillanelleTemplate
 
     t = VillanelleTemplate()
@@ -1583,7 +1583,7 @@ def test_format_poem_en_haiku() -> None:
 
 
 def test_format_poem_fr_haiku() -> None:
-    """法语模板使用基类 format_poem（换行连接）。."""
+    """法语模板使用基类 format_poem（换行连接）."""
     from src.templates.fr import RondeauTemplate
 
     t = RondeauTemplate()
@@ -1592,7 +1592,7 @@ def test_format_poem_fr_haiku() -> None:
 
 
 def test_format_poem_it_haiku() -> None:
-    """意大利语模板使用基类 format_poem（换行连接）。."""
+    """意大利语模板使用基类 format_poem（换行连接）."""
     from src.templates.it import TerzaRimaTemplate
 
     t = TerzaRimaTemplate()
@@ -1601,7 +1601,7 @@ def test_format_poem_it_haiku() -> None:
 
 
 def test_format_poem_la_elegy() -> None:
-    """拉丁语模板使用基类 format_poem（换行连接）。."""
+    """拉丁语模板使用基类 format_poem（换行连接）."""
     from src.templates.la import HexameterTemplate
 
     t = HexameterTemplate()
@@ -1610,7 +1610,7 @@ def test_format_poem_la_elegy() -> None:
 
 
 def test_format_poem_base_with_punctuation() -> None:
-    """基类 format_poem 提供标点时逐行套用。."""
+    """基类 format_poem 提供标点时逐行套用."""
     from src.templates.en import ShakespeareSonnetTemplate
 
     t = ShakespeareSonnetTemplate()
@@ -1619,7 +1619,7 @@ def test_format_poem_base_with_punctuation() -> None:
 
 
 def test_format_poem_wulv_with_punctuation() -> None:
-    """五言律诗提供标点时按联拼接。."""
+    """五言律诗提供标点时按联拼接."""
     from src.templates.zh import WulvTemplate
 
     t = WulvTemplate()
@@ -1631,7 +1631,7 @@ def test_format_poem_wulv_with_punctuation() -> None:
 
 
 def test_format_poem_wulv_with_punctuation_odd() -> None:
-    """五言律诗提供标点且正文奇数行时触发 odd-content 分支。."""
+    """五言律诗提供标点且正文奇数行时触发 odd-content 分支."""
     from src.templates.zh import WulvTemplate
 
     t = WulvTemplate()
@@ -1640,7 +1640,7 @@ def test_format_poem_wulv_with_punctuation_odd() -> None:
 
 
 def test_format_poem_qilv_with_punctuation() -> None:
-    """七言律诗提供标点时按联拼接。."""
+    """七言律诗提供标点时按联拼接."""
     from src.templates.zh import QilvTemplate
 
     t = QilvTemplate()
@@ -1651,7 +1651,7 @@ def test_format_poem_qilv_with_punctuation() -> None:
 
 
 def test_format_poem_qilv_with_punctuation_odd() -> None:
-    """七言律诗提供标点且正文奇数行时触发 odd-content 分支。."""
+    """七言律诗提供标点且正文奇数行时触发 odd-content 分支."""
     from src.templates.zh import QilvTemplate
 
     t = QilvTemplate()
@@ -1660,7 +1660,7 @@ def test_format_poem_qilv_with_punctuation_odd() -> None:
 
 
 def test_format_poem_xiangjianhuan_with_punctuation() -> None:
-    """相见欢提供标点时逐行套用后再按阙拼接。."""
+    """相见欢提供标点时逐行套用后再按阙拼接."""
     from src.templates.zh import XiangjianhuanTemplate
 
     t = XiangjianhuanTemplate()
@@ -1672,7 +1672,7 @@ def test_format_poem_xiangjianhuan_with_punctuation() -> None:
 
 
 def test_format_poem_rumengling() -> None:
-    """如梦令格式：开头Tab，单调不分阕，默认标点。."""
+    """如梦令格式：开头Tab，单调不分阕，默认标点."""
     from src.templates.zh import RumenglingTemplate
 
     t = RumenglingTemplate()
@@ -1696,7 +1696,7 @@ def test_format_poem_rumengling() -> None:
 
 
 def test_format_poem_langtaosha() -> None:
-    """浪淘沙格式：开头Tab，上下片阙间Tab，默认标点。."""
+    """浪淘沙格式：开头Tab，上下片阙间Tab，默认标点."""
     from src.templates.zh import LangtaoshaTemplate
 
     t = LangtaoshaTemplate()
@@ -1709,7 +1709,7 @@ def test_format_poem_langtaosha() -> None:
 
 
 def test_format_poem_qingpingyue() -> None:
-    """清平乐格式：开头Tab，上下片阙间Tab，默认标点。."""
+    """清平乐格式：开头Tab，上下片阙间Tab，默认标点."""
     from src.templates.zh import QingpingyueTemplate
 
     t = QingpingyueTemplate()
@@ -1722,7 +1722,7 @@ def test_format_poem_qingpingyue() -> None:
 
 
 def test_format_poem_langtaosha_with_punctuation() -> None:
-    """浪淘沙提供标点时逐行套用。."""
+    """浪淘沙提供标点时逐行套用."""
     from src.templates.zh import LangtaoshaTemplate
 
     t = LangtaoshaTemplate()
