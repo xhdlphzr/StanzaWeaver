@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""格律总校验器（MeterValidator）。.
+"""格律总校验器（MeterValidator）.
 
 对整首诗执行三层校验：
 1. 行数匹配；
@@ -33,7 +33,7 @@ VariantList = list[list[Syllable]]
 
 
 def _count_matches(actual: int, expected: SyllableCount) -> bool:
-    """判断实际音节数是否落在期望（定值或区间）。.
+    """判断实际音节数是否落在期望（定值或区间）.
 
     Args:
         actual: 实际音节数。
@@ -50,7 +50,7 @@ def _count_matches(actual: int, expected: SyllableCount) -> bool:
 
 @dataclass
 class ValidationResult:
-    """一次格律校验的结果。.
+    """一次格律校验的结果.
 
     Attributes:
         passed: 是否全部通过。
@@ -62,7 +62,7 @@ class ValidationResult:
     errors: list[str] = field(default_factory=list)
 
     def add_error(self, msg: str) -> None:
-        """追加一条错误并使结果不通过。.
+        """追加一条错误并使结果不通过.
 
         Args:
             msg: 错误描述。
@@ -73,7 +73,7 @@ class ValidationResult:
 
 
 class MeterValidator:
-    """多语言格律总校验器（符号层，零 AI 开销）。."""
+    """多语言格律总校验器（符号层，零 AI 开销）."""
 
     def validate(
         self,
@@ -81,7 +81,7 @@ class MeterValidator:
         template: TemplateDict,
         template_obj: object = None,
     ) -> ValidationResult:
-        """校验整首诗。.
+        """校验整首诗.
 
         Args:
             poem: 诗行列表。
@@ -163,7 +163,7 @@ class MeterValidator:
     def _line_matches_variant(
         variant: list[Syllable], line_constraints: ConstraintLine
     ) -> bool:
-        """判断一行音节是否满足整行逐位约束。.
+        """判断一行音节是否满足整行逐位约束.
 
         Args:
             variant: 一行的一个音节切分变体。
@@ -183,7 +183,7 @@ class MeterValidator:
     def _order_variants(
         language: str, variants: list[list[Syllable]]
     ) -> list[list[Syllable]]:
-        """为组合搜索排序每行变体（主变体优先，作为首个被尝试的组合）。.
+        """为组合搜索排序每行变体（主变体优先，作为首个被尝试的组合）.
 
         Args:
             language: 语言代码。
@@ -210,7 +210,7 @@ class MeterValidator:
         all_syllables: list[list[list[Syllable]]],
         language: str,
     ) -> list[str]:
-        """对每行全部发音/切分变体做组合搜索，任一组合通过即视为合律。.
+        """对每行全部发音/切分变体做组合搜索，任一组合通过即视为合律.
 
         不再仅取主变体：把每个变体逐一带入 validate_full 审查。若存在一个
         逐行变体组合使全部格律规则通过，则返回空错误；否则返回错误数最少的
@@ -251,7 +251,7 @@ class MeterValidator:
         poem: list[str],
         template: TemplateDict,
     ) -> ValidationResult:
-        """仅校验行数与每行音节数（初稿阶段的快速检查）。.
+        """仅校验行数与每行音节数（初稿阶段的快速检查）.
 
         Args:
             poem: 诗行列表。
@@ -296,7 +296,7 @@ class MeterValidator:
         line_index: int,
         template: TemplateDict,
     ) -> ValidationResult:
-        """校验单行（modify 工具 line 类型的前置检查）。.
+        """校验单行（modify 工具 line 类型的前置检查）.
 
         Args:
             line_text: 新行文本。
@@ -347,7 +347,7 @@ class MeterValidator:
 
     @staticmethod
     def _describe_constraint(c: Constraint) -> str:
-        """约束的人类可读描述。.
+        """约束的人类可读描述.
 
         Args:
             c: 约束字典。
@@ -370,7 +370,7 @@ class MeterValidator:
 
     @staticmethod
     def _describe_syllable(s: Syllable) -> str:
-        """音节的人类可读描述。.
+        """音节的人类可读描述.
 
         Args:
             s: 音节。

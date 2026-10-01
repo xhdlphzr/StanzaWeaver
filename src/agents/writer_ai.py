@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""编写 AI：描述生成、初稿生成、ReAct 炼句循环。.
+"""编写 AI：描述生成、初稿生成、ReAct 炼句循环.
 
 炼句循环无轮数上限：AI 反复调用 search_words/modify
 修改诗句、标题或标点（每次修改后自动跑全部格律校验），直到调用 submit
@@ -33,7 +33,7 @@ RefineResult = tuple[list[str], list[dict[str, Any]], str, int, str, list[str]]
 
 
 def _parse_punctuation(raw: Any, lines: int) -> tuple[list[str] | None, str | None]:
-    """解析并校验标点列表。.
+    """解析并校验标点列表.
 
     Args:
         raw: 原始标点参数（None / list[str]）。
@@ -53,7 +53,7 @@ def _parse_punctuation(raw: Any, lines: int) -> tuple[list[str] | None, str | No
 
 
 def _fire_stream(cb: ChunkCallback, text: str) -> None:
-    """安全触发流式回调（吞掉回调内部异常）。.
+    """安全触发流式回调（吞掉回调内部异常）.
 
     前端流回调失败不应中断生成流程。
 
@@ -70,7 +70,7 @@ def _fire_stream(cb: ChunkCallback, text: str) -> None:
 
 
 def _get_constraints_desc(template: dict[str, Any], template_obj: object = None) -> str:
-    """获取格律约束描述文本。.
+    """获取格律约束描述文本.
 
     Args:
         template: 模板字典。
@@ -92,7 +92,7 @@ def _get_constraints_desc(template: dict[str, Any], template_obj: object = None)
 
 
 def _build_draft_system(language: str, constraints_desc: str) -> str:
-    """构造 Step 2 初稿生成的系统提示。.
+    """构造 Step 2 初稿生成的系统提示.
 
     Args:
         language: 语言代码。
@@ -117,7 +117,7 @@ def _build_draft_system(language: str, constraints_desc: str) -> str:
 
 
 def _build_refine_system(constraints_desc: str, feedback: str = "") -> str:
-    """构造 Step 3 炼句循环的系统提示。.
+    """构造 Step 3 炼句循环的系统提示.
 
     Args:
         constraints_desc: 格律约束描述。
@@ -155,7 +155,7 @@ def _build_refine_system(constraints_desc: str, feedback: str = "") -> str:
 
 
 def _extract_poem_from_messages(messages: list[Message]) -> list[str]:
-    """从对话历史中提取最近的诗稿行。.
+    """从对话历史中提取最近的诗稿行.
 
     在 assistant 消息的 content 中查找连续的非空行作为诗稿。
 
@@ -176,10 +176,10 @@ def _extract_poem_from_messages(messages: list[Message]) -> list[str]:
 
 
 class WriterAI:
-    """编写 AI：四步流水线的神经层（描述/初稿/炼句）。."""
+    """编写 AI：四步流水线的神经层（描述/初稿/炼句）."""
 
     def __init__(self, config: dict[str, Any]):
-        """初始化编写 AI。.
+        """初始化编写 AI.
 
         Args:
             config: {"base_url", "api_key", "model"}。
@@ -200,7 +200,7 @@ class WriterAI:
         template: dict[str, Any],
         template_obj: object = None,
     ) -> None:
-        """压缩对话历史：用 LLM 生成结构化摘要，替换当前消息列表。.
+        """压缩对话历史：用 LLM 生成结构化摘要，替换当前消息列表.
 
         摘要包含：目标、重要细节、工作状态、下一步行动，以及当前诗稿。
 
@@ -260,7 +260,7 @@ class WriterAI:
         template: dict[str, Any],
         template_obj: object = None,
     ) -> None:
-        """检查 token 数，超过阈值时自动压缩对话历史。.
+        """检查 token 数，超过阈值时自动压缩对话历史.
 
         Args:
             messages: 消息列表。
@@ -280,7 +280,7 @@ class WriterAI:
         messages: list[Message],
         on_stream: ChunkCallback = None,
     ) -> str:
-        """生成主题的现代文描述（Step 1）。.
+        """生成主题的现代文描述（Step 1）.
 
         Args:
             topic: 用户主题。
@@ -317,7 +317,7 @@ class WriterAI:
         template_obj: object = None,
         on_stream: ChunkCallback = None,
     ) -> DraftResult:
-        """生成初稿（Step 2，通过 submit 工具提交，无尝试次数上限）。.
+        """生成初稿（Step 2，通过 submit 工具提交，无尝试次数上限）.
 
         Args:
             description: 主题描述。
@@ -465,7 +465,7 @@ class WriterAI:
         title: str = "",
         punctuation: list[str] | None = None,
     ) -> RefineResult:
-        """ReAct 炼句循环（Step 3，无轮数上限，直到格律校验通过）。.
+        """ReAct 炼句循环（Step 3，无轮数上限，直到格律校验通过）.
 
         每次 modify 修改诗句后都会立即执行全量格律校验；调用 submit 时
         同样先做全量校验，通过才接受定稿，否则把错误返回给模型继续修改。

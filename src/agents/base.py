@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""LLM 调用封装（OpenAI 兼容接口）。.
+"""LLM 调用封装（OpenAI 兼容接口）.
 
 - 回环地址（127.0.0.1/localhost）自动绕过 shell 代理（trust_env=False），
   修复本地 Ollama 等服务的 502 Bad Gateway；
@@ -31,7 +31,7 @@ ChunkCallback = Callable[[str], None] | None
 
 
 def _is_loopback(base_url: str) -> bool:
-    """判断 URL 是否为回环地址。.
+    """判断 URL 是否为回环地址.
 
     Args:
         base_url: LLM 服务地址。
@@ -45,10 +45,10 @@ def _is_loopback(base_url: str) -> bool:
 
 
 class LLMClient:
-    """OpenAI 兼容客户端（含代理绕过与错误提示）。."""
+    """OpenAI 兼容客户端（含代理绕过与错误提示）."""
 
     def __init__(self, base_url: str, api_key: str, model: str):
-        """初始化客户端。.
+        """初始化客户端.
 
         Args:
             base_url: 服务地址（本地服务须含 /v1）。
@@ -65,7 +65,7 @@ class LLMClient:
         self.model = model
 
     def _raise_with_hint(self, e: Exception) -> RuntimeError:
-        """构造带排查提示的异常。.
+        """构造带排查提示的异常.
 
         Args:
             e: 原始异常。
@@ -83,7 +83,7 @@ class LLMClient:
     def chat(
         self, messages: list[Message], tools: list[dict[str, Any]] | None = None
     ) -> ChatResult:
-        """非流式对话（可带工具）。.
+        """非流式对话（可带工具）.
 
         Args:
             messages: 消息列表。
@@ -137,7 +137,7 @@ class LLMClient:
     def chat_stream(
         self, messages: list[Message], on_chunk: ChunkCallback = None
     ) -> ChatResult:
-        """流式对话：逐 token 累积并回调。.
+        """流式对话：逐 token 累积并回调.
 
         Args:
             messages: 消息列表。
@@ -168,7 +168,7 @@ class LLMClient:
         return {"role": "assistant", "content": full_content, "tool_calls": []}
 
     def count_tokens(self, messages: list[Message]) -> int:
-        """估算消息列表的 token 数量。.
+        """估算消息列表的 token 数量.
 
         使用 tiktoken 编码器统计所有消息内容的 token 数。
 
@@ -197,7 +197,7 @@ class LLMClient:
 
     @staticmethod
     def assistant_to_message(response: ChatResult) -> Message:
-        """把 ChatResult 转为可继续对话的 assistant 消息。.
+        """把 ChatResult 转为可继续对话的 assistant 消息.
 
         Args:
             response: chat/chat_stream 的返回。

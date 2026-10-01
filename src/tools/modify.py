@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""modify 工具执行：按类型修改诗稿（行 / 标题 / 标点）。.
+"""modify 工具执行：按类型修改诗稿（行 / 标题 / 标点）.
 
 - line：整行替换（前置单行格律校验）；
 - title：替换标题；
@@ -23,7 +23,7 @@ def execute_modify(
     title: str = "",
     punctuation: list[str] | None = None,
 ) -> dict[str, Any]:
-    """执行一次修改。.
+    """执行一次修改.
 
     Args:
         poem: 当前诗稿（正文行）。
@@ -54,7 +54,7 @@ def execute_modify(
 def _modify_line(
     poem: list[str], template: dict[str, Any], arguments: dict[str, Any]
 ) -> dict[str, Any]:
-    """整行替换：校验行号与新行格律后原位替换。.
+    """整行替换：校验行号与新行格律后原位替换.
 
     Args:
         poem: 当前诗稿。
@@ -93,7 +93,7 @@ def _modify_line(
 
 
 def _modify_title(arguments: dict[str, Any], title: str) -> dict[str, Any]:
-    """替换标题（去空白后不得为空）。.
+    """替换标题（去空白后不得为空）.
 
     Args:
         arguments: 工具参数（content）。
@@ -117,7 +117,7 @@ def _modify_punctuation(
     arguments: dict[str, Any],
     punctuation: list[str] | None,
 ) -> dict[str, Any]:
-    """替换标点列表（长度须等于格律行数）。.
+    """替换标点列表（长度须等于格律行数）.
 
     Args:
         template: 模板字典（提供格律行数）。
