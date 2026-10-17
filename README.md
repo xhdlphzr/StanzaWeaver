@@ -108,6 +108,7 @@ flowchart TD
 
 - **Neuro‑Symbolic Dual Engine** – Hard meter rules are enforced by deterministic pure‑Python validation; the AI is responsible only for poetic meaning, decoupled via structured tools.
 - **Four‑Step Generation Pipeline** – Description generation → First draft (syllable count only) → ReAct refinement loop (search + modify line/title/punctuation, or whole‑poem replacement via `submit`, with immediate full‑poem validation after each change) → Checker AI semantic final review.
+- **Poem Sequence (组诗)** – The user picks the poem count and meter(s) (one meter for all, or a meter per poem); an Architect AI then writes the sequence title and a self‑contained prompt per poem, each poem is generated in its own session (with earlier poems injected for coherence) and reviewed per poem before assembly.
 - **Three‑Element Feedback Loop** – Writer AI → Checker AI → User; any failure sends the work back to Step 3 for further refinement, **with no upper limit on refinement rounds**.
 - **Multi‑language Meter** – Chinese (5‑character quatrain, 7‑character quatrain, 5‑character regulated verse, 7‑character regulated verse, Xiangjianhuan, Rumengling, Langtaosha, Qingpingyue), English (Shakespearean sonnet, villanelle, heroic couplet), Italian, French, Classical Latin; templates are defined as Python classes and can be extended indefinitely.
 - **Multi‑Layer Meter Validation** – Per‑syllable tone/stress constraints + three‑level‑tail + solitary level + alternating tone rule + rhyme checking (Chinese grouped by Thirteen Rhymes, Western languages by real‑time phoneme‑based rhyme).
@@ -132,6 +133,16 @@ The following image shows the generation interface and refinement process:
 2. **Step 2 · First Draft** – The Writer AI produces an initial draft respecting the template’s meter requirements (line count, syllable count). Only line and syllable counts are validated at this stage.
 3. **Step 3 · Refinement Loop (ReAct)** – The AI repeatedly calls `search_words` to find compliant words/phrases and `modify` to change a line, the title, or the punctuation; it may also call `submit` with a whole new poem (`poem`) or a punctuation list. Every modification immediately triggers symbolic‑layer full‑poem validation. The AI may call `submit` at any time, but the submission is accepted **only after the full‑poem meter validation passes** — otherwise it is rejected with the concrete errors and the loop continues. **There is no upper limit on this loop**; it continues until the draft is submitted with a valid meter.
 4. **Step 4 · Semantic Final Review** – The Checker AI reviews the final draft from aspects such as coherence, thematic fit, and higher‑level dimensions beyond meter, then calls `submit` to give a pass/fail decision. If it fails, suggestions are sent back to Step 3 for further refinement; if it passes, the poem is finalised.
+
+---
+
+## Poem Sequence (组诗)
+
+A poem sequence is generated in three phases, mirroring the multi‑movement architecture:
+
+1. **Sequence Planning** – The user fixes the poem count and meter(s) (one meter for all, or a meter per poem). The Architect AI then only uses `set_sequence_title` and `set_poem_prompt` (no `add_poem`): the poems are pre‑seeded from the chosen meters, and the planner writes a self‑contained prompt for each. Missing prompts are fed back and planning continues (bounded by `max_rounds`). Prompts must not use cross‑poem references such as “see poem N”.
+2. **Per‑Poem Composition** – Poems are composed in order, each in an independent session that reuses the single‑poem pipeline (description → draft → refine → checker review). The sequence goal and the titles/first lines of earlier poems are injected; symbolic meter validation and the Checker AI run **per poem**.
+3. **Assembly** – Finished poems are assembled under the sequence title. Cross‑poem coherence relies on planning + injection rather than a whole‑sequence symbolic check.
 
 ---
 
