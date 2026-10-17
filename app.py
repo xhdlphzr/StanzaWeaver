@@ -119,6 +119,7 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 _active_states: dict[str, dict[str, Any]] = {}
+_active_sequences: dict[str, dict[str, Any]] = {}
 _CSRF_TOKEN = secrets.token_hex(16)
 _llm_status: dict[str, str] = {"writer": "unknown", "checker": "unknown"}
 _llm_ping_event = threading.Event()
@@ -487,10 +488,104 @@ def handle_feedback(data: dict[str, Any]) -> None:
     threading.Thread(target=run, daemon=True).start()
 
 
+def _sequence_payload(state: Any) -> dict[str, Any]:
+    """把诗组状态转为可推送/可序列化的字典.
+
+    Args:
+        state: SequenceState。
+
+    Returns:
+        前端可用的诗组字典。
+
+    """
+    return {
+        "title": state.title,
+        "plan_text": state.plan_text,
+        "plan_completed": state.plan_completed,
+        "completed": state.completed,
+        "ok": state.ok,
+        "poems": [
+            {
+                "title": p.final_title or p.title,
+                "planned_title": p.title,
+                "template_key": p.template_key,
+                "prompt": p.prompt,
+                "draft": list(p.draft),
+                "checker_pass": p.checker_pass,
+                "checker_suggestions": p.checker_suggestions,
+                "formatted_poem": p.formatted_poem,
+                "rounds": p.rounds,
+                "done": p.done,
+            }
+            for p in state.poems
+        ],
+    }
+
+
+@socketio.on("generate_sequence")
+def handle_generate_sequence(data: dict[str, Any]) -> None:
+    """开始诗组生成：规划 → 逐首生成/检查 → 汇总.
+
+    Args:
+        data: 事件负载（topic 诗组总目标；template_keys 每首格律 key 列表）。
+
+    """
+    from src.pipeline.sequence import PoemSequencePipeline
+
+    topic = str(data.get("topic", ""))
+    session_id = request.sid  # type: ignore[attr-defined]  # flask_socketio 注入
+
+    if not topic:
+        emit("error", {"message": "诗组主题不能为空"})
+        return
+
+    template_keys: list[str] | None = None
+    if "template_keys" in data:
+        raw = data.get("template_keys")
+        if not isinstance(raw, list) or not raw:
+            emit("error", {"message": "请至少为每首诗选择格律"})
+            return
+        template_keys = [str(item) for item in raw]
+
+    logger.info("generate_sequence 开始 session=%s topic=%r", session_id, topic)
+    pipeline = PoemSequencePipeline()
+
+    def on_progress(state_dict: dict[str, Any]) -> None:
+        """推送诗组规划/生成进度到该会话.
+
+        Args:
+            state_dict: 诗组状态字典。
+
+        """
+        socketio.emit("sequence_progress", state_dict, to=session_id)
+
+    def run() -> None:
+        """在后台线程执行诗组流水线并推送 sequence_done/error 事件."""
+        try:
+            state = pipeline.run(
+                topic, on_progress=on_progress, template_keys=template_keys
+            )
+        except Exception as e:  # noqa: BLE001 - 诗组线程兜底：任何失败转为前端错误事件
+            logger.error("generate_sequence 失败 session=%s: %s", session_id, e)
+            socketio.emit("error", {"message": f"诗组生成失败: {e}"}, to=session_id)
+            return
+        _active_sequences[session_id] = {"sequence_state": state}
+        logger.info(
+            "generate_sequence 完成 session=%s poems=%s ok=%s",
+            session_id,
+            len(state.poems),
+            state.ok,
+        )
+        socketio.emit("sequence_done", _sequence_payload(state), to=session_id)
+
+    threading.Thread(target=run, daemon=True).start()
+
+
 @socketio.on("disconnect")
 def handle_disconnect() -> None:
     """连接断开：清理会话状态."""
     _active_states.pop(request.sid, None)  # type: ignore[attr-defined]  # flask_socketio 注入
+    _active_sequences.pop(request.sid, None)  # type: ignore[attr-defined]  # flask_socketio 注入
 
 
 def _build_custom_template_code(

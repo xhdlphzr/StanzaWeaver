@@ -24,6 +24,24 @@ generate:
   button: 开始生成
   loading: 生成中...
 
+mode:
+  label: 模式
+  single: 单首
+  sequence: 诗组
+
+sequence:
+  progress_title: 诗组进度
+  all_pass: 诗组全部通过
+  some_fail: 诗组有未通过的诗
+  history_label: 诗组
+  count_label: 诗数
+  meter_mode_label: 格律
+  meter_uniform: 统一
+  meter_per: 逐首
+  uniform_label: 统一格律
+  per_label: 逐首格律
+  poem_ordinal: "第{n}首"
+
 progress:
   title: 生成进度
 

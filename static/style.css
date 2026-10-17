@@ -1260,3 +1260,110 @@ html[lang="en"] .slogan {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(139, 115, 85, 0.5);
 }
+
+/* ---- 诗组 ---- */
+
+.sequence-plan {
+  white-space: pre-wrap;
+  font-family: "Noto Serif SC", "SimSun", Georgia, serif;
+  font-size: 15px;
+  line-height: 1.8;
+  color: #5a4a3a;
+  padding: 8px 4px;
+}
+
+.sequence-poems-status {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sequence-poem-status {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 15px;
+  color: #5a4a3a;
+}
+
+.sequence-poem-index {
+  color: #8b7355;
+  min-width: 1.6em;
+}
+
+.sequence-poem-name {
+  font-weight: 600;
+}
+
+.sequence-poem-tpl {
+  color: #8b7355;
+  font-size: 13px;
+}
+
+.sequence-poem-flag {
+  margin-left: auto;
+  color: #8b7355;
+}
+
+.sequence-poem {
+  margin-top: 18px;
+  text-align: center;
+}
+
+.sequence-poem-title {
+  font-size: 22px;
+  font-weight: bold;
+  color: #3d3226;
+  letter-spacing: 4px;
+  margin-bottom: 6px;
+}
+
+.sequence-poem-ok {
+  color: #4a7c59;
+  margin-top: 6px;
+}
+
+.sequence-poem-bad {
+  color: #a94442;
+  margin-top: 6px;
+}
+
+.sequence-count {
+  width: 64px;
+  padding: 6px 8px;
+  border: 1px solid rgba(139, 115, 85, 0.25);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  font-family: inherit;
+  color: #3d3226;
+}
+
+.sequence-per-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sequence-per-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sequence-per-label {
+  min-width: 4em;
+  color: #8b7355;
+  font-size: 14px;
+}
+
+.sequence-per-select {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid rgba(139, 115, 85, 0.25);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  font-family: inherit;
+  color: #3d3226;
+  cursor: pointer;
+}

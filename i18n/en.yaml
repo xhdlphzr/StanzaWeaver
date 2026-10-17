@@ -24,6 +24,24 @@ generate:
   button: Generate
   loading: Generating...
 
+mode:
+  label: Mode
+  single: Single poem
+  sequence: Poem sequence
+
+sequence:
+  progress_title: Sequence Progress
+  all_pass: All poems passed
+  some_fail: Some poems failed
+  history_label: Poem Sequence
+  count_label: Poems
+  meter_mode_label: Meter
+  meter_uniform: Same for all
+  meter_per: Per poem
+  uniform_label: Meter for all
+  per_label: Meter per poem
+  poem_ordinal: "Poem {n}"
+
 progress:
   title: Generation Progress
 

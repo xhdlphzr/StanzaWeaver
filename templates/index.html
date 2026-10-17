@@ -111,6 +111,13 @@
             ></textarea>
           </div>
           <div class="field field-inline">
+            <label data-i18n="mode.label">模式</label>
+            <select id="mode-select">
+              <option value="single" data-i18n="mode.single">单首</option>
+              <option value="sequence" data-i18n="mode.sequence">诗组</option>
+            </select>
+          </div>
+          <div class="field field-inline" id="template-field">
             <label data-i18n="template.label">格律</label>
             <select id="template-select">
               <option value="" data-i18n="template.default_option">
@@ -124,6 +131,33 @@
             >
               + 自定义
             </button>
+          </div>
+          <div id="sequence-config" class="hidden">
+            <div class="field field-inline">
+              <label data-i18n="sequence.count_label">诗数</label>
+              <input
+                id="sequence-count"
+                class="sequence-count"
+                type="number"
+                min="1"
+                value="3"
+              />
+              <label data-i18n="sequence.meter_mode_label">格律</label>
+              <select id="sequence-meter-mode">
+                <option value="uniform" data-i18n="sequence.meter_uniform">
+                  统一
+                </option>
+                <option value="per" data-i18n="sequence.meter_per">逐首</option>
+              </select>
+            </div>
+            <div class="field field-inline" id="sequence-uniform-field">
+              <label data-i18n="sequence.uniform_label">统一格律</label>
+              <select id="sequence-uniform-template"></select>
+            </div>
+            <div class="field hidden" id="sequence-per-field">
+              <label data-i18n="sequence.per_label">逐首格律</label>
+              <div id="sequence-per-list" class="sequence-per-list"></div>
+            </div>
           </div>
           <div class="actions">
             <button
@@ -140,6 +174,14 @@
         <section id="progress-section" class="hidden card">
           <div class="section-header" data-i18n="progress.title">生成进度</div>
           <div id="progress-list"></div>
+        </section>
+
+        <section id="sequence-section" class="hidden card">
+          <div class="section-header" data-i18n="sequence.progress_title">
+            诗组进度
+          </div>
+          <div id="sequence-plan" class="sequence-plan"></div>
+          <div id="sequence-poems-status" class="sequence-poems-status"></div>
         </section>
 
         <section id="poem-section" class="hidden card">
@@ -353,6 +395,7 @@
       let llmConnected = false;
       let lastPoem = [];
       let currentStep = "";
+      let TEMPLATES = [];
       var STEP_NAMES = {
         1: "生成描述",
         2: "生成初稿",
@@ -399,6 +442,15 @@
         document
           .getElementById("btn-generate")
           .addEventListener("click", startGenerate);
+        document
+          .getElementById("mode-select")
+          .addEventListener("change", applyMode);
+        document
+          .getElementById("sequence-count")
+          .addEventListener("change", rebuildSequenceMeters);
+        document
+          .getElementById("sequence-meter-mode")
+          .addEventListener("change", applySequenceMeterMode);
         document
           .getElementById("btn-feedback")
           .addEventListener("click", sendFeedback);
@@ -472,6 +524,8 @@
 
         socket.on("progress", handleProgress);
         socket.on("done", handleDone);
+        socket.on("sequence_progress", handleSequenceProgress);
+        socket.on("sequence_done", handleSequenceDone);
         socket.on("error", handleError);
         socket.on("templates_updated", function () {
           loadTemplates();
@@ -506,19 +560,38 @@
         });
       });
 
+      function templateOptionsHtml() {
+        return TEMPLATES.map(function (item) {
+          return (
+            '<option value="' +
+            item.key +
+            '">' +
+            escapeHtml(item.display_name || item.name) +
+            "</option>"
+          );
+        }).join("");
+      }
+
       function loadTemplates() {
         fetch("/api/templates")
           .then((r) => r.json())
           .then((templates) => {
+            TEMPLATES = templates;
             const select = document.getElementById("template-select");
             select.innerHTML =
-              '<option value="">' + t("template.default_option") + "</option>";
-            templates.forEach((t) => {
-              const opt = document.createElement("option");
-              opt.value = t.key;
-              opt.textContent = t.display_name || t.name;
-              select.appendChild(opt);
-            });
+              '<option value="">' +
+              t("template.default_option") +
+              "</option>" +
+              templateOptionsHtml();
+            const uniform = document.getElementById(
+              "sequence-uniform-template",
+            );
+            uniform.innerHTML =
+              '<option value="">' +
+              t("template.default_option") +
+              "</option>" +
+              templateOptionsHtml();
+            rebuildSequenceMeters();
           });
       }
 
@@ -586,11 +659,62 @@
 
       function startGenerate() {
         const topic = document.getElementById("topic").value.trim();
-        const templateKey = getSelectedTemplate();
+        const mode = document.getElementById("mode-select").value;
         if (!topic) {
           showToast(t("toast.enter_topic"), "warning");
           return;
         }
+        if (mode === "sequence") {
+          const count = clampSequenceCount();
+          const meterMode = document.getElementById("sequence-meter-mode").value;
+          let templateKeys = [];
+          if (meterMode === "uniform") {
+            const uniformKey = document.getElementById(
+              "sequence-uniform-template",
+            ).value;
+            if (!uniformKey) {
+              showToast(t("toast.select_template"), "warning");
+              return;
+            }
+            templateKeys = new Array(count).fill(uniformKey);
+          } else {
+            const selects = document.querySelectorAll(
+              "#sequence-per-list .sequence-per-select",
+            );
+            selects.forEach(function (sel) {
+              templateKeys.push(sel.value);
+            });
+            if (
+              templateKeys.length !== count ||
+              templateKeys.some(function (key) {
+                return !key;
+              })
+            ) {
+              showToast(t("toast.select_template"), "warning");
+              return;
+            }
+          }
+          isGenerating = true;
+          applyButtonStates();
+          document.getElementById("progress-section").classList.add("hidden");
+          document.getElementById("poem-section").classList.add("hidden");
+          document.getElementById("feedback-section").classList.add("hidden");
+          document.getElementById("checker-inline").classList.add("hidden");
+          document.getElementById("tool-status").classList.add("hidden");
+          document.getElementById("sequence-section").classList.remove("hidden");
+          document.getElementById("sequence-plan").textContent = "";
+          document.getElementById("sequence-poems-status").innerHTML = "";
+          document.getElementById("poem-display").innerHTML = "";
+          lastPoem = [];
+          currentStep = "";
+          renderedSeqs.clear();
+          socket.emit("generate_sequence", {
+            topic: topic,
+            template_keys: templateKeys,
+          });
+          return;
+        }
+        const templateKey = getSelectedTemplate();
         if (!templateKey) {
           showToast(t("toast.select_template"), "warning");
           return;
@@ -600,6 +724,7 @@
         applyButtonStates();
         document.getElementById("progress-section").classList.remove("hidden");
         document.getElementById("poem-section").classList.remove("hidden");
+        document.getElementById("sequence-section").classList.add("hidden");
         document.getElementById("feedback-section").classList.add("hidden");
         document.getElementById("checker-inline").classList.add("hidden");
         document.getElementById("tool-status").classList.add("hidden");
@@ -612,6 +737,59 @@
         renderedSeqs.clear();
 
         socket.emit("generate", { topic: topic, template_key: templateKey });
+      }
+
+      function applyMode() {
+        const mode = document.getElementById("mode-select").value;
+        const isSequence = mode === "sequence";
+        document
+          .getElementById("template-field")
+          .classList.toggle("hidden", isSequence);
+        document
+          .getElementById("sequence-config")
+          .classList.toggle("hidden", !isSequence);
+        if (isSequence) {
+          applySequenceMeterMode();
+          rebuildSequenceMeters();
+        }
+      }
+
+      function applySequenceMeterMode() {
+        const per = document.getElementById("sequence-meter-mode").value === "per";
+        document
+          .getElementById("sequence-uniform-field")
+          .classList.toggle("hidden", per);
+        document
+          .getElementById("sequence-per-field")
+          .classList.toggle("hidden", !per);
+      }
+
+      function clampSequenceCount() {
+        const el = document.getElementById("sequence-count");
+        let count = parseInt(el.value, 10);
+        if (isNaN(count)) count = 3;
+        count = Math.max(1, count);
+        el.value = count;
+        return count;
+      }
+
+      function rebuildSequenceMeters() {
+        const list = document.getElementById("sequence-per-list");
+        if (!list) return;
+        const count = clampSequenceCount();
+        const options = templateOptionsHtml();
+        list.innerHTML = "";
+        for (let i = 0; i < count; i++) {
+          const row = document.createElement("div");
+          row.className = "sequence-per-row";
+          row.innerHTML =
+            '<span class="sequence-per-label">' +
+            t("sequence.poem_ordinal", { n: i + 1 }) +
+            '</span><select class="sequence-per-select">' +
+            options +
+            "</select>";
+          list.appendChild(row);
+        }
       }
 
       function sendFeedback() {
@@ -900,6 +1078,109 @@
         }
       }
 
+      function renderSequencePoems(data) {
+        const display = document.getElementById("poem-display");
+        display.innerHTML = "";
+        const titleEl = document.createElement("div");
+        titleEl.className = "poem-title";
+        titleEl.textContent = "《" + (data.title || "") + "》";
+        display.appendChild(titleEl);
+        (data.poems || []).forEach(function (p) {
+          const wrap = document.createElement("div");
+          wrap.className = "sequence-poem";
+          const name = document.createElement("div");
+          name.className = "sequence-poem-title";
+          name.textContent = "《" + (p.title || p.planned_title || "") + "》";
+          wrap.appendChild(name);
+          const pre = document.createElement("pre");
+          pre.className = "poem-formatted";
+          pre.textContent =
+            p.formatted_poem || (p.draft || []).join("\n") || "\u2026";
+          wrap.appendChild(pre);
+          const status = document.createElement("div");
+          status.className = p.checker_pass ? "sequence-poem-ok" : "sequence-poem-bad";
+          if (p.done) {
+            status.textContent = p.checker_pass
+              ? t("checker.pass")
+              : t("checker.fail");
+          }
+          wrap.appendChild(status);
+          display.appendChild(wrap);
+        });
+      }
+
+      function handleSequenceProgress(data) {
+        document.getElementById("sequence-section").classList.remove("hidden");
+        document.getElementById("sequence-plan").textContent = data.plan_text || "";
+        const list = document.getElementById("sequence-poems-status");
+        list.innerHTML = "";
+        (data.poems || []).forEach(function (p, i) {
+          const row = document.createElement("div");
+          row.className = "sequence-poem-status";
+          let flag = "\u00b7";
+          if (p.done) flag = p.checker_pass ? "\u2714" : "\u2718";
+          else if (i === data.current_index) flag = "\u2026";
+          row.innerHTML =
+            '<span class="sequence-poem-index">' +
+            (i + 1) +
+            '</span><span class="sequence-poem-name">\u300a' +
+            escapeHtml(p.title || p.planned_title || "") +
+            '\u300b</span><span class="sequence-poem-tpl">' +
+            escapeHtml(p.template_key || "") +
+            '</span><span class="sequence-poem-flag">' +
+            flag +
+            "</span>";
+          list.appendChild(row);
+        });
+        if (data.poems && data.poems.length) {
+          document.getElementById("poem-section").classList.remove("hidden");
+          renderSequencePoems(data);
+        }
+      }
+
+      function handleSequenceDone(data) {
+        isGenerating = false;
+        applyButtonStates();
+        document.getElementById("sequence-section").classList.add("hidden");
+        document.getElementById("poem-section").classList.remove("hidden");
+        renderSequencePoems(data);
+        const checkerInline = document.getElementById("checker-inline");
+        checkerInline.classList.remove("hidden");
+        if (data.ok) {
+          checkerInline.innerHTML =
+            '<div class="checker-pass">&#10004; ' +
+            t("sequence.all_pass") +
+            "</div>";
+        } else {
+          checkerInline.innerHTML =
+            '<div class="checker-fail">&#10008; ' +
+            t("sequence.some_fail") +
+            "</div>";
+        }
+        document.getElementById("tool-status").classList.add("hidden");
+        document.getElementById("feedback-section").classList.add("hidden");
+        if (data.ok) {
+          const topic = document.getElementById("topic").value;
+          const parts = (data.poems || []).map(function (p) {
+            return "\u300a" + (p.title || "") + "\u300b\n" + (p.formatted_poem || "");
+          });
+          const poemText =
+            "\u300a" + (data.title || "") + "\u300b\n\n" + parts.join("\n\n");
+          fetch("/api/history", {
+            method: "POST",
+            headers: Object.assign(
+              { "Content-Type": "application/json" },
+              csrfHeaders(),
+            ),
+            body: JSON.stringify({
+              topic: topic,
+              template_name: t("sequence.history_label"),
+              poem: poemText,
+            }),
+          });
+        }
+      }
+
       function handleError(data) {
         showToast(data.message || t("toast.error_default"), "error");
         isGenerating = false;
@@ -970,16 +1251,28 @@
 
       function copyPoem() {
         var parts = [];
-        var titleEl = document.querySelector(".poem-title");
-        if (titleEl) parts.push(titleEl.textContent);
-        var formatted = document.querySelector(".poem-formatted");
-        if (formatted) {
-          parts.push(formatted.textContent);
-        } else {
-          var lines = document.querySelectorAll(".poem-line");
-          lines.forEach(function (el) {
-            parts.push(el.textContent);
+        var sequencePoems = document.querySelectorAll(".sequence-poem");
+        if (sequencePoems.length) {
+          var sequenceTitle = document.querySelector(".poem-title");
+          if (sequenceTitle) parts.push(sequenceTitle.textContent);
+          sequencePoems.forEach(function (item) {
+            var name = item.querySelector(".sequence-poem-title");
+            var pre = item.querySelector(".poem-formatted");
+            if (name) parts.push(name.textContent);
+            if (pre) parts.push(pre.textContent);
           });
+        } else {
+          var titleEl = document.querySelector(".poem-title");
+          if (titleEl) parts.push(titleEl.textContent);
+          var formatted = document.querySelector(".poem-formatted");
+          if (formatted) {
+            parts.push(formatted.textContent);
+          } else {
+            var lines = document.querySelectorAll(".poem-line");
+            lines.forEach(function (el) {
+              parts.push(el.textContent);
+            });
+          }
         }
         var text = parts.join("\n");
         if (!text) return;
