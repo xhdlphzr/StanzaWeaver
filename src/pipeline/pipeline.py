@@ -132,6 +132,30 @@ class PoetryPipeline:
         self._template_obj = get_template(key)
         return self._template_obj.to_dict()
 
+    def _format_current(self, state: PipelineState) -> str:
+        """按当前诗稿/标题/标点即时格式化（用于全程实时展示）.
+
+        Args:
+            state: 流水线状态。
+
+        Returns:
+            格式化文本；无草稿时返回空串。
+
+        """
+        if not state.draft:
+            return ""
+        if self._template_obj is not None and hasattr(
+            self._template_obj, "format_poem"
+        ):
+            text = str(
+                self._template_obj.format_poem(
+                    [state.title, *state.draft], state.punctuation or None
+                )
+            )
+            return text if state.title else text.lstrip("\n")
+        lines = ([state.title] if state.title else []) + list(state.draft)
+        return "\n".join(lines)
+
     def _report(self, state: PipelineState) -> None:
         """推送进度事件到前端.
 
@@ -146,6 +170,9 @@ class PoetryPipeline:
                     "description": state.description,
                     "draft": state.draft,
                     "title": state.title,
+                    "formatted_poem": self._format_current(state),
+                    "language": str(state.template.get("language", "")),
+                    "centered": bool(state.template.get("centered", True)),
                     "refine_rounds": state.refine_rounds,
                     "checker_pass": state.checker_pass,
                     "checker_suggestions": state.checker_suggestions,
@@ -417,16 +444,7 @@ class PoetryPipeline:
                 state.final_poem = (
                     [state.title] + state.draft if state.title else list(state.draft)
                 )
-                if self._template_obj is not None and hasattr(
-                    self._template_obj, "format_poem"
-                ):
-                    state.formatted_poem = str(
-                        self._template_obj.format_poem(
-                            state.final_poem, state.punctuation or None
-                        )
-                    )
-                else:
-                    state.formatted_poem = "\n".join(state.final_poem)
+                state.formatted_poem = self._format_current(state)
                 break
 
             checker_feedback = state.checker_suggestions
@@ -435,16 +453,7 @@ class PoetryPipeline:
             state.final_poem = (
                 [state.title] + state.draft if state.title else list(state.draft)
             )
-            if self._template_obj is not None and hasattr(
-                self._template_obj, "format_poem"
-            ):
-                state.formatted_poem = str(
-                    self._template_obj.format_poem(
-                        state.final_poem, state.punctuation or None
-                    )
-                )
-            else:
-                state.formatted_poem = "\n".join(state.final_poem)
+            state.formatted_poem = self._format_current(state)
 
     def continue_with_feedback(
         self,

@@ -110,6 +110,8 @@ class PoetryTemplate(ABC):
     # Sequence（协变）允许子类覆盖为 list[int] 或 list[tuple[int, int]]
     syllables_per_line: ClassVar[Sequence[SyllableCount]] = []
     rule_description: ClassVar[str] = ""
+    #: 展示时是否居中（诗居中；词等长句体裁可覆写为 False 左对齐）。
+    centered: ClassVar[bool] = True
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
         """返回逐位音节约束表（每行一个约束列表）.
@@ -140,7 +142,7 @@ class PoetryTemplate(ABC):
 
         Returns:
             {"name", "language", "lines", "syllables_per_line",
-             "syllable_constraints"}。
+             "syllable_constraints", "centered"}。
 
         """
         return {
@@ -149,6 +151,7 @@ class PoetryTemplate(ABC):
             "lines": self.lines,
             "syllables_per_line": list(self.syllables_per_line),
             "syllable_constraints": self.get_syllable_constraints(),
+            "centered": self.centered,
         }
 
     def describe(self) -> str:

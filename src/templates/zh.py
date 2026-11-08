@@ -646,6 +646,7 @@ class XiangjianhuanTemplate(PoetryTemplate):
     name = "相见欢"
     language = "zh"
     lines = 7
+    centered = False
     syllables_per_line: ClassVar[list[int]] = [6, 3, 9, 3, 3, 3, 9]
     rule_description = (
         "格律规则：上阕3句三平韵（中平中仄平平/仄平平/中仄中平平仄仄平平）；"
@@ -754,6 +755,7 @@ class RumenglingTemplate(PoetryTemplate):
     name = "如梦令"
     language = "zh"
     lines = 7
+    centered = False
     syllables_per_line: ClassVar[list[int]] = [6, 6, 5, 6, 2, 2, 6]
     rule_description = (
         "格律规则：单调七句，全押仄声韵（一韵到底）；第5、6句为二字叠句须完全相同；"
@@ -825,6 +827,7 @@ class LangtaoshaTemplate(PoetryTemplate):
     name = "浪淘沙"
     language = "zh"
     lines = 10
+    centered = False
     syllables_per_line: ClassVar[list[int]] = [5, 4, 7, 7, 4, 5, 4, 7, 7, 4]
     rule_description = (
         "格律规则：双调十句，上下片各五句四平韵（第4、9句为句不入韵），一韵到底；"
@@ -899,6 +902,7 @@ class QingpingyueTemplate(PoetryTemplate):
     name = "清平乐"
     language = "zh"
     lines = 8
+    centered = False
     syllables_per_line: ClassVar[list[int]] = [4, 5, 7, 6, 6, 6, 6, 6]
     rule_description = (
         "格律规则：上片四句句句押仄韵，下片四句隔句押平韵（第7句为句不入韵），"
