@@ -417,6 +417,29 @@ def test_empty_title_excluded_from_final_poem() -> None:
     assert state.final_poem == ["床前明月光", "疑是地上霜"]
 
 
+def test_format_current_empty_title_with_template() -> None:
+    """无标题但有模板对象时即时格式化会去掉首个空标题行."""
+    from src.templates.zh import WujueTemplate
+
+    pipeline = _make_pipeline(_FakeWriter([]), _FakeChecker([]))
+    pipeline._template_obj = WujueTemplate()
+    state = PipelineState(
+        template={"lines": 2, "language": "zh"},
+        draft=["白日依山尽", "黄河入海流"],
+        title="",
+    )
+    text = pipeline._format_current(state)
+    assert text.startswith("白日依山尽")
+    assert "。" in text
+
+
+def test_format_current_empty_draft_returns_empty() -> None:
+    """无草稿时即时格式化为空串."""
+    pipeline = _make_pipeline(_FakeWriter([]), _FakeChecker([]))
+    state = PipelineState(template={"language": "zh"}, draft=[], title="题")
+    assert pipeline._format_current(state) == ""
+
+
 # --------------------------------------------------------------------------- #
 # P2-9: json_dumps_safe 的 ValueError / RecursionError 分支
 # --------------------------------------------------------------------------- #

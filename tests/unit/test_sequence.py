@@ -261,6 +261,8 @@ class _FakePoemPipeline:
                     "refine_rounds": 1,
                     "checker_pass": self.checker_pass,
                     "checker_suggestions": "",
+                    "formatted_poem": "句一，句二。",
+                    "language": "zh",
                 }
             )
         return PipelineState(
@@ -469,6 +471,8 @@ def test_sequence_pipeline_seeds_templates() -> None:
     state = pipeline.run("四季", template_keys=["zh_wujue", "zh_rumengling"])
     assert state.ok is True
     assert [p.template_key for p in state.poems] == ["zh_wujue", "zh_rumengling"]
+    assert state.poems[0].centered is True
+    assert state.poems[1].centered is False
     architect = cast(Any, pipeline.architect)
     assert architect.seed is not None
     assert [p.title for p in architect.seed] == ["第1首", "第2首"]
@@ -482,3 +486,25 @@ def test_sequence_pipeline_invalid_template_keys() -> None:
         pipeline.run("x", template_keys=[])
     with pytest.raises(ValueError):
         pipeline.run("x", template_keys=["nope"])
+
+
+def test_centered_flag_shi_vs_ci() -> None:
+    """诗居中、词不居中，并随 to_dict 下发以驱动前端对齐."""
+    from src.templates.zh import (
+        LangtaoshaTemplate,
+        QingpingyueTemplate,
+        RumenglingTemplate,
+        WujueTemplate,
+        XiangjianhuanTemplate,
+    )
+
+    assert WujueTemplate().centered is True
+    assert WujueTemplate().to_dict()["centered"] is True
+    for tpl in (
+        XiangjianhuanTemplate(),
+        RumenglingTemplate(),
+        LangtaoshaTemplate(),
+        QingpingyueTemplate(),
+    ):
+        assert tpl.centered is False
+        assert tpl.to_dict()["centered"] is False

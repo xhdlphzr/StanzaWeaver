@@ -394,6 +394,7 @@
       let llmDisabled = true;
       let llmConnected = false;
       let lastPoem = [];
+      let lastFormatted = "";
       let currentStep = "";
       let TEMPLATES = [];
       var STEP_NAMES = {
@@ -706,6 +707,7 @@
           document.getElementById("sequence-poems-status").innerHTML = "";
           document.getElementById("poem-display").innerHTML = "";
           lastPoem = [];
+          lastFormatted = "";
           currentStep = "";
           renderedSeqs.clear();
           socket.emit("generate_sequence", {
@@ -733,6 +735,7 @@
         document.getElementById("feedback-input-area").classList.add("hidden");
         document.getElementById("user-feedback").value = "";
         lastPoem = [];
+        lastFormatted = "";
         currentStep = "";
         renderedSeqs.clear();
 
@@ -802,6 +805,7 @@
         document.getElementById("tool-status").classList.add("hidden");
         document.getElementById("feedback-section").classList.add("hidden");
         lastPoem = [];
+        lastFormatted = "";
         currentStep = "";
         socket.emit("feedback", { feedback: feedback });
       }
@@ -904,13 +908,17 @@
           const display = document.getElementById("poem-display");
           if (!data.draft || !data.draft.length) {
             display.innerHTML =
-              '<div class="poem-line stream-text">' +
+              '<div class="poem-line stream-text' +
+              (data.centered === false ? " poem-left" : "") +
+              '">' +
               escapeHtml(data.stream_text) +
               "</div>";
           }
         }
-        if (data.draft && data.draft.length > 0) {
-          updatePoemDisplay(data.draft, data.title);
+        if (data.formatted_poem) {
+          renderFormattedPoem(data.formatted_poem, data.centered);
+        } else if (data.draft && data.draft.length > 0) {
+          updatePoemDisplay(data.draft, data.title, data.centered);
         }
 
         if (data.last_tool) {
@@ -981,21 +989,35 @@
         return wrapper;
       }
 
-      function updatePoemDisplay(poem, title) {
+      function renderFormattedPoem(text, centered) {
+        if (text === lastFormatted) return;
+        lastFormatted = text;
+        const display = document.getElementById("poem-display");
+        display.innerHTML = "";
+        const pre = document.createElement("pre");
+        pre.className =
+          "poem-formatted" + (centered === false ? " poem-left" : "");
+        pre.textContent = text;
+        display.appendChild(pre);
+      }
+
+      function updatePoemDisplay(poem, title, centered) {
         if (JSON.stringify(poem) === JSON.stringify(lastPoem)) return;
         lastPoem = [...poem];
+        lastFormatted = "";
 
         const display = document.getElementById("poem-display");
         display.innerHTML = "";
+        const leftClass = centered === false ? " poem-left" : "";
         if (title) {
           const titleDiv = document.createElement("div");
-          titleDiv.className = "poem-title";
+          titleDiv.className = "poem-title" + leftClass;
           titleDiv.textContent = title;
           display.appendChild(titleDiv);
         }
-        poem.forEach((line, i) => {
+        poem.forEach((line) => {
           const div = document.createElement("div");
-          div.className = "poem-line";
+          div.className = "poem-line" + leftClass;
           div.textContent = line;
           display.appendChild(div);
         });
@@ -1010,12 +1032,14 @@
         display.innerHTML = "";
 
         if (data.formatted_poem) {
+          lastFormatted = data.formatted_poem;
           const pre = document.createElement("pre");
-          pre.className = "poem-formatted";
+          pre.className =
+            "poem-formatted" + (data.centered === false ? " poem-left" : "");
           pre.textContent = data.formatted_poem;
           display.appendChild(pre);
         } else {
-          updatePoemDisplay(poem, data.title);
+          updatePoemDisplay(poem, data.title, data.centered);
         }
 
         document.getElementById("tool-status").classList.add("hidden");
@@ -1093,7 +1117,8 @@
           name.textContent = "《" + (p.title || p.planned_title || "") + "》";
           wrap.appendChild(name);
           const pre = document.createElement("pre");
-          pre.className = "poem-formatted";
+          pre.className =
+            "poem-formatted" + (p.centered === false ? " poem-left" : "");
           pre.textContent =
             p.formatted_poem || (p.draft || []).join("\n") || "\u2026";
           wrap.appendChild(pre);

@@ -30,6 +30,8 @@ class SequencePoemState:
     title: str
     template_key: str
     prompt: str
+    language: str = ""
+    centered: bool = True
     draft: list[str] = field(default_factory=list)
     final_title: str = ""
     punctuation: list[str] = field(default_factory=list)
@@ -144,7 +146,11 @@ class PoemSequencePipeline:
             plan_completed=plan.completed,
             poems=[
                 SequencePoemState(
-                    title=p.title, template_key=p.template_key, prompt=p.prompt
+                    title=p.title,
+                    template_key=p.template_key,
+                    prompt=p.prompt,
+                    language=get_template(p.template_key).language,
+                    centered=get_template(p.template_key).centered,
                 )
                 for p in plan.poems
             ],
@@ -259,6 +265,9 @@ class PoemSequencePipeline:
         suggestions = info.get("checker_suggestions")
         if suggestions is not None:
             poem.checker_suggestions = str(suggestions)
+        formatted = info.get("formatted_poem")
+        if formatted is not None:
+            poem.formatted_poem = str(formatted)
         self._report(state)
 
     def _report(self, state: SequenceState) -> None:
@@ -296,6 +305,8 @@ class PoemSequencePipeline:
             "title": poem.final_title or poem.title,
             "planned_title": poem.title,
             "template_key": poem.template_key,
+            "language": poem.language,
+            "centered": poem.centered,
             "prompt": poem.prompt,
             "draft": list(poem.draft),
             "checker_pass": poem.checker_pass,

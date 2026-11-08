@@ -712,6 +712,10 @@ html[lang="en"] .slogan {
   animation: line-appear 0.6s ease-out both;
 }
 
+.poem-left {
+  text-align: left;
+}
+
 .poem-line {
   font-size: 24px;
   line-height: 2.3;
