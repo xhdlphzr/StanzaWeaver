@@ -421,10 +421,13 @@ class PoetryPipeline:
             self._report(state)
 
             try:
+                # 检查 AI 只依据用户原始提示词与模板规则描述评审，
+                # 不传创作 AI 自己提炼的 description，避免评审基准被二次概括带偏。
                 result = self._get_checker().check(
-                    description=state.description,
                     poem=state.draft,
                     template=state.template,
+                    user_prompt=state.topic,
+                    user_feedback=state.user_feedback,
                 )
                 state.checker_pass = bool(result["pass"])
                 state.checker_suggestions = str(result.get("suggestions", ""))

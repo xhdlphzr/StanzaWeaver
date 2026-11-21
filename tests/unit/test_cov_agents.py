@@ -329,15 +329,49 @@ def test_fire_stream_swallows_exception() -> None:
 def test_build_checker_system_parallelism() -> None:
     """五言律诗/七言律诗模板应包含对仗检查说明."""
     text = _build_checker_system(
-        "主题", ["a", "b"], {"name": "五言律诗", "language": "zh", "lines": 8}
+        ["a", "b"], {"name": "五言律诗", "language": "zh", "lines": 8}
     )
     assert "对仗" in text
 
 
 def test_build_checker_system_no_parallelism() -> None:
     """非中文或不足 8 行时不包含对仗说明."""
-    text = _build_checker_system("主题", ["a"], {"language": "en", "lines": 4})
+    text = _build_checker_system(["a"], {"language": "en", "lines": 4})
     assert "对仗" not in text
+
+
+def test_build_checker_system_includes_user_prompt_and_rule() -> None:
+    """检查 AI 提示词必须包含用户原始提示词、模板规则描述与用户反馈."""
+    text = _build_checker_system(
+        ["a"],
+        {"language": "zh", "lines": 4, "rule_note": "必须使用对仗句"},
+        user_prompt="写一首思乡的七言绝句",
+        user_feedback="再婉约一些",
+    )
+    assert "用户原始要求" in text
+    assert "写一首思乡的七言绝句" in text
+    assert "模板规则描述" in text
+    assert "必须使用对仗句" in text
+    assert "用户修改反馈" in text
+    assert "再婉约一些" in text
+    assert "用户要求符合" in text
+    # 不再使用创作 AI 自己提炼的主题描述
+    assert "【主题描述】" not in text
+
+
+def test_build_checker_system_rule_description_fallback() -> None:
+    """没有 rule_note 时回退到 rule_description；空用户提示/反馈不产生空段."""
+    text = _build_checker_system(
+        ["a"],
+        {"language": "zh", "lines": 4, "rule_description": "格律说明"},
+    )
+    assert "模板规则描述" in text
+    assert "格律说明" in text
+    assert "\n【用户原始要求（创作提示词）】\n" not in text
+    assert "\n【用户修改反馈（本轮必须落实）】\n" not in text
+
+    no_rule = _build_checker_system(["a"], {"language": "zh", "lines": 4})
+    assert "\n【模板规则描述】\n" not in no_rule
 
 
 # --------------------------------------------------------------------------- #
@@ -388,7 +422,7 @@ def test_checker_pass_true() -> None:
         "content": "",
         "tool_calls": [{"id": "1", "name": "submit", "arguments": {"pass": True}}],
     }
-    res = checker.check("主题", ["line"], {"language": "zh", "lines": 4})
+    res = checker.check(["line"], {"language": "zh", "lines": 4})
     assert res["pass"] is True
 
 
@@ -405,7 +439,7 @@ def test_checker_pass_false() -> None:
             }
         ],
     }
-    res = checker.check("主题", ["line"], {"language": "zh", "lines": 4})
+    res = checker.check(["line"], {"language": "zh", "lines": 4})
     assert res["pass"] is False
     assert res["suggestions"] == "改"
 
@@ -417,7 +451,7 @@ def test_checker_tool_calls_no_submit() -> None:
         "content": "",
         "tool_calls": [{"id": "1", "name": "search", "arguments": {}}],
     }
-    res = checker.check("主题", ["line"], {"language": "zh", "lines": 4})
+    res = checker.check(["line"], {"language": "zh", "lines": 4})
     assert res["pass"] is False
     assert "未能给出结论" in res["suggestions"]
 
@@ -426,15 +460,36 @@ def test_checker_no_tool_calls() -> None:
     """模型未调用工具时追加提醒，3 轮后放弃."""
     checker, chat = _make_checker()
     chat.chat.return_value = {"content": "我看看", "tool_calls": []}
-    res = checker.check("主题", ["line"], {"language": "zh", "lines": 4})
+    res = checker.check(["line"], {"language": "zh", "lines": 4})
     assert res["pass"] is False
+
+
+def test_checker_check_sends_user_prompt_to_llm() -> None:
+    """CheckerAI.check 会把用户提示词/反馈拼进系统消息发给 LLM."""
+    checker, chat = _make_checker()
+    chat.chat.return_value = {
+        "content": "",
+        "tool_calls": [{"id": "1", "name": "submit", "arguments": {"pass": True}}],
+    }
+    res = checker.check(
+        ["line"],
+        {"language": "zh", "lines": 4, "rule_note": "模板规则"},
+        user_prompt="用户原始提示词",
+        user_feedback="请更婉约",
+    )
+    assert res["pass"] is True
+    messages = chat.chat.call_args[0][0]
+    system = messages[0]["content"]
+    assert "用户原始提示词" in system
+    assert "模板规则" in system
+    assert "请更婉约" in system
 
 
 def test_checker_exception_fallback() -> None:
     """调用抛错时兜底为未通过."""
     checker, chat = _make_checker()
     chat.chat.side_effect = RuntimeError("boom")
-    res = checker.check("主题", ["line"], {"language": "zh", "lines": 4})
+    res = checker.check(["line"], {"language": "zh", "lines": 4})
     assert res["pass"] is False
     assert "boom" in res["suggestions"]
 

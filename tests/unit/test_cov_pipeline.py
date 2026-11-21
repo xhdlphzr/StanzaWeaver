@@ -147,23 +147,29 @@ class _FakeChecker(CheckerAI):
     """假 CheckerAI：按预置结果/异常返回，绝不构造/调用 LLMClient."""
 
     def __init__(self, check_results: CheckPlan) -> None:
-        """记录预置的 check 返回序列（可为异常）.
+        """记录预置的 check 返回序列（可为异常）与每次调用参数.
 
         Args:
             check_results: 依次返回的结果；异常元素会被原样抛出。
 
         """
         self._check_results: CheckPlan = list(check_results)
+        self.calls: list[dict[str, Any]] = []
 
     def check(
-        self, description: str, poem: list[str], template: dict[str, Any]
+        self,
+        poem: list[str],
+        template: dict[str, Any],
+        user_prompt: str = "",
+        user_feedback: str = "",
     ) -> dict[str, Any]:
         """按预置序列返回一次终审结果；若是异常则抛出.
 
         Args:
-            description: 主题描述（未使用）。
-            poem: 诗行列表（未使用）。
-            template: 模板字典（未使用）。
+            poem: 诗行列表。
+            template: 模板字典。
+            user_prompt: 用户原始提示词（记录用于断言）。
+            user_feedback: 用户反馈（记录用于断言）。
 
         Returns:
             预置的终审结果字典。
@@ -172,6 +178,13 @@ class _FakeChecker(CheckerAI):
             预置的任意异常（用于覆盖 except 兜底分支）。
 
         """
+        self.calls.append(
+            {
+                "template": template,
+                "user_prompt": user_prompt,
+                "user_feedback": user_feedback,
+            }
+        )
         item = self._check_results.pop(0)
         if isinstance(item, Exception):
             raise item
@@ -232,6 +245,24 @@ def test_run_full_with_fakes() -> None:
     assert state.final_poem == ["测试标题", "窗前明月光", "疑是地上霜"]
     assert writer.generate_description_calls == 1
     assert writer.generate_draft_calls == 1
+    # 检查 AI 必须收到用户发给创作 AI 的原始提示词，才能核对是否符合用户要求。
+    assert checker.calls
+    assert checker.calls[0]["user_prompt"] == "静夜思"
+    assert checker.calls[0]["user_feedback"] == ""
+
+
+def test_continue_with_feedback_passes_user_message_to_checker() -> None:
+    """用户「不定稿」反馈续跑时，检查 AI 也能收到用户反馈与原始提示词."""
+    writer = _FakeWriter([(["床前明月光", "疑是地上霜"], [], "炼句详情", 1)])
+    checker = _FakeChecker([{"pass": True, "suggestions": ""}])
+    pipeline = _make_pipeline(writer, checker)
+
+    state = pipeline.continue_with_feedback(_make_state(), "请更婉约")
+
+    assert state.checker_pass is True
+    assert checker.calls
+    assert checker.calls[0]["user_prompt"] == "静夜思"
+    assert checker.calls[0]["user_feedback"] == "请更婉约"
 
 
 def test_refine_checker_exception() -> None:
