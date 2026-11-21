@@ -26,6 +26,7 @@ StanzaWeaver weaves together the "imagination of AI" and the "hard rules of mete
 - [Project Introduction](#project-introduction)
 - [System Architecture](#system-architecture)
 - [Core Features](#core-features)
+- [Use Cases](#use-cases)
 - [Demo](#demo)
 - [Four‑Step Generation Pipeline](#fourstep-generation-pipeline)
 - [Docker Deployment](#docker-deployment)
@@ -112,10 +113,46 @@ flowchart TD
 - **Three‑Element Feedback Loop** – Writer AI → Checker AI → User; any failure sends the work back to Step 3 for further refinement, **with no upper limit on refinement rounds**.
 - **Multi‑language Meter** – Chinese (5‑character quatrain, 7‑character quatrain, 5‑character regulated verse, 7‑character regulated verse, Xiangjianhuan, Rumengling, Langtaosha, Qingpingyue), English (Shakespearean sonnet, villanelle, heroic couplet), Italian, French, Classical Latin; templates are defined as Python classes and can be extended indefinitely.
 - **Multi‑Layer Meter Validation** – Per‑syllable tone/stress constraints + three‑level‑tail + solitary level + alternating tone rule + rhyme checking (Chinese grouped by Thirteen Rhymes, Western languages by real‑time phoneme‑based rhyme).
+- **Custom Meter Templates + AI Template Editor** – The “+ Custom” dialog builds a template from the UI: per‑syllable constraints (labels shown in the UI language), up to 8 constraint variants joined by OR (e.g. the four tonal patterns of a quatrain), rhyme schemes such as `ABAB CDCD EFEF GG` with an optional “all rhyme groups must differ”, a free‑form rule description, and optional custom Python validation. A separately configurable **Template AI** can fill the same fields through tools, streaming its thinking, answers and every tool call (with arguments) into the dialog.
+- **Cross‑Language Template Conversion** – A unified conversion interface (`POST /api/templates/convert`, shared by the UI and the Template AI) carries the line/syllable structure, constraint variants, rhyme scheme, custom validation code, rule description and data‑ised structural rules (e.g. the tone skeleton, “three‑level‑tail” and “solitary level” of regulated verse) into another language, mapping **only** the per‑syllable constraint values (many‑to‑one allowed). The UI reports exactly which parts are carried and which language‑specific rules are not.
+- **Prompt‑Ready Rule Description** – Every custom template stores a free‑form rule description which is injected into the Writer AI prompt together with the symbolic constraints, so requirements that cannot be expressed numerically (diction, parallelism, imagery structure, translation constraints) still guide generation.
 - **Real‑time Streaming Output** – LLM generation tokens are pushed to the frontend token by token, with the Step detail area continuously updating.
 - **Separable Dual AI Agents** – Writer AI (3 tools) and Checker AI (1 tool) can use different LLM endpoints and models independently.
 - **Local Lexicon + Vector Reranking** – SQLite lexicon (CC‑CEDICT / CMUdict / Lexique / GLAW‑IT / Lewis & Short), with `sentence‑transformers` for semantic reranking.
 - **Desktop Packaging** – pywebview + Flask + SocketIO, packaged as a single executable using PyInstaller.
+
+
+---
+
+## Use Cases
+
+The symbolic constraint engine is not limited to writing poems from scratch — it is also a practical tool for **constrained translation** and other meter‑aware tasks.
+
+### 1. Poem Creation
+
+- **From scratch** – enter a topic, pick a built-in or custom meter; the four-step pipeline drafts, refines against the symbolic rules and gets a semantic review.
+- **Poem sequences** – plan multi-poem suites with the Architect AI (one meter for all, or a meter per poem).
+- **Custom forms** – describe a form with per-syllable constraints, OR‑joined constraint variants, a rhyme scheme, custom Python rules and a free‑form rule description.
+- **AI-authored templates** – describe the form in natural language and let the Template AI call tools to configure it (thinking, answers, tool names and arguments are all shown).
+- **Cross-language adaptation** – convert a template into another language and keep its rhyme scheme and structural rules; the conversion report tells you what was carried and what was dropped.
+
+### 2. Verse Translation
+
+The same neuro-symbolic loop works for translating poetry (or any text) into a metrically constrained target form:
+
+1. **Paste the source text into the topic box** and state the task, e.g. “Translate the following Tang poem into English heroic couplets, keep the imagery, do not add explanations.”
+2. **Choose a target-language template** (e.g. Shakespearean sonnet for English, elegiac couplet for Latin), or **convert a source-language template** in the conversion panel to obtain the same line/syllable structure and rhyme scheme in the target language.
+3. **Write the translation requirements into the template’s rule description** (literal vs. literary, register, images/names that must be preserved, rhyme constraints) — it is sent to the Writer AI as part of the meter prompt and can be edited per task.
+4. **Let the four-step loop work** – the Writer AI proposes lines, the symbolic layer rejects any line that breaks syllable/tone/rhyme rules, and the Checker AI reviews semantic fidelity and rejects meaning drift so the draft is refined again.
+5. **Iterate from the poem panel** – press “Reject” and give feedback such as “more literal”, “keep the river image”, “avoid archaic words”.
+
+Why it works: constraints are symbolic, so each candidate line is validated deterministically instead of being trusted from the model’s own claims; and because the Writer AI can only act through tools, it cannot silently abandon the rhyme scheme. When a source form relies on rules that cannot be transported (refrains, caesura, stress‑position rules, …), the conversion report names them so you can re-express them in the rule description or custom validation code.
+
+### 3. Other Scenarios
+
+- **Constrained / experimental writing** – fixed rhyme schemes, lipograms, pattern poetry, punning under meter.
+- **Teaching and practice** – inspect the symbolic errors to explain why a line breaks the meter rules; build textbook exercise templates.
+- **Bilingual adaptation** – translate a poem, then re-constrain it with a target‑language template for publication or performance.
 
 ---
 
@@ -132,7 +169,7 @@ The following image shows the generation interface and refinement process:
 1. **Step 1 · Description Generation** – The Writer AI takes the user’s modern‑language theme and produces a poetic description (a “creative outline” reused in later steps).
 2. **Step 2 · First Draft** – The Writer AI produces an initial draft respecting the template’s meter requirements (line count, syllable count). Only line and syllable counts are validated at this stage.
 3. **Step 3 · Refinement Loop (ReAct)** – The AI repeatedly calls `search_words` to find compliant words/phrases and `modify` to change a line, the title, or the punctuation; it may also call `submit` with a whole new poem (`poem`) or a punctuation list. Every modification immediately triggers symbolic‑layer full‑poem validation. The AI may call `submit` at any time, but the submission is accepted **only after the full‑poem meter validation passes** — otherwise it is rejected with the concrete errors and the loop continues. **There is no upper limit on this loop**; it continues until the draft is submitted with a valid meter.
-4. **Step 4 · Semantic Final Review** – The Checker AI reviews the final draft from aspects such as coherence, thematic fit, and higher‑level dimensions beyond meter, then calls `submit` to give a pass/fail decision. If it fails, suggestions are sent back to Step 3 for further refinement; if it passes, the poem is finalised.
+4. **Step 4 · Semantic Final Review** – The Checker AI receives the user's original prompt sent to the Writer AI plus the template rule description (and the latest user feedback), **not** the AI‑refined theme description, so its pass/fail decision is based on the user's actual requirements rather than on the Writer AI's own summary. It checks conformity with those requirements as well as coherence and higher‑level dimensions beyond meter. It then calls `submit` to give a pass/fail decision; if it fails, suggestions are sent back to Step 3 for further refinement, and the poem is finalised only after it passes.
 
 ---
 
@@ -165,7 +202,7 @@ Notes:
 - **Dependencies** – Uses the full project dependencies declared in `pyproject.toml` and locked by `uv.lock` (managed with [uv](https://docs.astral.sh/uv/); includes desktop GUI and embedded reranking components, same functionality as local). The Linux image includes all these dependencies, so the image is large and initial build is slow, but can be reused after the first build.
 - **Data Persistence** – Configuration, lexicon, history, and logs are persisted via the `stanzaweaver-data` volume, mounted to `~/.stanza_weaver` inside the container.
 - **Security** – The application only accepts `localhost`/`127.0.0.1` Host headers (via `app.py`’s `_guard_local_access`). Docker deployment must access via `http://localhost:5000`; on Linux you can also use `network_mode: host` (see comments in `docker-compose.yml`).
-- **Custom Templates** – Templates created via the UI are written to `/app/src/templates/` inside the container; they will be lost when the container is rebuilt (source is not mounted). To persist them, you would need to mount the directory.
+- **Custom Templates** – Templates created via the UI (including their constraint tables, rhyme scheme, rule description and custom code) are written to `/app/src/templates/` inside the container; they will be lost when the container is rebuilt (source is not mounted). To persist them, you would need to mount the directory.
 - **Logs** – Container log files are located at `~/.stanza_weaver/logs/stanza.log` (persisted via the volume); you can override with `STANZAWEAVER_LOG_DIR`. `docker compose logs` shows standard output.
 
 ---
@@ -225,15 +262,22 @@ StanzaWeaver/
     │   └── vocabulary.py    # Query interface
     ├── agents/              # Neural layer: AI Agents
     │   ├── __init__.py
+    │   ├── architect_ai.py  # Sequence Architect AI (planning tools)
     │   ├── base.py          # LLM call wrapper
     │   ├── checker_ai.py    # Checker AI (1 tool)
+    │   ├── editor_ai.py     # Template AI (configures custom templates via tools)
     │   └── writer_ai.py     # Writer AI (3 tools)
     ├── tools/               # Agent tool definitions
     │   ├── __init__.py      # OpenAI Tool JSON Schemas
     │   ├── modify.py        # Modify execution (line/title/punctuation)
-    │   └── search_words.py  # Word search execution
+    │   ├── planning.py      # Architect planning tools
+    │   ├── search_words.py  # Word search execution
+    │   └── template_tools.py   # Template AI tools (syllables/constraints/rhyme/code/submit)
     ├── templates/           # Meter templates (Python classes)
     │   ├── __init__.py      # PoetryTemplate base class + registry
+    │   ├── convert.py       # Unified cross‑language template conversion
+    │   ├── rhyme.py         # Generic rhyme‑scheme checking
+    │   ├── structural.py    # Data‑ised structural rules (regulated verse)
     │   ├── en.py            # English templates (sonnet, villanelle, heroic couplet)
     │   ├── fr.py            # French templates (rondeau, triolet, ballade)
     │   ├── it.py            # Italian templates (terza rima, ottava rima, canzone)
@@ -241,7 +285,8 @@ StanzaWeaver/
     │   └── zh.py            # Chinese templates (5‑char quatrain, 7‑char quatrain, etc.)
     └── pipeline/
         ├── __init__.py
-        └── pipeline.py      # 4‑step pipeline + feedback loop
+        ├── pipeline.py      # 4‑step pipeline + feedback loop
+        └── sequence.py      # Poem‑sequence pipeline
 ```
 
 ---
@@ -254,11 +299,35 @@ Templates are defined as Python classes inheriting from `PoetryTemplate`, and mu
 | :--------------------------- | :----------------------------------------------------------------------------------- |
 | `get_syllable_constraints()` | Per‑position syllable constraints (used by `modify` for single‑line validation)    |
 | `validate_full()`            | Full‑poem rule checking (three‑level‑tail, solitary level, rhyme, etc.)              |
-| `describe()`                 | Human‑readable meter description (used in the AI prompt)                             |
+| `describe()`                 | Human‑readable meter description (used in the AI prompt); it also contains the template's rule description |
 
 Built‑in templates: 5‑character quatrain, 7‑character quatrain, 5‑character regulated verse, 7‑character regulated verse, Xiangjianhuan, Rumengling, Langtaosha, Qingpingyue, Shakespearean sonnet, villanelle, heroic couplet, Italian terza rima / ottava rima / canzone, French rondeau / triolet / ballade, Latin hexameter / elegiac couplet / hendecasyllabic.
 
 To extend: add a new Python file under `src/templates/`, define the class, and register it in `app.py`; or use the UI’s “+ Custom” button to generate a template (automatically saved to `src/templates/custom_*.py` and restored on restart).
+
+### Custom Template Editor
+
+The “+ Custom” dialog builds a complete template without writing Python by hand:
+
+| Capability | Details |
+| :--- | :--- |
+| Localized constraints | Per‑syllable constraints; attribute names and value labels follow the UI language (e.g. 轻/重 for stress, 长/短 for length) instead of always showing raw English. |
+| Constraint variants (OR) | 1–8 constraint tables; the generation AI may satisfy **any one** of them — ideal for the four tonal patterns (仄起/平起 × 首句入韵/不入韵) of a quatrain. |
+| Rhyme scheme | Per‑line rhyme groups A–J and complex schemes like `ABAB CDCD EFEF GG`; an optional “all rhyme groups must differ” switch (e.g. for sonnets). |
+| Conversion from another template | Pick a source template, choose the target language, then map each source attribute value to a target value (many‑to‑one is allowed, one‑to‑many is impossible). |
+| Rule description | A free‑form text stored with the template and injected into the Writer AI prompt together with the symbolic constraints — use it for diction, parallelism, imagery structure, translation requirements, etc. It is reused by conversion and can be edited afterwards. |
+| Custom validation code | Optional Python appended to `validate_full` for whole‑form rules. |
+| AI template editor | A third configurable LLM endpoint (“Template AI”). It edits exactly the same fields through tools and streams its thinking, answers and every tool call (name + arguments + result) into the dialog. |
+
+### Cross‑Language Template Conversion
+
+Conversion is implemented once in the backend and shared by the UI and the Template AI (`POST /api/templates/convert` / the `set_from_template` tool):
+`convert_template()` in `src/templates/convert.py`.
+
+- **Carried over**: line count, syllables per line, number of constraint variants, the constraint tables (values mapped), rhyme scheme + “distinct” flag, custom validation code, rule description, and **data‑ised structural rules** of regulated verse (tone skeleton, 三平尾 / “three‑level‑tail”, 孤平 / “solitary level”, rhyme‑tone requirement).
+- **Only changed**: the per‑syllable constraint values, via the user’s mapping (e.g. `平 → heavy`, `仄 → light`; or `heavy → long` when converting further).
+- **Reported in the UI**: “carried over” and “language‑specific special rules NOT carried over” lists. Rules that live only in code (refrains, caesura, tenth‑syllable stress, rhyme‑change rules, …) are declared as `special_rules` on each built‑in template and shown here, so nothing is silently lost.
+- If the mapping is incomplete, the target language has no equivalent attribute, or both tone values collapse onto the same target value, the structural rules are **dropped with a reason** instead of producing a wrong rule.
 
 ---
 
@@ -277,9 +346,16 @@ Supports any OpenAI‑compatible endpoint (OpenAI / Ollama / vLLM / DeepSeek / G
     "base_url": "http://localhost:11434/v1",
     "api_key": "ollama",
     "model": "qwen2.5:7b"
+  },
+  "editor": {
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "sk-xxx",
+    "model": "gpt-4o"
   }
 }
 ```
+
+Three endpoints can be configured independently: `writer` (composition), `checker` (semantic review) and `editor` (Template AI that configures custom templates). The Template AI is optional — without an `editor` key the rest of the app works normally.
 
 Edit directly in the UI via the gear icon, or manually edit `~/.stanza_weaver/config.json`.
 
