@@ -10,6 +10,7 @@
 """
 
 import importlib.util
+import inspect
 import json
 import os
 import secrets
@@ -393,6 +394,91 @@ def api_templates_meta() -> Any:
     return jsonify(meta)
 
 
+def _template_source_code(base_key: str, template: Any) -> str:
+    """返回源模板可供 AI 转写的代码文本.
+
+    自定义模板优先读取落盘的源码文件；找不到时按模板规格重建等价源码。
+    内置模板返回模板类源码，并附带同模块内定义的辅助函数/常量，便于 AI
+    理解三平尾、孤平、步格等规则代码。
+
+    Args:
+        base_key: 源模板 key。
+        template: 源模板对象（PoetryTemplate 实例）。
+
+    Returns:
+        源码文本；无法获取时返回空串。
+    """
+    if base_key.startswith("custom_"):
+        for directory in (_custom_templates_dir(), _legacy_custom_templates_dir()):
+            if directory is None:
+                continue
+            path = directory / f"{base_key}.py"
+            if not path.exists():
+                continue
+            try:
+                return path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+        try:
+            data = template.to_dict()
+            from src.templates.convert import convert_syllable_count
+
+            alternatives = list(
+                data.get("syllable_constraint_alternatives")
+                or [data.get("syllable_constraints") or []]
+            )
+            syllables = [
+                convert_syllable_count(item)
+                for item in data.get("syllables_per_line") or []
+            ]
+            language = str(data.get("language", ""))
+            dimension, _ = custom_template_schemes().get(language, ("", ()))
+            safe_name = base_key[len("custom_") :]
+            return _build_custom_template_code(
+                name=str(data.get("name", "")),
+                language=language,
+                lines=len(syllables),
+                syllables_per_line=syllables,
+                dimension=dimension,
+                constraints=list(alternatives[0]),
+                custom_code=str(data.get("custom_code", "")),
+                class_name=f"Custom{safe_name.title().replace('_', '')}Template",
+                file_key=base_key,
+                alternatives=alternatives,
+                rhyme_scheme=str(data.get("rhyme_scheme", "")),
+                rhyme_distinct=bool(data.get("rhyme_distinct", False)),
+                structural_rules=data.get("structural_rules"),
+                rule_note=str(data.get("rule_note", "")),
+            )
+        except Exception as e:  # noqa: BLE001 - 源码重建仅用于 AI 参考，失败返回空
+            logger.warning("自定义模板源码重建失败 %s: %s", base_key, e)
+            return ""
+
+    class_object = type(template)
+    parts: list[str] = []
+    try:
+        parts.append(inspect.getsource(class_object))
+    except OSError, TypeError:
+        return ""
+    module = sys.modules.get(class_object.__module__)
+    if module is not None:
+        for name, obj in vars(module).items():
+            if inspect.isfunction(obj):
+                if getattr(obj, "__module__", None) != module.__name__:
+                    continue
+                try:
+                    parts.append(inspect.getsource(obj))
+                except OSError, TypeError:
+                    continue
+            elif (
+                name.startswith("_")
+                and not name.startswith("__")
+                and isinstance(obj, (dict, frozenset, tuple, list, set))
+            ):
+                parts.append(f"{name} = {obj!r}")
+    return "\n\n".join(parts)
+
+
 @app.route("/api/templates/convert", methods=["POST"])
 def api_convert_template() -> Any:
     """统一的跨语言模板转化接口.
@@ -423,6 +509,47 @@ def api_convert_template() -> Any:
     spec, error = convert_template(base_key, language, data.get("mapping"))
     if error:
         return jsonify({"status": "error", "message": error}), 400
+
+    if bool(data.get("ai_rewrite_code", False)):
+        spec["ai_rewrite_requested"] = True
+        spec["ai_rewrite_applied"] = False
+        ai_error = ""
+        try:
+            from src.agents.editor_ai import TemplateCodeRewriter
+            from src.config import get_config
+            from src.templates import get as get_template
+
+            editor_config = get_config().editor
+            if not editor_config.get("api_key"):
+                ai_error = "模板AI未配置，请先在设置中填写模板AI的 API Key"
+            else:
+                source_template = get_template(base_key)
+                source_code = _template_source_code(base_key, source_template)
+                if not source_code:
+                    ai_error = "无法获取源模板代码，未进行 AI 转写"
+                else:
+                    rewritten = TemplateCodeRewriter(editor_config).rewrite(
+                        source_language=str(spec.get("source_language", "")),
+                        target_language=language,
+                        mapping=dict(spec.get("mapped") or {}),
+                        source_code=source_code,
+                        target_spec=spec,
+                        rule_note=str(spec.get("rule_note", "") or ""),
+                    )
+                    if rewritten.get("status") == "ok":
+                        spec["code"] = str(rewritten.get("code", ""))
+                        spec["ai_rewrite_applied"] = True
+                        spec["ai_rewrite_notes"] = str(rewritten.get("notes", ""))
+                        carried = list(spec.get("carried_rules") or [])
+                        if "ai_code" not in carried:
+                            carried.append("ai_code")
+                        spec["carried_rules"] = carried
+                    else:
+                        ai_error = str(rewritten.get("message", "模板代码转写失败"))
+        except Exception as e:  # noqa: BLE001 - AI 转写失败降级为确定性转化结果
+            ai_error = f"模板代码 AI 转写失败: {e}"
+        if ai_error:
+            spec["ai_rewrite_error"] = ai_error
     return jsonify(spec)
 
 

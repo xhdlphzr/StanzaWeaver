@@ -6,6 +6,7 @@
 全部使用桩 LLM 与临时写盘，避免真实网络请求与污染仓库。
 """
 
+import inspect
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -695,6 +696,328 @@ def test_create_from_draft_keeps_structural_rules(
     assert payload["key"]
     assert captured and "check_jinti_rules" in captured[0]
     assert "注意情景交融" in captured[0]
+
+
+# --------------------------------------------------------------------------- #
+# 源模板代码提取 / AI 代码转写选项
+# --------------------------------------------------------------------------- #
+def test_template_source_code_builtin() -> None:
+    """内置模板源码包含类定义与其规则辅助函数."""
+    from src.templates import get
+
+    code = app_module._template_source_code("zh_wujue", get("zh_wujue"))
+    assert "class WujueTemplate" in code
+    assert "_check_jinti_full" in code
+    assert "_TONGYUN = " in code
+
+
+def test_template_source_code_builtin_inspect_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """无法读取类源码时返回空串."""
+    from src.templates import get
+
+    monkeypatch.setattr(
+        inspect,
+        "getsource",
+        lambda obj: (_ for _ in ()).throw(OSError("x")),
+    )
+    assert app_module._template_source_code("zh_wujue", get("zh_wujue")) == ""
+
+
+def test_template_source_code_custom_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """自定义模板优先读取落盘源码."""
+    from src.templates import PoetryTemplate, _registry, register
+
+    class _Tpl(PoetryTemplate):
+        """测试模板."""
+
+        name = "源码模板"
+        language = "zh"
+        lines = 1
+        syllables_per_line: ClassVar[list[int]] = [1]
+
+    register("custom_src_test", _Tpl())
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    (templates_dir / "custom_src_test.py").write_text("SOURCE_CODE", encoding="utf-8")
+    monkeypatch.setattr(app_module, "_custom_templates_dir", lambda: templates_dir)
+    monkeypatch.setattr(app_module, "_legacy_custom_templates_dir", lambda: None)
+    try:
+        assert (
+            app_module._template_source_code(
+                "custom_src_test", _registry["custom_src_test"]
+            )
+            == "SOURCE_CODE"
+        )
+    finally:
+        _registry.pop("custom_src_test", None)
+
+
+def test_template_source_code_custom_read_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """读取模板源码失败时回退到按规格重建."""
+    from src.templates import PoetryTemplate, _registry, register
+
+    class _Tpl(PoetryTemplate):
+        """测试模板."""
+
+        name = "读取失败模板"
+        language = "zh"
+        lines = 1
+        syllables_per_line: ClassVar[list[int]] = [1]
+
+    register("custom_read_fail", _Tpl())
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    (templates_dir / "custom_read_fail.py").write_text("SOURCE", encoding="utf-8")
+    monkeypatch.setattr(app_module, "_custom_templates_dir", lambda: templates_dir)
+    monkeypatch.setattr(app_module, "_legacy_custom_templates_dir", lambda: None)
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        lambda self, *a, **k: (_ for _ in ()).throw(OSError("denied")),
+    )
+    try:
+        code = app_module._template_source_code(
+            "custom_read_fail", _registry["custom_read_fail"]
+        )
+        assert "class CustomReadFailTemplate" in code
+    finally:
+        _registry.pop("custom_read_fail", None)
+
+
+def test_template_source_code_builtin_helper_source_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """辅助函数源码读取失败时跳过该函数（类源码仍保留）."""
+    from src.templates import get
+
+    real_getsource = inspect.getsource
+
+    def _getsource(obj: Any) -> str:
+        if inspect.isclass(obj):
+            return real_getsource(obj)
+        raise TypeError("no source")
+
+    monkeypatch.setattr(inspect, "getsource", _getsource)
+    code = app_module._template_source_code("zh_wujue", get("zh_wujue"))
+    assert "class WujueTemplate" in code
+
+
+def test_template_source_code_custom_fallback(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """源码文件缺失时按模板规格重建源码."""
+    from src.templates import PoetryTemplate, _registry, register
+
+    class _Tpl(PoetryTemplate):
+        """测试模板."""
+
+        name = "重建模板"
+        language = "zh"
+        lines = 1
+        syllables_per_line: ClassVar[list[int]] = [1]
+
+        def get_syllable_constraints(self) -> Any:
+            """一份约束表."""
+            return [
+                [
+                    _cell(""),
+                ]
+            ]
+
+    register("custom_rebuild_test", _Tpl())
+    monkeypatch.setattr(app_module, "_custom_templates_dir", lambda: tmp_path / "empty")
+    monkeypatch.setattr(app_module, "_legacy_custom_templates_dir", lambda: None)
+    try:
+        code = app_module._template_source_code(
+            "custom_rebuild_test", _registry["custom_rebuild_test"]
+        )
+        assert "class CustomRebuildTestTemplate" in code
+        assert "_make_syl" in code
+    finally:
+        _registry.pop("custom_rebuild_test", None)
+
+
+def test_template_source_code_custom_fallback_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """源码重建异常时返回空串（AI 转写降级）."""
+    from src.templates import PoetryTemplate, _registry, register
+
+    class _Tpl(PoetryTemplate):
+        """to_dict 会失败的测试模板."""
+
+        name = "坏模板"
+        language = "zh"
+        lines = 1
+        syllables_per_line: ClassVar[list[int]] = [1]
+
+        def to_dict(self) -> dict[str, Any]:
+            """始终抛异常."""
+            raise RuntimeError("boom")
+
+    register("custom_bad_test", _Tpl())
+    monkeypatch.setattr(app_module, "_custom_templates_dir", lambda: tmp_path / "empty")
+    monkeypatch.setattr(app_module, "_legacy_custom_templates_dir", lambda: None)
+    try:
+        assert (
+            app_module._template_source_code(
+                "custom_bad_test", _registry["custom_bad_test"]
+            )
+            == ""
+        )
+    finally:
+        _registry.pop("custom_bad_test", None)
+
+
+def _patch_ai_rewriter(monkeypatch: pytest.MonkeyPatch, result: Any) -> dict[str, Any]:
+    """替换 TemplateCodeRewriter 并记录调用参数."""
+    record: dict[str, Any] = {}
+    fake_class: Any
+
+    if isinstance(result, Exception):
+
+        class fake_class:  # type: ignore[no-redef]
+            """抛异常的桩."""
+
+            def __init__(self, config: dict[str, Any]) -> None:
+                record["config"] = config
+
+            def rewrite(self, **kwargs: Any) -> dict[str, Any]:
+                record["kwargs"] = kwargs
+                raise result
+
+    else:
+
+        class fake_class:  # type: ignore[no-redef]
+            """返回预置结果的桩."""
+
+            def __init__(self, config: dict[str, Any]) -> None:
+                record["config"] = config
+
+            def rewrite(self, **kwargs: Any) -> dict[str, Any]:
+                record["kwargs"] = kwargs
+                return dict(result)
+
+    monkeypatch.setattr("src.agents.editor_ai.TemplateCodeRewriter", fake_class)
+    return record
+
+
+def _editor_config(api_key: str = "k") -> SimpleNamespace:
+    """构造模板 AI 配置."""
+    return SimpleNamespace(
+        editor={"base_url": "http://x", "api_key": api_key, "model": "m"}
+    )
+
+
+def test_convert_with_ai_rewrite_success(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """勾选 AI 转写时用返回代码替换确定性代码."""
+    monkeypatch.setattr("src.config.get_config", lambda: _editor_config())
+    monkeypatch.setattr(app_module, "_template_source_code", lambda key, tpl: "SOURCE")
+    record = _patch_ai_rewriter(
+        monkeypatch,
+        {"status": "ok", "code": "errors.append('ai')", "notes": "note"},
+    )
+    resp = client.post(
+        "/api/templates/convert",
+        json={
+            "base_template_key": "zh_wujue",
+            "language": "en",
+            "mapping": {"平": "heavy", "仄": "light"},
+            "ai_rewrite_code": True,
+        },
+        headers=_csrf_headers(),
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ai_rewrite_applied"] is True
+    assert data["code"] == "errors.append('ai')"
+    assert data["ai_rewrite_notes"] == "note"
+    assert "ai_code" in data["carried_rules"]
+    assert record["kwargs"]["source_code"] == "SOURCE"
+    assert record["kwargs"]["mapping"] == {"平": "heavy", "仄": "light"}
+    assert record["kwargs"]["source_language"] == "zh"
+    assert record["kwargs"]["target_language"] == "en"
+
+
+def test_convert_with_ai_rewrite_requires_api_key(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """模板 AI 未配置时降级为确定性结果并给出错误信息."""
+    monkeypatch.setattr("src.config.get_config", lambda: _editor_config(""))
+    resp = client.post(
+        "/api/templates/convert",
+        json={
+            "base_template_key": "zh_wujue",
+            "language": "en",
+            "mapping": {"平": "heavy", "仄": "light"},
+            "ai_rewrite_code": True,
+        },
+        headers=_csrf_headers(),
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ai_rewrite_applied"] is False
+    assert "未配置" in data["ai_rewrite_error"]
+
+
+def test_convert_with_ai_rewrite_source_unavailable(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """无法提取源码时降级并提示."""
+    monkeypatch.setattr("src.config.get_config", lambda: _editor_config())
+    monkeypatch.setattr(app_module, "_template_source_code", lambda key, tpl: "")
+    resp = client.post(
+        "/api/templates/convert",
+        json={
+            "base_template_key": "zh_wujue",
+            "language": "en",
+            "mapping": {"平": "heavy", "仄": "light"},
+            "ai_rewrite_code": True,
+        },
+        headers=_csrf_headers(),
+    )
+    assert "无法获取源模板代码" in resp.get_json()["ai_rewrite_error"]
+
+
+def test_convert_with_ai_rewrite_error_and_exception(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AI 返回错误或异常时降级并提示."""
+    monkeypatch.setattr("src.config.get_config", lambda: _editor_config())
+    monkeypatch.setattr(app_module, "_template_source_code", lambda key, tpl: "SOURCE")
+    _patch_ai_rewriter(monkeypatch, {"status": "error", "message": "转写失败原因"})
+    resp = client.post(
+        "/api/templates/convert",
+        json={
+            "base_template_key": "zh_wujue",
+            "language": "en",
+            "mapping": {"平": "heavy", "仄": "light"},
+            "ai_rewrite_code": True,
+        },
+        headers=_csrf_headers(),
+    )
+    assert "转写失败原因" in resp.get_json()["ai_rewrite_error"]
+
+    _patch_ai_rewriter(monkeypatch, RuntimeError("boom"))
+    resp = client.post(
+        "/api/templates/convert",
+        json={
+            "base_template_key": "zh_wujue",
+            "language": "en",
+            "mapping": {"平": "heavy", "仄": "light"},
+            "ai_rewrite_code": True,
+        },
+        headers=_csrf_headers(),
+    )
+    assert "模板代码 AI 转写失败" in resp.get_json()["ai_rewrite_error"]
 
 
 def test_route_create_with_alternatives_and_rhyme(

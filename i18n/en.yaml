@@ -97,6 +97,11 @@ template_modal:
   convert_source_rhyme: "Source rhyme scheme: {scheme} (will be copied)"
   convert_source_code: The source template has custom validation code (will be copied)
   convert_copies: Line counts, syllables, rhyme scheme and custom code are copied too; only per-syllable constraints are mapped
+  convert_ai_code_label: Rewrite the source template code with AI (adapt validation logic to the target language)
+  convert_ai_code_hint: When checked, the source template code and attribute mapping (e.g. 平 → light/heavy) are sent to the Template AI; review the generated code before saving.
+  convert_ai_running: AI is rewriting the code...
+  convert_ai_done: AI rewrote the template code; please review it
+  convert_carried_ai_code: AI-rewritten template code
   convert_carried_label: "Carried over: "
   convert_dropped_label: "Language-specific special rules NOT carried over: "
   convert_carried_constraints: syllable constraints (mapped)
