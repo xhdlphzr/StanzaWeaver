@@ -26,7 +26,13 @@ from flask import Flask, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
 
 from src.logging_setup import get_logger, setup_logging
-from src.templates import custom_template_schemes, list_dicts, template_helpers
+from src.templates import (
+    custom_template_schemes,
+    list_dicts,
+    set_order,
+    template_helpers,
+    unregister,
+)
 from src.templates.en import register_english_templates
 from src.templates.fr import register_french_templates
 from src.templates.it import register_italian_templates
@@ -260,7 +266,61 @@ def _register_custom_templates() -> None:
                 logger.error("[StanzaWeaver] 自定义模板注册失败 %s: %s", f.name, e)
 
 
+def _template_order_path() -> Path:
+    """用户自定义模板顺序的持久化文件路径.
+
+    Returns:
+        ``~/.stanza_weaver/template_order.json``。
+
+    """
+    return Path.home() / ".stanza_weaver" / "template_order.json"
+
+
+def _load_template_order() -> list[str]:
+    """读取已保存的模板顺序.
+
+    Returns:
+        key 列表；文件不存在/损坏/格式非法时返回空列表。
+
+    """
+    path = _template_order_path()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError, ValueError:
+        return []
+    if not isinstance(data, list):
+        return []
+    return [str(key) for key in data]
+
+
+def _save_template_order(keys: list[str]) -> None:
+    """把模板顺序写入用户数据目录.
+
+    Args:
+        keys: 按显示顺序排列的模板 key 列表。
+
+    Raises:
+        OSError: 写入失败时抛出，由调用方决定是否回报错误。
+
+    """
+    path = _template_order_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(list(keys), ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def _apply_saved_template_order() -> None:
+    """启动时应用已保存的模板顺序（测试环境跳过，避免外部数据影响测试）."""
+    if os.environ.get("STANZA_WEAVER_TEST") == "1":
+        return
+    keys = _load_template_order()
+    if keys:
+        set_order(keys)
+
+
 _register_custom_templates()
+_apply_saved_template_order()
 
 
 @app.before_request
@@ -392,6 +452,89 @@ def api_templates_meta() -> Any:
             "helpers": list(template_helpers(lang)),
         }
     return jsonify(meta)
+
+
+@app.route("/api/templates/order", methods=["POST"])
+def api_reorder_templates() -> Any:
+    """保存用户自定义的模板显示顺序.
+
+    Returns:
+        JSON Response：成功时返回重排后的 key 顺序。
+
+    Raises:
+        400: 请求格式错误。
+        403: CSRF 令牌校验失败。
+        500: 顺序文件写入失败。
+
+    """
+    if not _require_csrf():
+        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"status": "error", "message": "请求格式错误"}), 400
+    raw_order = data.get("order")
+    if not isinstance(raw_order, list) or not all(
+        isinstance(key, str) for key in raw_order
+    ):
+        return jsonify({"status": "error", "message": "顺序必须是模板 key 列表"}), 400
+    ordered = set_order(raw_order)
+    try:
+        _save_template_order(ordered)
+    except OSError as e:
+        return jsonify({"status": "error", "message": f"保存模板顺序失败: {e}"}), 500
+    socketio.emit("templates_updated", {"count": len(list_dicts())})
+    logger.info("模板顺序已更新: %d 个模板", len(ordered))
+    return jsonify({"status": "ok", "order": ordered})
+
+
+@app.route("/api/templates/delete", methods=["POST"])
+def api_delete_template() -> Any:
+    """删除自定义模板（移除注册并删除落盘源码）.
+
+    Returns:
+        JSON Response：成功时返回删除的 key。
+
+    Raises:
+        400: 请求格式错误或尝试删除内置模板。
+        403: CSRF 令牌校验失败。
+        404: 模板不存在。
+        500: 模板文件删除失败。
+
+    """
+    if not _require_csrf():
+        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"status": "error", "message": "请求格式错误"}), 400
+    key = str(data.get("key", "")).strip()
+    if not key:
+        return jsonify({"status": "error", "message": "请选择要删除的模板"}), 400
+    registered_keys = [item["key"] for item in list_dicts()]
+    if key not in registered_keys:
+        return jsonify({"status": "error", "message": "模板不存在"}), 404
+    if not key.startswith("custom_"):
+        return jsonify({"status": "error", "message": "内置模板不能删除"}), 400
+    for directory in (_custom_templates_dir(), _legacy_custom_templates_dir()):
+        if directory is None:
+            continue
+        path = directory / f"{key}.py"
+        if not path.exists():
+            continue
+        try:
+            path.unlink()
+        except OSError as e:
+            return jsonify(
+                {"status": "error", "message": f"模板文件删除失败: {e}"}
+            ), 500
+    unregister(key)
+    sys.modules.pop(f"src.templates.{key}", None)
+    try:
+        _save_template_order([item["key"] for item in list_dicts()])
+    except OSError as e:
+        logger.warning("删除模板后保存顺序失败: %s", e)
+    socketio.emit("templates_updated", {"count": len(list_dicts())})
+    logger.info("自定义模板已删除: %s", key)
+    return jsonify({"status": "ok", "key": key, "count": len(list_dicts())})
 
 
 def _template_source_code(base_key: str, template: Any) -> str:

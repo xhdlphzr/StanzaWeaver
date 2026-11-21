@@ -131,6 +131,15 @@
             >
               + 自定义
             </button>
+            <button
+              id="btn-manage-templates"
+              class="btn-secondary btn-small"
+              data-i18n="template.manage"
+              data-i18n-title="template.manage_title"
+              title="模板管理"
+            >
+              管理
+            </button>
           </div>
           <div id="sequence-config" class="hidden">
             <div class="field field-inline">
@@ -503,6 +512,25 @@
       </div>
     </div>
 
+    <div id="template-manage-modal" class="modal hidden">
+      <div class="modal-content modal-wide">
+        <h2 data-i18n="template_manage.title">模板管理</h2>
+        <p class="rhyme-hint" data-i18n="template_manage.hint">
+          按住模板行上下拖动可调整顺序；删除仅对自定义模板可用。
+        </p>
+        <div id="template-manage-list" class="template-manage-list"></div>
+        <div class="modal-actions">
+          <button
+            id="btn-close-manage"
+            class="btn-secondary"
+            data-i18n="template_manage.close"
+          >
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
@@ -519,6 +547,7 @@
       let lastFormatted = "";
       let currentStep = "";
       let TEMPLATES = [];
+      var manageDragKey = null;
       var STEP_NAMES = {
         1: "生成描述",
         2: "生成初稿",
@@ -598,6 +627,50 @@
         document
           .getElementById("btn-custom-template")
           .addEventListener("click", openTemplateModal);
+        document
+          .getElementById("btn-manage-templates")
+          .addEventListener("click", openTemplateManage);
+        document
+          .getElementById("btn-close-manage")
+          .addEventListener("click", closeTemplateManage);
+        var manageList = document.getElementById("template-manage-list");
+        manageList.addEventListener("dragstart", function (e) {
+          var target = e.target && e.target.closest
+            ? e.target.closest(".template-manage-item")
+            : null;
+          if (!target) return;
+          manageDragKey = target.dataset.key;
+          target.classList.add("dragging");
+          if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+        });
+        manageList.addEventListener("dragend", function () {
+          manageDragKey = null;
+          manageList
+            .querySelectorAll(".template-manage-item.dragging")
+            .forEach(function (el) {
+              el.classList.remove("dragging");
+            });
+        });
+        manageList.addEventListener("dragover", function (e) {
+          e.preventDefault();
+          var dragging = manageList.querySelector(
+            ".template-manage-item.dragging",
+          );
+          var target = e.target && e.target.closest
+            ? e.target.closest(".template-manage-item")
+            : null;
+          if (!dragging || !target || target === dragging) return;
+          var rect = target.getBoundingClientRect();
+          if (e.clientY < rect.top + rect.height / 2) {
+            manageList.insertBefore(dragging, target);
+          } else {
+            manageList.insertBefore(dragging, target.nextSibling);
+          }
+        });
+        manageList.addEventListener("drop", function (e) {
+          e.preventDefault();
+          if (manageDragKey) persistTemplateOrder();
+        });
         document
           .getElementById("btn-create-template")
           .addEventListener("click", createTemplate);
@@ -740,24 +813,176 @@
           .then((templates) => {
             TEMPLATES = templates;
             const select = document.getElementById("template-select");
+            const uniform = document.getElementById(
+              "sequence-uniform-template",
+            );
+            const prevSelect = select.value;
+            const prevUniform = uniform.value;
+            const prevPer = Array.prototype.map.call(
+              document.querySelectorAll(".sequence-per-select"),
+              function (el) {
+                return el.value;
+              },
+            );
             select.innerHTML =
               '<option value="">' +
               t("template.default_option") +
               "</option>" +
               templateOptionsHtml();
-            const uniform = document.getElementById(
-              "sequence-uniform-template",
-            );
             uniform.innerHTML =
               '<option value="">' +
               t("template.default_option") +
               "</option>" +
               templateOptionsHtml();
             rebuildSequenceMeters();
+            function restoreValue(el, previous) {
+              var exists = Array.prototype.some.call(
+                el.options,
+                function (option) {
+                  return option.value === previous;
+                },
+              );
+              el.value = exists ? previous : "";
+            }
+            restoreValue(select, prevSelect);
+            restoreValue(uniform, prevUniform);
+            Array.prototype.forEach.call(
+              document.querySelectorAll(".sequence-per-select"),
+              function (el, index) {
+                restoreValue(el, prevPer[index] || "");
+              },
+            );
             var templateModal = document.getElementById("template-modal");
             if (templateModal && !templateModal.classList.contains("hidden")) {
               renderBaseTemplateOptions();
             }
+          });
+      }
+
+      // ---- 模板管理：拖动排序 / 删除自定义模板 ----
+
+      function openTemplateManage() {
+        document
+          .getElementById("template-manage-modal")
+          .classList.remove("hidden");
+        fetch("/api/templates")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (list) {
+            renderTemplateManage(list);
+          });
+      }
+
+      function closeTemplateManage() {
+        document.getElementById("template-manage-modal").classList.add("hidden");
+      }
+
+      function renderTemplateManage(list) {
+        var container = document.getElementById("template-manage-list");
+        container.innerHTML = "";
+        (list || []).forEach(function (item) {
+          var row = document.createElement("div");
+          row.className = "template-manage-item";
+          row.draggable = true;
+          row.dataset.key = item.key;
+          var handle = document.createElement("span");
+          handle.className = "template-manage-handle";
+          handle.textContent = "\u2630";
+          row.appendChild(handle);
+          var name = document.createElement("span");
+          name.className = "template-manage-name";
+          name.textContent = item.display_name || item.name;
+          row.appendChild(name);
+          if (item.deletable) {
+            var del = document.createElement("button");
+            del.type = "button";
+            del.className = "template-manage-delete";
+            del.textContent = "\u2715";
+            del.title = t("template_manage.delete_title");
+            del.addEventListener("click", function (e) {
+              e.stopPropagation();
+              deleteTemplate(item);
+            });
+            row.appendChild(del);
+          } else {
+            var badge = document.createElement("span");
+            badge.className = "template-manage-builtin";
+            badge.textContent = t("template_manage.builtin");
+            row.appendChild(badge);
+          }
+          container.appendChild(row);
+        });
+      }
+
+      function persistTemplateOrder() {
+        var items = document.querySelectorAll(
+          "#template-manage-list .template-manage-item",
+        );
+        var order = Array.prototype.map.call(items, function (el) {
+          return el.dataset.key;
+        });
+        fetch("/api/templates/order", {
+          method: "POST",
+          headers: Object.assign(
+            { "Content-Type": "application/json" },
+            csrfHeaders(),
+          ),
+          body: JSON.stringify({ order: order }),
+        })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (resp) {
+            if (!resp || resp.status !== "ok") {
+              showToast(
+                (resp && resp.message) || t("template_manage.order_failed"),
+                "error",
+              );
+              openTemplateManage();
+              return;
+            }
+            showToast(t("template_manage.order_saved"), "success");
+            loadTemplates();
+          })
+          .catch(function () {
+            showToast(t("template_manage.order_failed"), "error");
+            openTemplateManage();
+          });
+      }
+
+      function deleteTemplate(item) {
+        var name = item.display_name || item.name;
+        if (!window.confirm(t("template_manage.delete_confirm", { name: name }))) {
+          return;
+        }
+        fetch("/api/templates/delete", {
+          method: "POST",
+          headers: Object.assign(
+            { "Content-Type": "application/json" },
+            csrfHeaders(),
+          ),
+          body: JSON.stringify({ key: item.key }),
+        })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (resp) {
+            if (!resp || resp.status !== "ok") {
+              showToast(
+                (resp && resp.message) || t("toast.error_default"),
+                "error",
+              );
+              return;
+            }
+            showToast(t("template_manage.delete_ok"), "success");
+            var select = document.getElementById("template-select");
+            if (select.value === item.key) select.value = "";
+            openTemplateManage();
+            loadTemplates();
+          })
+          .catch(function () {
+            showToast(t("toast.error_default"), "error");
           });
       }
 

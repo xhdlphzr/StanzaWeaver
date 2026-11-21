@@ -19,6 +19,8 @@ template:
   label: Meter
   default_option: "-- Select template --"
   custom: "+ Custom"
+  manage: Manage
+  manage_title: Manage templates (drag to reorder / delete custom templates)
 
 generate:
   button: Generate
@@ -190,3 +192,14 @@ constraint:
     length:
       long: long
       short: short
+
+template_manage:
+  title: Manage Templates
+  hint: Drag a template row up/down to reorder; the order applies to every template dropdown. Deletion is available for custom templates only.
+  close: Close
+  delete_title: Delete template
+  delete_confirm: Delete template "{name}"? This cannot be undone.
+  delete_ok: Template deleted
+  order_saved: Template order saved
+  order_failed: Failed to save template order
+  builtin: Built-in

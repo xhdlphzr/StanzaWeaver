@@ -516,6 +516,313 @@ def test_register_custom_templates_success(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 # --------------------------------------------------------------------------- #
+# 模板顺序持久化 / 排序接口 / 删除接口
+# --------------------------------------------------------------------------- #
+def test_template_order_path_uses_home(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """顺序文件位于用户数据目录."""
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    assert app_module._template_order_path() == (
+        tmp_path / ".stanza_weaver" / "template_order.json"
+    )
+
+
+def test_template_order_load_save_roundtrip(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """顺序文件读写与损坏兜底."""
+    path = tmp_path / "order.json"
+    monkeypatch.setattr(app_module, "_template_order_path", lambda: path)
+    assert app_module._load_template_order() == []
+    app_module._save_template_order(["b", "a"])
+    assert app_module._load_template_order() == ["b", "a"]
+    path.write_text("not json", encoding="utf-8")
+    assert app_module._load_template_order() == []
+    path.write_text('{"k": 1}', encoding="utf-8")
+    assert app_module._load_template_order() == []
+    path.write_text('["x", 1]', encoding="utf-8")
+    assert app_module._load_template_order() == ["x", "1"]
+
+
+def test_apply_saved_template_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    """测试环境跳过应用顺序；正式环境按文件应用；空顺序不调用."""
+    calls: list[list[str]] = []
+    monkeypatch.setattr(app_module, "set_order", lambda keys: calls.append(list(keys)))
+    monkeypatch.setenv("STANZA_WEAVER_TEST", "1")
+    app_module._apply_saved_template_order()
+    assert calls == []
+    monkeypatch.delenv("STANZA_WEAVER_TEST", raising=False)
+    monkeypatch.setattr(app_module, "_load_template_order", lambda: ["b"])
+    app_module._apply_saved_template_order()
+    assert calls == [["b"]]
+    monkeypatch.setattr(app_module, "_load_template_order", list)
+    app_module._apply_saved_template_order()
+    assert calls == [["b"]]
+
+
+def _ordered_snapshot() -> list[str]:
+    """返回注册表当前 key 顺序."""
+    from src.templates import _registry
+
+    return list(_registry)
+
+
+def _restore_order(snapshot: list[str]) -> None:
+    """恢复注册表顺序."""
+    from src.templates import set_order
+
+    set_order(snapshot)
+
+
+def test_reorder_templates_requires_csrf(client: FlaskClient) -> None:
+    """排序接口需要 CSRF."""
+    assert client.post("/api/templates/order", json={"order": []}).status_code == 403
+
+
+def test_reorder_templates_invalid_body(client: FlaskClient) -> None:
+    """排序接口请求体非法返回 400."""
+    client.post("/api/templates/order", data="x", headers=_csrf_headers())
+    assert (
+        client.post(
+            "/api/templates/order", data="x", headers=_csrf_headers()
+        ).status_code
+        == 400
+    )
+    assert (
+        client.post(
+            "/api/templates/order", json={"order": "x"}, headers=_csrf_headers()
+        ).status_code
+        == 400
+    )
+    assert (
+        client.post(
+            "/api/templates/order", json={"order": [1]}, headers=_csrf_headers()
+        ).status_code
+        == 400
+    )
+
+
+def test_reorder_templates_success(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """排序接口重排注册表并持久化；未列出的模板追加在末尾."""
+    import json as _json
+
+    from src.templates import list_dicts
+
+    path = tmp_path / "order.json"
+    monkeypatch.setattr(app_module, "_template_order_path", lambda: path)
+    snapshot = _ordered_snapshot()
+    try:
+        resp = client.post(
+            "/api/templates/order",
+            json={"order": ["zh_qijue", "zh_wujue"]},
+            headers=_csrf_headers(),
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["order"][:2] == ["zh_qijue", "zh_wujue"]
+        assert set(data["order"]) == set(snapshot)
+        assert [item["key"] for item in list_dicts()][:2] == [
+            "zh_qijue",
+            "zh_wujue",
+        ]
+        saved = _json.loads(path.read_text(encoding="utf-8"))
+        assert saved[:2] == ["zh_qijue", "zh_wujue"]
+    finally:
+        _restore_order(snapshot)
+
+
+def test_reorder_templates_save_failure(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """顺序文件写入失败返回 500."""
+    monkeypatch.setattr(
+        app_module,
+        "_save_template_order",
+        lambda keys: (_ for _ in ()).throw(OSError("ro")),
+    )
+    snapshot = _ordered_snapshot()
+    try:
+        resp = client.post(
+            "/api/templates/order",
+            json={"order": ["zh_qijue"]},
+            headers=_csrf_headers(),
+        )
+        assert resp.status_code == 500
+    finally:
+        _restore_order(snapshot)
+
+
+def test_delete_template_requires_csrf(client: FlaskClient) -> None:
+    """删除接口需要 CSRF."""
+    assert client.post("/api/templates/delete", json={"key": "x"}).status_code == 403
+
+
+def test_delete_template_invalid_body(client: FlaskClient) -> None:
+    """删除接口请求体非法/缺少 key 返回 400."""
+    assert (
+        client.post(
+            "/api/templates/delete", data="x", headers=_csrf_headers()
+        ).status_code
+        == 400
+    )
+    assert (
+        client.post(
+            "/api/templates/delete", json={}, headers=_csrf_headers()
+        ).status_code
+        == 400
+    )
+
+
+def test_delete_template_not_found(client: FlaskClient) -> None:
+    """删除不存在的模板返回 404."""
+    resp = client.post(
+        "/api/templates/delete",
+        json={"key": "custom_nope"},
+        headers=_csrf_headers(),
+    )
+    assert resp.status_code == 404
+
+
+def test_delete_template_builtin_rejected(client: FlaskClient) -> None:
+    """内置模板不可删除."""
+    resp = client.post(
+        "/api/templates/delete",
+        json={"key": "zh_wujue"},
+        headers=_csrf_headers(),
+    )
+    assert resp.status_code == 400
+
+
+def _register_delete_dummy(key: str = "custom_delete_test") -> None:
+    """注册一个可删除的测试模板."""
+    from src.templates import PoetryTemplate, register
+
+    class _Tpl(PoetryTemplate):
+        """测试模板."""
+
+        name = "删除测试"
+        language = "zh"
+        lines = 1
+        syllables_per_line: ClassVar[list[int]] = [1]
+
+    register(key, _Tpl())
+
+
+def test_delete_template_success(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """删除自定义模板：移除注册、删除源码并更新时间顺序文件."""
+    from src.templates import _registry
+
+    key = "custom_delete_test"
+    _register_delete_dummy(key)
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    file_path = templates_dir / f"{key}.py"
+    file_path.write_text("x", encoding="utf-8")
+    order_path = tmp_path / "order.json"
+    monkeypatch.setattr(app_module, "_custom_templates_dir", lambda: templates_dir)
+    monkeypatch.setattr(app_module, "_legacy_custom_templates_dir", lambda: None)
+    monkeypatch.setattr(app_module, "_template_order_path", lambda: order_path)
+    try:
+        resp = client.post(
+            "/api/templates/delete",
+            json={"key": key},
+            headers=_csrf_headers(),
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["key"] == key
+        assert key not in _registry
+        assert not file_path.exists()
+        assert order_path.exists()
+    finally:
+        _registry.pop(key, None)
+
+
+def test_delete_template_without_file_success(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """源码文件不存在时仍可移除注册（容错）."""
+    from src.templates import _registry
+
+    key = "custom_delete_nofile"
+    _register_delete_dummy(key)
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    monkeypatch.setattr(app_module, "_custom_templates_dir", lambda: templates_dir)
+    monkeypatch.setattr(app_module, "_legacy_custom_templates_dir", lambda: None)
+    monkeypatch.setattr(
+        app_module, "_template_order_path", lambda: tmp_path / "order.json"
+    )
+    try:
+        resp = client.post(
+            "/api/templates/delete", json={"key": key}, headers=_csrf_headers()
+        )
+        assert resp.status_code == 200
+        assert key not in _registry
+    finally:
+        _registry.pop(key, None)
+
+
+def test_delete_template_unlink_failure(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """删除源码失败返回 500 且保留注册."""
+    from src.templates import _registry
+
+    key = "custom_delete_fail"
+    _register_delete_dummy(key)
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    (templates_dir / f"{key}.py").write_text("x", encoding="utf-8")
+    monkeypatch.setattr(app_module, "_custom_templates_dir", lambda: templates_dir)
+    monkeypatch.setattr(app_module, "_legacy_custom_templates_dir", lambda: None)
+    monkeypatch.setattr(
+        Path,
+        "unlink",
+        lambda self, *a, **k: (_ for _ in ()).throw(OSError("denied")),
+    )
+    try:
+        resp = client.post(
+            "/api/templates/delete", json={"key": key}, headers=_csrf_headers()
+        )
+        assert resp.status_code == 500
+        assert key in _registry
+    finally:
+        _registry.pop(key, None)
+
+
+def test_delete_template_order_save_failure_still_ok(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """删除成功但顺序保存失败时仍返回成功（仅告警）."""
+    from src.templates import _registry
+
+    key = "custom_delete_ordersave"
+    _register_delete_dummy(key)
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    monkeypatch.setattr(app_module, "_custom_templates_dir", lambda: templates_dir)
+    monkeypatch.setattr(app_module, "_legacy_custom_templates_dir", lambda: None)
+    monkeypatch.setattr(
+        app_module,
+        "_save_template_order",
+        lambda keys: (_ for _ in ()).throw(OSError("ro")),
+    )
+    try:
+        resp = client.post(
+            "/api/templates/delete", json={"key": key}, headers=_csrf_headers()
+        )
+        assert resp.status_code == 200
+        assert key not in _registry
+    finally:
+        _registry.pop(key, None)
+
+
+# --------------------------------------------------------------------------- #
 # 本地访问守卫 / i18n 兜底 / 配置写回
 # --------------------------------------------------------------------------- #
 def test_guard_local_access_rejects_foreign_host() -> None:

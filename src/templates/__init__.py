@@ -410,7 +410,8 @@ def list_dicts() -> list[dict[str, Any]]:
 
     Returns:
         [{"key", "name", "language", "lines", "syllables_per_line",
-          "syllable_constraints", "display_name"}, ...]。
+          "syllable_constraints", "display_name", "deletable"}, ...]；
+        顺序即注册表当前顺序（可由用户自定义排序）。
 
     """
     return [
@@ -418,6 +419,50 @@ def list_dicts() -> list[dict[str, Any]]:
             "key": k,
             **t.to_dict(),
             "display_name": f"{t.name}（{_LANGUAGE_LABELS.get(t.language, t.language)}）",
+            "deletable": k.startswith("custom_"),
         }
         for k, t in _registry.items()
     ]
+
+
+def set_order(keys: Sequence[str]) -> list[str]:
+    """按给定 key 顺序重排模板注册表.
+
+    Args:
+        keys: 期望的模板 key 顺序；未知/重复 key 会被忽略，未列出的已注册
+            模板按原顺序追加到末尾。
+
+    Returns:
+        重排后的完整 key 顺序。
+
+    """
+    items = dict(_registry)
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for key in keys:
+        if isinstance(key, str) and key in items and key not in seen:
+            ordered.append(key)
+            seen.add(key)
+    for key in items:
+        if key not in seen:
+            ordered.append(key)
+    _registry.clear()
+    for key in ordered:
+        _registry[key] = items[key]
+    return list(_registry)
+
+
+def unregister(key: str) -> bool:
+    """从注册表移除一个模板（不删除源码文件）.
+
+    Args:
+        key: 模板 key。
+
+    Returns:
+        存在并移除返回 True，否则 False。
+
+    """
+    if key in _registry:
+        del _registry[key]
+        return True
+    return False
