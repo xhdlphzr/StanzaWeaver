@@ -7,6 +7,8 @@
 1. 行数匹配；
 2. 每行音节数（任一切分变体满足即通过）；
 3. 逐位音节约束（平仄/重音/长短），任一切分变体满足即通过；
+   多份约束表（syllable_constraint_alternatives）之间为“或”关系：
+   满足任意一份约束表即可；
 4. 模板自定义完整规则（validate_full：押韵、三平尾、孤平等）。
 
 第 4 层不再仅取主变体，而是把每行全部发音/切分变体逐一带入审查：
@@ -28,6 +30,7 @@ from .syllable_counter import get_analyzer
 SyllableCount = int | tuple[int, int]
 Constraint = dict[str, Any]
 ConstraintLine = list[Constraint]
+ConstraintTable = list[ConstraintLine]
 TemplateDict = dict[str, Any]
 VariantList = list[list[Syllable]]
 
@@ -98,9 +101,8 @@ class MeterValidator:
             template.get("syllables_per_line", [])
         )
         constraints_raw = template.get("syllable_constraints", [])
-        constraints: list[ConstraintLine] = (
-            list(constraints_raw) if constraints_raw else []
-        )
+        alternatives = self._constraint_alternatives(template)
+        constraints: ConstraintTable = list(constraints_raw) if constraints_raw else []
 
         result = ValidationResult()
 
@@ -128,27 +130,12 @@ class MeterValidator:
                     f"第{i + 1}行音节数不匹配: 期望 {format_count(expected_count)}, 实际 {actual_count}"
                 )
 
-        if constraints:
-            min_constraint_lines = min(len(poem), len(constraints))
-            for i in range(min_constraint_lines):
-                line_constraints = constraints[i]
-                variants = all_syllables[i]
-                if not variants:
-                    result.add_error(f"第{i + 1}行无音节，无法满足逐位约束")
-                    continue
-                if any(
-                    self._line_matches_variant(v, line_constraints) for v in variants
-                ):
-                    continue
-                syllables = variants[0]
-                min_syl = min(len(syllables), len(line_constraints))
-                for j in range(min_syl):
-                    if not syllables[j].match_constraint(line_constraints[j]):
-                        constraint_desc = self._describe_constraint(line_constraints[j])
-                        actual_desc = self._describe_syllable(syllables[j])
-                        result.add_error(
-                            f"第{i + 1}行第{j + 1}音节不匹配: 要求{constraint_desc}, 实际{actual_desc}"
-                        )
+        if alternatives:
+            for err in self._best_alternative_errors(all_syllables, alternatives):
+                result.add_error(err)
+        elif constraints:
+            for err in self._constraint_errors(all_syllables, constraints):
+                result.add_error(err)
 
         if template_obj is not None and hasattr(template_obj, "validate_full"):
             full_errors = self._validate_full_variants(
@@ -158,6 +145,85 @@ class MeterValidator:
                 result.add_error(err)
 
         return result
+
+    @staticmethod
+    def _constraint_alternatives(template: TemplateDict) -> list[ConstraintTable]:
+        """读取模板的多份逐位约束表（“或”关系）.
+
+        Args:
+            template: 模板字典。
+
+        Returns:
+            约束表列表；未配置多重约束时返回空列表。
+
+        """
+        raw = template.get("syllable_constraint_alternatives")
+        if not raw:
+            return []
+        return [list(table or []) for table in raw]
+
+    def _best_alternative_errors(
+        self,
+        all_syllables: list[VariantList],
+        alternatives: list[ConstraintTable],
+    ) -> list[str]:
+        """检查多份逐位约束表：任一满足即通过，否则返回错误最少的一份的错误.
+
+        Args:
+            all_syllables: 每行一个变体列表。
+            alternatives: 多份约束表。
+
+        Returns:
+            错误列表；存在满足的约束表时返回空列表。
+
+        """
+        best: list[str] | None = None
+        for table in alternatives:
+            errors = self._constraint_errors(all_syllables, table)
+            if not errors:
+                return []
+            if best is None or len(errors) < len(best):
+                best = errors
+        return best or []
+
+    @staticmethod
+    def _constraint_errors(
+        all_syllables: list[VariantList],
+        constraints: ConstraintTable,
+    ) -> list[str]:
+        """检查一份逐位约束表，收集全部不匹配项.
+
+        Args:
+            all_syllables: 每行一个变体列表。
+            constraints: 逐位约束表。
+
+        Returns:
+            错误信息列表。
+
+        """
+        errors: list[str] = []
+        min_constraint_lines = min(len(all_syllables), len(constraints))
+        for i in range(min_constraint_lines):
+            line_constraints = constraints[i]
+            variants = all_syllables[i]
+            if not variants:
+                errors.append(f"第{i + 1}行无音节，无法满足逐位约束")
+                continue
+            if any(
+                MeterValidator._line_matches_variant(v, line_constraints)
+                for v in variants
+            ):
+                continue
+            syllables = variants[0]
+            min_syl = min(len(syllables), len(line_constraints))
+            for j in range(min_syl):
+                if not syllables[j].match_constraint(line_constraints[j]):
+                    errors.append(
+                        f"第{i + 1}行第{j + 1}音节不匹配: "
+                        f"要求{MeterValidator._describe_constraint(line_constraints[j])}, "
+                        f"实际{MeterValidator._describe_syllable(syllables[j])}"
+                    )
+        return errors
 
     @staticmethod
     def _line_matches_variant(
@@ -312,9 +378,8 @@ class MeterValidator:
             template.get("syllables_per_line", [])
         )
         constraints_raw = template.get("syllable_constraints", [])
-        constraints: list[ConstraintLine] = (
-            list(constraints_raw) if constraints_raw else []
-        )
+        alternatives = self._constraint_alternatives(template)
+        constraints: ConstraintTable = list(constraints_raw) if constraints_raw else []
 
         result = ValidationResult()
 
@@ -327,6 +392,15 @@ class MeterValidator:
                 result.add_error(
                     f"音节数不匹配: 期望 {format_count(expected_count)}, 实际 {actual_count}"
                 )
+
+        if alternatives:
+            best_errors = self._best_line_alternative_errors(
+                language, line_text, line_index, alternatives
+            )
+            if best_errors is not None:
+                for err in best_errors:
+                    result.add_error(err)
+            return result
 
         if constraints and line_index < len(constraints):
             line_constraints = constraints[line_index]
@@ -344,6 +418,49 @@ class MeterValidator:
                     )
 
         return result
+
+    def _best_line_alternative_errors(
+        self,
+        language: str,
+        line_text: str,
+        line_index: int,
+        alternatives: list[ConstraintTable],
+    ) -> list[str] | None:
+        """检查单行对多份约束表的匹配（任一满足即通过）.
+
+        Args:
+            language: 语言代码。
+            line_text: 行文本。
+            line_index: 行号（0-based）。
+            alternatives: 多份约束表。
+
+        Returns:
+            全部约束表都不满足时，错误最少的一份的错误；存在满足的约束表
+            （或该行不受约束）时返回 None。
+
+        """
+        variants = get_analyzer(language).analyze_line_variants(line_text)
+        best: list[str] | None = None
+        for table in alternatives:
+            if line_index >= len(table):
+                return None
+            line_constraints = table[line_index]
+            if not line_constraints:
+                return None
+            if any(self._line_matches_variant(v, line_constraints) for v in variants):
+                return None
+            errors: list[str] = []
+            syllables = variants[0] if variants else []
+            min_syl = min(len(syllables), len(line_constraints))
+            for j in range(min_syl):
+                if not syllables[j].match_constraint(line_constraints[j]):
+                    errors.append(
+                        f"第{j + 1}音节: 要求{self._describe_constraint(line_constraints[j])}, "
+                        f"实际{self._describe_syllable(syllables[j])}"
+                    )
+            if best is None or len(errors) < len(best):
+                best = errors
+        return best
 
     @staticmethod
     def _describe_constraint(c: Constraint) -> str:

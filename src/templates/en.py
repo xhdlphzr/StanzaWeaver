@@ -115,6 +115,8 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
     name = "莎士比亚商籁体"
     language = "en"
     lines = 14
+    special_rules = ("每行至少4个重读音节", "每组四行内A/B韵须不同")
+    rhyme_scheme = "ABABCDCDEFEFGG"
     syllables_per_line: ClassVar[list[int]] = [10] * 14
     rule_description = (
         "格律规则：每行抑扬格五音步（10音节，重音在偶数位，次重音亦算重读）；"
@@ -188,6 +190,8 @@ class VillanelleTemplate(PoetryTemplate):
     name = "维拉内拉诗"
     language = "en"
     lines = 19
+    special_rules = ("每行至少4个重读音节", "叠句须原样重复", "A/B韵须不同")
+    rhyme_scheme = "ABAABAABAABAABAABAA"
     syllables_per_line: ClassVar[list[int | tuple[int, int]]] = []
     rule_description = (
         "格律规则：全诗19行（5个三行联句+1个四行联句）；韵式 ABA ABA ABA ABA ABA ABAA；"
@@ -267,6 +271,8 @@ class HeroicCoupletTemplate(PoetryTemplate):
     name = "英雄双行体"
     language = "en"
     lines = 2
+    special_rules = ("每行至少4个重读音节",)
+    rhyme_scheme = "AA"
     syllables_per_line: ClassVar[list[int]] = [10, 10]
     rule_description = (
         "格律规则：每行抑扬格五音步（10音节），全行重音音节数不少于4（次重音亦算重读）；"

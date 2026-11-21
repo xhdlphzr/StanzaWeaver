@@ -64,19 +64,20 @@ def _last_word(line: str, allowed_chars: str) -> str:
     return re.sub(rf"[^{allowed_chars}]", "", line.strip().split()[-1]).lower()
 
 
-def describe_template_from_dict(template_dict: dict[str, Any]) -> str:
-    """从模板字典生成格律描述（无模板对象时的降级方案）.
+def _describe_constraint_table(
+    lines_spec: Sequence[SyllableCount], constraints: ConstraintTable
+) -> str:
+    """把一份逐位约束表渲染为多行描述.
 
     Args:
-        template_dict: 含 lines/syllables_per_line/syllable_constraints 的字典。
+        lines_spec: 每行音节数。
+        constraints: 逐位约束表。
 
     Returns:
-        多行格律描述文本。
+        多行描述文本。
 
     """
-    lines_spec = template_dict.get("syllables_per_line", [])
-    lines_desc = f"共 {template_dict.get('lines', len(lines_spec))} 行"
-    constraints = template_dict.get("syllable_constraints") or []
+    lines_desc = ""
     for i, cnt in enumerate(lines_spec):
         line_constraints = constraints[i] if i < len(constraints) else []
         line_info = f"  第{i + 1}行: {format_count(cnt)}音节"
@@ -101,6 +102,52 @@ def describe_template_from_dict(template_dict: dict[str, Any]) -> str:
     return lines_desc
 
 
+def describe_template_from_dict(template_dict: dict[str, Any]) -> str:
+    """从模板字典生成格律描述（无模板对象时的降级方案）.
+
+    Args:
+        template_dict: 含 lines/syllables_per_line/syllable_constraints
+            与可选的 syllable_constraint_alternatives 的字典。
+
+    Returns:
+        多行格律描述文本。
+
+    """
+    lines_spec = template_dict.get("syllables_per_line", [])
+    lines_desc = f"共 {template_dict.get('lines', len(lines_spec))} 行"
+    alternatives = template_dict.get("syllable_constraint_alternatives") or []
+    if alternatives:
+        lines_desc += f"（{len(alternatives)} 种音节约束，满足任意一种即可）"
+        for k, table in enumerate(alternatives, start=1):
+            lines_desc += f"\n【约束种类 {k}】"
+            lines_desc += _describe_constraint_table(lines_spec, list(table or []))
+        return lines_desc
+    constraints = template_dict.get("syllable_constraints") or []
+    return lines_desc + _describe_constraint_table(lines_spec, list(constraints))
+
+
+def _copy_structural_rules(
+    rules: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """复制结构规则字典（列表字段做浅拷贝，避免调用方误改模板常量）.
+
+    Args:
+        rules: 结构规则字典或 None。
+
+    Returns:
+        复制后的字典或 None。
+
+    """
+    if not rules:
+        return None
+    copied = dict(rules)
+    for key in ("positions", "rhyme_lines"):
+        value = copied.get(key)
+        if isinstance(value, (list, tuple)):
+            copied[key] = list(value)
+    return copied
+
+
 class PoetryTemplate(ABC):
     """格律模板基类（每种诗体一个子类）."""
 
@@ -110,6 +157,18 @@ class PoetryTemplate(ABC):
     # Sequence（协变）允许子类覆盖为 list[int] 或 list[tuple[int, int]]
     syllables_per_line: ClassVar[Sequence[SyllableCount]] = []
     rule_description: ClassVar[str] = ""
+    #: 押韵韵式（如 "ABAB CDCD EFEF GG"；空串表示该模板无可转化的显式韵式）。
+    rhyme_scheme: ClassVar[str] = ""
+    #: 不同韵组是否须互不相同。
+    rhyme_distinct: ClassVar[bool] = False
+    #: 用户自定义整体校验代码（自定义模板用；内置模板为空）。
+    custom_code: ClassVar[str] = ""
+    #: 用户填写的模板规则描述（会作为 prompt 提供给写作 AI）。
+    rule_note: ClassVar[str] = ""
+    #: 已数据化的结构规则（如近体诗的平仄骨架/三平尾/孤平），供跨语言转化复制。
+    structural_rules: ClassVar[dict[str, Any] | None] = None
+    #: 仅实现于代码、无法随转化携带的语言专属特殊规则说明（供前端提示）。
+    special_rules: ClassVar[tuple[str, ...]] = ()
     #: 展示时是否居中（诗居中；词等长句体裁可覆写为 False 左对齐）。
     centered: ClassVar[bool] = True
 
@@ -118,6 +177,15 @@ class PoetryTemplate(ABC):
 
         Returns:
             约束表；不限定时返回 None。
+
+        """
+        return None
+
+    def get_syllable_constraint_alternatives(self) -> list[ConstraintTable] | None:
+        """返回多份逐位音节约束表（满足任意一份即可，即“或”关系）.
+
+        Returns:
+            约束表列表；未配置多重约束时返回 None。
 
         """
         return None
@@ -142,7 +210,8 @@ class PoetryTemplate(ABC):
 
         Returns:
             {"name", "language", "lines", "syllables_per_line",
-             "syllable_constraints", "centered"}。
+             "syllable_constraints", "syllable_constraint_alternatives",
+             "rhyme_scheme", "rhyme_distinct", "custom_code", "centered"}。
 
         """
         return {
@@ -151,6 +220,16 @@ class PoetryTemplate(ABC):
             "lines": self.lines,
             "syllables_per_line": list(self.syllables_per_line),
             "syllable_constraints": self.get_syllable_constraints(),
+            "syllable_constraint_alternatives": (
+                self.get_syllable_constraint_alternatives()
+            ),
+            "rhyme_scheme": self.rhyme_scheme,
+            "rhyme_distinct": self.rhyme_distinct,
+            "custom_code": self.custom_code,
+            "rule_description": self.rule_description,
+            "rule_note": self.rule_note,
+            "structural_rules": _copy_structural_rules(self.structural_rules),
+            "special_rules": list(self.special_rules),
             "centered": self.centered,
         }
 
@@ -159,6 +238,7 @@ class PoetryTemplate(ABC):
 
         Returns:
             多行文本：行数、每行音节数、逐位约束、自然语言规则。
+            用户填写的模板规则描述（rule_note）会作为 prompt 正文一并返回。
 
         """
         lines_desc = describe_template_from_dict(
@@ -166,8 +246,13 @@ class PoetryTemplate(ABC):
                 "lines": self.lines,
                 "syllables_per_line": self.syllables_per_line,
                 "syllable_constraints": self.get_syllable_constraints(),
+                "syllable_constraint_alternatives": (
+                    self.get_syllable_constraint_alternatives()
+                ),
             }
         )
+        if self.rule_note:
+            lines_desc += "\n" + self.rule_note
         if self.rule_description:
             lines_desc += "\n" + self.rule_description
         return lines_desc

@@ -23,6 +23,12 @@ DEFAULT_CHECKER: dict[str, Any] = {
     "model": "gpt-4o-mini",
 }
 
+DEFAULT_EDITOR: dict[str, Any] = {
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "",
+    "model": "gpt-4o",
+}
+
 LLMEndpoint = dict[str, str]
 
 
@@ -129,6 +135,35 @@ class Config:
         """
         self._ensure_loaded()
         self._data["checker"] = value
+
+    @property
+    def editor(self) -> LLMEndpoint:
+        """模板编辑 AI 端点配置（缺省回退默认值）.
+
+        Returns:
+            {"base_url", "api_key", "model"}。
+
+        """
+        self._ensure_loaded()
+        e = self._data.get("editor", {})
+        if not isinstance(e, dict):
+            e = {}
+        return {
+            "base_url": str(e.get("base_url", DEFAULT_EDITOR["base_url"])),
+            "api_key": str(e.get("api_key", DEFAULT_EDITOR["api_key"])),
+            "model": str(e.get("model", DEFAULT_EDITOR["model"])),
+        }
+
+    @editor.setter
+    def editor(self, value: dict[str, Any]) -> None:
+        """设置模板编辑 AI 端点配置.
+
+        Args:
+            value: 配置字典。
+
+        """
+        self._ensure_loaded()
+        self._data["editor"] = value
 
     @property
     def language(self) -> str:
