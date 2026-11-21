@@ -948,6 +948,142 @@ def test_editor_non_dict_tool_arguments(monkeypatch: pytest.MonkeyPatch) -> None
     assert any(e["type"] == "tool" for e in events)
 
 
+def test_format_value_mapping_branches() -> None:
+    """属性值映射说明：普通映射 / 空映射 / 目标无属性."""
+    text = editor_ai.format_value_mapping("zh", "en", {"平": "heavy", "仄": "light"})
+    assert "tone" in text and "stress" in text
+    assert "平（平声）→ heavy（重读）" in text
+    assert "仄（仄声）→ light（轻读）" in text
+
+    empty = editor_ai.format_value_mapping("zh", "en", {})
+    assert "未提供具体属性值映射" in empty
+
+    no_target = editor_ai.format_value_mapping("zh", "fr", {"平": "heavy"})
+    assert "目标语言没有逐位音节属性" in no_target
+
+    unknown = editor_ai.format_value_mapping("xx", "yy", {})
+    assert "目标语言没有逐位音节属性" in unknown
+
+
+def test_build_rewrite_system_contains_context() -> None:
+    """转写提示包含映射、源代码、目标规格、运行环境与规则描述."""
+    text = editor_ai._build_rewrite_system(
+        "zh",
+        "en",
+        {"平": "heavy"},
+        "errors.append('x')",
+        {"lines": 4, "syllables_per_line": [5, 5, 5, 5], "alternatives": []},
+        rule_note="注意对仗",
+    )
+    assert "平（平声）→ heavy（重读）" in text
+    assert "errors.append('x')" in text
+    assert "validate_full" in text
+    assert "注意对仗" in text
+    assert "self.structural_rules" in text
+
+
+def test_rewriter_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    """AI 返回合法代码时转写成功."""
+    stub = make_stub(
+        chat=[tool_call("submit_code", {"code": "errors.append('x')", "notes": "说明"})]
+    )
+    monkeypatch.setattr(editor_ai, "LLMClient", stub)
+    rewriter = editor_ai.TemplateCodeRewriter(
+        {"base_url": "u", "api_key": "k", "model": "m"}
+    )
+    result = rewriter.rewrite(
+        "zh", "en", {"平": "heavy"}, "src", {"lines": 1, "syllables_per_line": [1]}
+    )
+    assert result["status"] == "ok"
+    assert result["code"] == "errors.append('x')"
+    assert result["notes"] == "说明"
+
+
+def test_rewriter_retries_empty_and_syntax_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """空代码/语法错误时重试，直到拿到合法代码."""
+    stub = make_stub(
+        chat=[
+            tool_call("submit_code", {"code": ""}),
+            tool_call("submit_code", {"code": "if True"}),
+            tool_call("submit_code", {"code": "errors.append('ok')"}),
+        ]
+    )
+    monkeypatch.setattr(editor_ai, "LLMClient", stub)
+    rewriter = editor_ai.TemplateCodeRewriter(
+        {"base_url": "u", "api_key": "k", "model": "m"}
+    )
+    result = rewriter.rewrite(
+        "zh",
+        "en",
+        {},
+        "src",
+        {"lines": 1, "syllables_per_line": [1]},
+        max_rounds=3,
+    )
+    assert result["status"] == "ok"
+    assert result["code"] == "errors.append('ok')"
+
+
+def test_rewriter_no_tool_calls_then_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AI 未调用工具时提示后继续，并在下一轮成功."""
+    stub = make_stub(
+        chat=[
+            {"role": "assistant", "content": "代码如下", "tool_calls": []},
+            tool_call("submit_code", {"code": "errors.append('y')"}),
+        ]
+    )
+    monkeypatch.setattr(editor_ai, "LLMClient", stub)
+    rewriter = editor_ai.TemplateCodeRewriter(
+        {"base_url": "u", "api_key": "k", "model": "m"}
+    )
+    result = rewriter.rewrite(
+        "zh", "en", {}, "src", {"lines": 1, "syllables_per_line": [1]}
+    )
+    assert result["status"] == "ok"
+
+
+def test_rewriter_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    """调用异常 / 始终无合法代码时返回错误."""
+    stub = make_stub(chat=[])
+    monkeypatch.setattr(editor_ai, "LLMClient", stub)
+
+    class _Boom(stub):  # type: ignore[misc, valid-type]
+        def chat(self, messages: list[dict[str, Any]], tools: Any = None) -> Any:
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(editor_ai, "LLMClient", _Boom)
+    rewriter = editor_ai.TemplateCodeRewriter(
+        {"base_url": "u", "api_key": "k", "model": "m"}
+    )
+    result = rewriter.rewrite(
+        "zh", "en", {}, "src", {"lines": 1, "syllables_per_line": [1]}
+    )
+    assert result["status"] == "error"
+    assert "boom" in result["message"]
+
+    monkeypatch.setattr(
+        editor_ai,
+        "LLMClient",
+        make_stub(chat=[tool_call("submit_code", {"code": "if True"})]),
+    )
+    rewriter = editor_ai.TemplateCodeRewriter(
+        {"base_url": "u", "api_key": "k", "model": "m"}
+    )
+    result = rewriter.rewrite(
+        "zh",
+        "en",
+        {},
+        "src",
+        {"lines": 1, "syllables_per_line": [1]},
+        max_rounds=1,
+    )
+    assert result["status"] == "error"
+
+
 def test_editor_result_dataclass() -> None:
     """EditorResult 保存结果."""
     draft = tools.TemplateDraft()

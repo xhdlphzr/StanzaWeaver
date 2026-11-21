@@ -1542,6 +1542,14 @@ html[lang="en"] .slogan {
   margin-top: 10px;
 }
 
+.ai-rewrite-code-label {
+  margin-top: 10px;
+}
+
+.ai-rewrite-code-label span {
+  font-size: 12px;
+}
+
 /* ---- 押韵 ---- */
 
 .rhyme-hint {

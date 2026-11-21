@@ -374,6 +374,16 @@
           </label>
           <div id="tmpl-conversion" class="tmpl-conversion hidden">
             <div id="tmpl-convert-mapping" class="tmpl-convert-mapping"></div>
+            <label class="checkbox-label ai-rewrite-code-label">
+              <input type="checkbox" id="tmpl-ai-rewrite-code" />
+              <span data-i18n="template_modal.convert_ai_code_label"
+                >通过 AI 转写原模板代码（按目标语言重写校验逻辑）</span
+              >
+            </label>
+            <p class="rhyme-hint" data-i18n="template_modal.convert_ai_code_hint">
+              勾选后会把源模板代码与属性映射（如 平 → 轻/重）交给模板 AI 改写；
+              请生成模板后人工检查 AI 代码。
+            </p>
             <button
               type="button"
               id="btn-apply-convert"
@@ -2114,6 +2124,7 @@
         custom_code: "template_modal.convert_carried_custom_code",
         jinti: "template_modal.convert_carried_jinti",
         rule_note: "template_modal.convert_carried_rule_note",
+        ai_code: "template_modal.convert_carried_ai_code",
       };
 
       // 显示“会携带/不会携带哪些规则”，明确转化范围。
@@ -2261,6 +2272,9 @@
         if (!item) return;
         var button = document.getElementById("btn-apply-convert");
         if (button) button.disabled = true;
+        var aiRewrite = !!document.getElementById("tmpl-ai-rewrite-code")
+          .checked;
+        if (aiRewrite) button.textContent = t("template_modal.convert_ai_running");
         fetch("/api/templates/convert", {
           method: "POST",
           headers: Object.assign(
@@ -2271,6 +2285,7 @@
             base_template_key: TPL_STATE.baseTemplateKey,
             language: document.getElementById("tmpl-language").value,
             mapping: TPL_STATE.mapping,
+            ai_rewrite_code: aiRewrite,
           }),
         })
           .then(function (r) {
@@ -2285,13 +2300,23 @@
               return;
             }
             applyConvertedSpec(resp);
-            showToast(t("template_modal.convert_done"), "success");
+            if (resp.ai_rewrite_applied) {
+              showToast(t("template_modal.convert_ai_done"), "success");
+            } else {
+              showToast(t("template_modal.convert_done"), "success");
+            }
+            if (resp.ai_rewrite_error) {
+              showToast(resp.ai_rewrite_error, "warning");
+            }
           })
           .catch(function () {
             showToast(t("toast.error_default"), "error");
           })
           .finally(function () {
-            if (button) button.disabled = false;
+            if (button) {
+              button.disabled = false;
+              button.textContent = t("template_modal.convert_apply");
+            }
           });
       }
 
