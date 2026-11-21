@@ -1748,3 +1748,71 @@ html[lang="en"] .slogan {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ---- 模板管理（拖动排序 / 删除） ---- */
+
+.template-manage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 55vh;
+  overflow-y: auto;
+  margin: 10px 0 16px;
+  padding-right: 4px;
+}
+
+.template-manage-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(180, 150, 120, 0.25);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: grab;
+  user-select: none;
+  transition: all 0.2s;
+}
+
+.template-manage-item:hover {
+  border-color: rgba(139, 115, 85, 0.4);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.template-manage-item.dragging {
+  opacity: 0.45;
+  border-style: dashed;
+  cursor: grabbing;
+}
+
+.template-manage-handle {
+  color: #a08c75;
+  font-size: 16px;
+  letter-spacing: -1px;
+}
+
+.template-manage-name {
+  flex: 1;
+  font-size: 14px;
+  color: #3d3226;
+}
+
+.template-manage-builtin {
+  font-size: 11px;
+  color: #a08c75;
+}
+
+.template-manage-delete {
+  border: none;
+  background: transparent;
+  color: #b3402e;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.template-manage-delete:hover {
+  background: rgba(179, 64, 46, 0.12);
+}
