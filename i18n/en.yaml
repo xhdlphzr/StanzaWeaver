@@ -65,6 +65,7 @@ config_modal:
   lang_en: English
   writer: Writer AI
   checker: Checker AI
+  editor: Template AI
   save: Save
   cancel: Cancel
 
@@ -86,10 +87,51 @@ template_modal:
   lines_label: Lines
   syllables_label: Syllables per line
   syllables_placeholder: comma separated
+  kind_count_label: Constraint variants
+  convert_label: Convert from another template
+  convert_none: "-- Do not convert --"
+  convert_mapping_label: "Attribute mapping: {source} → {target}"
+  convert_apply: Apply conversion
+  convert_no_mapping: The target language has no per-syllable attribute; only lines, syllables, rhyme and code are copied
+  convert_no_source_constraints: The source template has no per-syllable constraints; only lines, syllables, rhyme and custom code are copied
+  convert_source_rhyme: "Source rhyme scheme: {scheme} (will be copied)"
+  convert_source_code: The source template has custom validation code (will be copied)
+  convert_copies: Line counts, syllables, rhyme scheme and custom code are copied too; only per-syllable constraints are mapped
+  convert_carried_label: "Carried over: "
+  convert_dropped_label: "Language-specific special rules NOT carried over: "
+  convert_carried_constraints: syllable constraints (mapped)
+  convert_carried_multiple_kinds: multiple constraint variants (any one suffices)
+  convert_carried_rhyme: rhyme scheme
+  convert_carried_custom_code: custom validation code
+  convert_carried_jinti: regulated-verse structural rules (tone skeleton/three-level ending/solitary level/rhyme)
+  convert_carried_rule_note: template rule description (writing-AI prompt)
+  convert_done: Template conversion applied
   constraints_title: Syllable constraints per line
+  constraint_kind: "Constraint variant {n}"
+  rhyme_title: Rhyme
+  rhyme_scheme_placeholder: "e.g. ABAB CDCD EFEF GG; - means no rhyme"
+  rhyme_scheme_hint: "Use letters to mark the rhyme of each line; identical letters rhyme. -, . or x means the line does not rhyme."
+  rhyme_none: No rhyme
+  rhyme_distinct_label: Different rhyme groups must be distinct (e.g. sonnet A/B rhymes)
+  rule_note_label: Template rule description (sent to the generation AI as a prompt)
+  rule_note_placeholder: "e.g. imitate a ci tune; upper/lower stanzas should echo each other; mind leading words and parallelism..."
+  rule_note_hint: This description is saved with the template and sent to the writing AI as part of the meter requirements.
   custom_code_label: Custom validation code (Python, optional)
   code_hint: "Optional: write whole-form rules inside validate_full appending to errors. Reusable helpers for this language (call via rules.): {helpers}"
   code_hint_empty: "Optional: write whole-form rules inside validate_full appending to errors (no per-position helpers for this language)."
+  ai_title: Template AI
+  ai_placeholder: Describe the template you want; the AI will configure it with tools...
+  ai_send: Send
+  ai_running: Configuring...
+  ai_thinking: Thinking
+  ai_message: Message
+  ai_user: User
+  ai_args: "Arguments:"
+  ai_result: "Result:"
+  ai_error: Error
+  ai_applied: AI configuration applied. Review it, then click Create Template.
+  ai_created: The AI has created the template
+  ai_empty_prompt: Please describe the template you want first
   create: Create Template
   cancel: Cancel
 
@@ -127,3 +169,19 @@ syllable_constraints:
   free: Free
   light: light
   heavy: heavy
+
+constraint:
+  attributes:
+    tone: Tone
+    stress: Stress
+    length: Length
+  values:
+    tone:
+      "平": Level
+      "仄": Oblique
+    stress:
+      light: light
+      heavy: heavy
+    length:
+      long: long
+      short: short

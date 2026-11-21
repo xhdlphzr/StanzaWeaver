@@ -623,7 +623,8 @@ html[lang="en"] .slogan {
 .progress-body {
   padding: 8px 14px 14px 36px;
   max-height: 500px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   transition:
     max-height 0.35s ease,
     opacity 0.35s ease,
@@ -635,6 +636,7 @@ html[lang="en"] .slogan {
   opacity: 0;
   padding-top: 0;
   padding-bottom: 0;
+  overflow: hidden;
 }
 
 .step-record {
@@ -842,6 +844,8 @@ html[lang="en"] .slogan {
   border-left: 3px solid #d4a017;
   padding: 10px 14px;
   border-radius: 0 8px 8px 0;
+  max-height: 300px;
+  overflow-y: auto;
   user-select: text;
   cursor: text;
   animation: fade-in 0.4s ease-out 0.2s both;
@@ -909,6 +913,8 @@ html[lang="en"] .slogan {
   padding: 30px;
   width: 480px;
   max-width: 92%;
+  max-height: 92vh;
+  overflow-y: auto;
   box-shadow: 0 12px 40px rgba(50, 35, 20, 0.18);
   animation: modal-pop 0.35s ease-out;
 }
@@ -984,10 +990,11 @@ html[lang="en"] .slogan {
 .config-row {
   display: flex;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .config-row label {
-  flex: 1;
+  flex: 1 1 120px;
 }
 
 .config-row input[type="number"] {
@@ -998,6 +1005,28 @@ html[lang="en"] .slogan {
   width: 100%;
   font-family: "Consolas", "Monaco", monospace;
   font-size: 12px;
+}
+
+.rule-note-input {
+  width: 100%;
+  min-height: 66px;
+  max-height: 180px;
+  padding: 8px 12px;
+  border: 1px solid rgba(180, 150, 120, 0.3);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #3d3226;
+  background: rgba(253, 250, 245, 0.8);
+  resize: vertical;
+  transition: all 0.3s;
+}
+
+.rule-note-input:focus {
+  outline: none;
+  border-color: rgba(139, 115, 85, 0.5);
+  box-shadow: 0 0 0 3px rgba(139, 115, 85, 0.08);
 }
 
 .code-editor {
@@ -1274,6 +1303,8 @@ html[lang="en"] .slogan {
   line-height: 1.8;
   color: #5a4a3a;
   padding: 8px 4px;
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 .sequence-poems-status {
@@ -1323,6 +1354,13 @@ html[lang="en"] .slogan {
   margin-bottom: 6px;
 }
 
+/* 诗组中的单首标题与单首诗稿共用标题组件；比正文略大、加粗。 */
+.sequence-poem .poem-title {
+  font-size: 24px;
+  letter-spacing: 4px;
+  margin-bottom: 8px;
+}
+
 .sequence-poem-ok {
   color: #4a7c59;
   margin-top: 6px;
@@ -1370,4 +1408,335 @@ html[lang="en"] .slogan {
   font-family: inherit;
   color: #3d3226;
   cursor: pointer;
+}
+
+/* ---- 多重音节约束 ---- */
+
+.syllable-alternatives {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.syl-kind {
+  border: 1px solid rgba(180, 150, 120, 0.2);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.syl-kind-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8b7355;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.syl-kind .syllable-table {
+  max-height: 200px;
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+/* ---- 模板转化 ---- */
+
+.tmpl-conversion {
+  margin-top: 10px;
+  border: 1px solid rgba(180, 150, 120, 0.25);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.convert-mapping-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b5d4e;
+  margin-bottom: 8px;
+}
+
+.convert-mapping-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #5a4a3a;
+}
+
+.convert-mapping-row:last-child {
+  margin-bottom: 0;
+}
+
+.convert-source-label {
+  min-width: 3em;
+  text-align: right;
+  color: #5a3e2b;
+}
+
+.convert-arrow {
+  color: #a08c75;
+}
+
+.convert-mapping-empty {
+  font-size: 12px;
+  color: #a08c75;
+}
+
+.convert-copies-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #a08c75;
+  border-top: 1px dashed rgba(180, 150, 120, 0.25);
+  padding-top: 6px;
+}
+
+.convert-source-info {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #6b5d4e;
+  margin-bottom: 4px;
+}
+
+.convert-report {
+  margin-top: 10px;
+  border-top: 1px dashed rgba(180, 150, 120, 0.25);
+  padding-top: 8px;
+}
+
+.convert-report-line {
+  font-size: 11px;
+  line-height: 1.7;
+  margin-bottom: 4px;
+}
+
+.convert-report-carried {
+  color: #4a7c59;
+}
+
+.convert-report-dropped {
+  color: #b08030;
+}
+
+#btn-apply-convert:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tmpl-map-target {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid rgba(180, 150, 120, 0.3);
+  border-radius: 6px;
+  background: #fdfaf5;
+  color: #3d3226;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#btn-apply-convert {
+  margin-top: 10px;
+}
+
+/* ---- 押韵 ---- */
+
+.rhyme-hint {
+  font-size: 11px;
+  color: #a08c75;
+  line-height: 1.6;
+  margin: 2px 0 8px;
+}
+
+.config-group label.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #6b5d4e;
+  cursor: pointer;
+}
+
+.config-group label.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
+.rhyme-lines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.rhyme-line-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rhyme-line-label {
+  font-size: 11px;
+  color: #8b7355;
+}
+
+.rhyme-line-select {
+  padding: 3px 8px;
+  border: 1px solid rgba(180, 150, 120, 0.25);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: inherit;
+  background: #fdfaf5;
+  color: #3d3226;
+  cursor: pointer;
+}
+
+/* ---- 模板 AI 面板 ---- */
+
+.tmpl-ai-panel {
+  border: 1px solid rgba(180, 150, 120, 0.3);
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.tmpl-ai-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.tmpl-ai-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #8b7355;
+  letter-spacing: 1px;
+}
+
+.tmpl-ai-status {
+  font-size: 12px;
+  color: #5a8a3c;
+}
+
+.tmpl-ai-log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  min-height: 40px;
+  overflow-y: auto;
+  border: 1px solid rgba(180, 150, 120, 0.2);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: rgba(253, 250, 245, 0.8);
+}
+
+.tmpl-ai-entry {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #5a4a3a;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.tmpl-ai-user {
+  color: #5a3e2b;
+  font-weight: 600;
+}
+
+.tmpl-ai-thinking {
+  color: #8b7355;
+  font-style: italic;
+}
+
+.tmpl-ai-message {
+  color: #3d3226;
+}
+
+.tmpl-ai-info {
+  color: #6a7b8a;
+}
+
+.tmpl-ai-error {
+  color: #b3402e;
+}
+
+.tmpl-ai-tool {
+  border-left: 3px solid rgba(180, 150, 120, 0.4);
+  padding-left: 8px;
+}
+
+.tmpl-ai-tool-name strong {
+  color: #5a3e2b;
+}
+
+.tmpl-ai-json-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8b7355;
+  margin-top: 4px;
+}
+
+.tmpl-ai-json {
+  margin: 2px 0 0;
+  font-family: "JetBrains Mono", "Consolas", "Monaco", monospace;
+  font-size: 11px;
+  color: #6b5d4e;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 140px;
+  overflow: auto;
+  background: rgba(240, 230, 214, 0.5);
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+
+.tmpl-ai-result summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8b7355;
+  margin-top: 4px;
+}
+
+.tmpl-ai-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.tmpl-ai-input-row textarea {
+  flex: 1;
+  min-height: 54px;
+  max-height: 160px;
+  padding: 8px 10px;
+  border: 1px solid rgba(180, 150, 120, 0.3);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  background: rgba(253, 250, 245, 0.8);
+  color: #3d3226;
+  transition: all 0.3s;
+}
+
+.tmpl-ai-input-row textarea:focus {
+  outline: none;
+  border-color: rgba(139, 115, 85, 0.5);
+  box-shadow: 0 0 0 3px rgba(139, 115, 85, 0.08);
+}
+
+#btn-tmpl-ai-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
