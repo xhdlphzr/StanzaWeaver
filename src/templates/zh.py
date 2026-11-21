@@ -30,6 +30,28 @@ def _tone(t: str) -> dict[str, Any]:
 
 _FREE: dict[str, Any] = _make_syl()
 
+#: 已数据化的近体诗结构规则（供跨语言转化携带）。
+_JINTI_COMMON: dict[str, Any] = {
+    "kind": "jinti",
+    "attribute": "tone",
+    "level_value": "平",
+    "oblique_value": "仄",
+    "positions": [1, 3],
+    "rhyme_lines": [1, 3],
+    "optional_first_rhyme": True,
+    "forbid_sanpingwei": True,
+    "forbid_guping": True,
+}
+_JINTI_WUJUE: dict[str, Any] = dict(_JINTI_COMMON)
+_JINTI_QIJUE: dict[str, Any] = {**_JINTI_COMMON, "positions": [1, 3, 5]}
+_JINTI_WULV: dict[str, Any] = {**_JINTI_COMMON, "rhyme_lines": [1, 3, 5, 7]}
+_JINTI_QILV: dict[str, Any] = {
+    **_JINTI_COMMON,
+    "positions": [1, 3, 5],
+    "rhyme_lines": [1, 3, 5, 7],
+}
+
+
 #: 相见欢默认标点（七句：，。。，，。。）。
 _XIANGJIANHUAN_MARKS: list[str] = ["，", "。", "。", "，", "，", "。", "。"]
 
@@ -394,6 +416,8 @@ class WujueTemplate(PoetryTemplate):
     name = "五言绝句"
     language = "zh"
     lines = 4
+    structural_rules = _JINTI_WUJUE
+    rhyme_scheme = "-A-A"
     syllables_per_line: ClassVar[list[int]] = [5, 5, 5, 5]
     rule_description = (
         "格律规则：每句第2、4字平仄相间；每联上下句第2、4字平仄相对；"
@@ -453,6 +477,8 @@ class QijueTemplate(PoetryTemplate):
     name = "七言绝句"
     language = "zh"
     lines = 4
+    structural_rules = _JINTI_QIJUE
+    rhyme_scheme = "-A-A"
     syllables_per_line: ClassVar[list[int]] = [7, 7, 7, 7]
     rule_description = (
         "格律规则：每句第2、4、6字平仄相间；每联上下句第2、4、6字平仄相对；"
@@ -512,6 +538,8 @@ class WulvTemplate(PoetryTemplate):
     name = "五言律诗"
     language = "zh"
     lines = 8
+    structural_rules = _JINTI_WULV
+    rhyme_scheme = "-A-A-A-A"
     syllables_per_line: ClassVar[list[int]] = [5] * 8
     rule_description = WujueTemplate.rule_description
 
@@ -579,6 +607,8 @@ class QilvTemplate(PoetryTemplate):
     name = "七言律诗"
     language = "zh"
     lines = 8
+    structural_rules = _JINTI_QILV
+    rhyme_scheme = "-A-A-A-A"
     syllables_per_line: ClassVar[list[int]] = [7] * 8
     rule_description = QijueTemplate.rule_description
 
@@ -646,6 +676,12 @@ class XiangjianhuanTemplate(PoetryTemplate):
     name = "相见欢"
     language = "zh"
     lines = 7
+    special_rules = (
+        "下阕平韵须转回上阕同部",
+        "下阕仄韵须与平韵不同部（换韵）",
+        "上下阕末句末三字不宜全平",
+    )
+    rhyme_scheme = "AAABBAA"
     centered = False
     syllables_per_line: ClassVar[list[int]] = [6, 3, 9, 3, 3, 3, 9]
     rule_description = (
@@ -755,6 +791,8 @@ class RumenglingTemplate(PoetryTemplate):
     name = "如梦令"
     language = "zh"
     lines = 7
+    special_rules = ("第5、6句须为叠句（原文相同）",)
+    rhyme_scheme = "AA-AAAA"
     centered = False
     syllables_per_line: ClassVar[list[int]] = [6, 6, 5, 6, 2, 2, 6]
     rule_description = (
@@ -827,6 +865,7 @@ class LangtaoshaTemplate(PoetryTemplate):
     name = "浪淘沙"
     language = "zh"
     lines = 10
+    rhyme_scheme = "AAA-AAAA-A"
     centered = False
     syllables_per_line: ClassVar[list[int]] = [5, 4, 7, 7, 4, 5, 4, 7, 7, 4]
     rule_description = (
@@ -902,6 +941,8 @@ class QingpingyueTemplate(PoetryTemplate):
     name = "清平乐"
     language = "zh"
     lines = 8
+    special_rules = ("上下片换韵须不同部",)
+    rhyme_scheme = "AAAABB-B"
     centered = False
     syllables_per_line: ClassVar[list[int]] = [4, 5, 7, 6, 6, 6, 6, 6]
     rule_description = (

@@ -64,7 +64,7 @@ def _ping_one_endpoint(endpoint_name: str) -> None:
     """探测单个 LLM 端点连通性.
 
     Args:
-        endpoint_name: 端点名称（"writer" 或 "checker"）。
+        endpoint_name: 端点名称（"writer" / "checker" / "editor"）。
 
     """
     from src.agents.base import LLMClient
@@ -95,9 +95,13 @@ def _auto_ping() -> None:
     """
     time.sleep(5)
     while True:
-        socketio.emit("llm_status", {"writer": "checking", "checker": "checking"})
+        socketio.emit(
+            "llm_status",
+            {"writer": "checking", "checker": "checking", "editor": "checking"},
+        )
         _ping_one_endpoint("writer")
         _ping_one_endpoint("checker")
+        _ping_one_endpoint("editor")
         socketio.emit("llm_status", dict(_llm_status))
         _llm_ping_event.wait()
         _llm_ping_event.clear()
@@ -121,7 +125,11 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 _active_states: dict[str, dict[str, Any]] = {}
 _active_sequences: dict[str, dict[str, Any]] = {}
 _CSRF_TOKEN = secrets.token_hex(16)
-_llm_status: dict[str, str] = {"writer": "unknown", "checker": "unknown"}
+_llm_status: dict[str, str] = {
+    "writer": "unknown",
+    "checker": "unknown",
+    "editor": "unknown",
+}
 _llm_ping_event = threading.Event()
 
 
@@ -204,8 +212,10 @@ def api_llm_ping() -> Any:
         return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
     _llm_status["writer"] = "checking"
     _llm_status["checker"] = "checking"
+    _llm_status["editor"] = "checking"
     _ping_one_endpoint("writer")
     _ping_one_endpoint("checker")
+    _ping_one_endpoint("editor")
     socketio.emit("llm_status", dict(_llm_status))
     return jsonify(dict(_llm_status))
 
@@ -274,6 +284,39 @@ def api_templates_meta() -> Any:
     return jsonify(meta)
 
 
+@app.route("/api/templates/convert", methods=["POST"])
+def api_convert_template() -> Any:
+    """统一的跨语言模板转化接口.
+
+    读取源模板的完整规格（行数/每行音节/逐位约束/押韵韵式/自定义代码），
+    只把逐位约束的属性值按映射转换为目标语言属性值，其余原样复制。
+    前端“应用转换”与模板编辑 AI 的 set_from_template 工具共用此实现。
+
+    Returns:
+        JSON Response：成功时返回转化后的模板规格；失败返回错误信息。
+
+    Raises:
+        400: 请求格式错误、未知模板/语言或映射非法。
+        403: CSRF 令牌校验失败。
+
+    """
+    if not _require_csrf():
+        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"status": "error", "message": "请求格式错误"}), 400
+    base_key = str(data.get("base_template_key", "")).strip()
+    language = str(data.get("language", ""))
+    if not base_key:
+        return jsonify({"status": "error", "message": "请选择源模板"}), 400
+    from src.templates.convert import convert_template
+
+    spec, error = convert_template(base_key, language, data.get("mapping"))
+    if error:
+        return jsonify({"status": "error", "message": error}), 400
+    return jsonify(spec)
+
+
 @app.route("/api/config", methods=["GET"])
 def api_get_config() -> Any:
     """读取 LLM 配置.
@@ -294,6 +337,7 @@ def api_get_config() -> Any:
         {
             "writer": config.writer,
             "checker": config.checker,
+            "editor": config.editor,
             "language": config.language,
         }
     )
@@ -319,7 +363,7 @@ def api_save_config() -> Any:
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return jsonify({"status": "error", "message": "请求格式错误"}), 400
-    for key in ("writer", "checker"):
+    for key in ("writer", "checker", "editor"):
         if key in data:
             value = data[key]
             if not isinstance(value, dict):
@@ -333,12 +377,14 @@ def api_save_config() -> Any:
             config.language = lang
     config.save()
     logger.info(
-        "LLM 配置已保存 (writer.base_url=%s, checker.base_url=%s)",
+        "LLM 配置已保存 (writer.base_url=%s, checker.base_url=%s, editor.base_url=%s)",
         config.writer["base_url"],
         config.checker["base_url"],
+        config.editor["base_url"],
     )
     _llm_status["writer"] = "unknown"
     _llm_status["checker"] = "unknown"
+    _llm_status["editor"] = "unknown"
     _llm_ping_event.set()
     return jsonify({"status": "ok"})
 
@@ -592,6 +638,33 @@ def handle_disconnect() -> None:
     _active_sequences.pop(request.sid, None)  # type: ignore[attr-defined]  # flask_socketio 注入
 
 
+def _render_constraint_table(constraints: list[Any]) -> str:
+    """把一份逐位约束表渲染为 Python 字面量源码.
+
+    Args:
+        constraints: 逐位约束（行 -> 单元格 -> {attributes}）。
+
+    Returns:
+        Python 列表字面量源码。
+
+    """
+    constraints_code: list[str] = []
+    for line_c in constraints:
+        cells: list[str] = []
+        for c in line_c if isinstance(line_c, list) else []:
+            attrs = c.get("attributes", {}) if isinstance(c, dict) else {}
+            non_empty = {k: str(v) for k, v in attrs.items() if v}
+            if non_empty:
+                rendered = json.dumps(non_empty, ensure_ascii=False)
+                cells.append(f"_make_syl(attributes={rendered})")
+            else:
+                cells.append("_make_syl()")
+        constraints_code.append("[" + ", ".join(cells) + "]")
+    if not constraints_code:
+        return "[]"
+    return "[\n            " + ",\n            ".join(constraints_code) + "\n        ]"
+
+
 def _build_custom_template_code(
     name: str,
     language: str,
@@ -602,6 +675,11 @@ def _build_custom_template_code(
     custom_code: str,
     class_name: str,
     file_key: str,
+    alternatives: list[Any] | None = None,
+    rhyme_scheme: str = "",
+    rhyme_distinct: bool = False,
+    structural_rules: dict[str, Any] | None = None,
+    rule_note: str = "",
 ) -> str:
     """生成自定义模板的 Python 源码（供 /api/templates/custom 落盘）.
 
@@ -615,47 +693,110 @@ def _build_custom_template_code(
         custom_code: 用户提供的 validate_full 附加代码。
         class_name: 生成的模板类名。
         file_key: 注册键（custom_<name>）。
+        alternatives: 多份逐位约束表（满足任意一份即可）；为空时用 constraints。
+        rhyme_scheme: 归一化韵式（如 "ABABCDCDEFEFGG"；空串表示不押韵）。
+        rhyme_distinct: 不同韵组是否须互不相同。
+        structural_rules: 已数据化的结构规则（如近体诗平仄骨架/三平尾/孤平）。
+        rule_note: 用户填写的模板规则描述（会作为 prompt 提供给写作 AI）。
 
     Returns:
         可直接写入 src/templates/custom_*.py 的源码文本。
 
     """
-    constraints_code: list[str] = []
-    for line_c in constraints:
-        cells: list[str] = []
-        for c in line_c:
-            attrs = c.get("attributes", {}) if isinstance(c, dict) else {}
-            value = str(attrs.get(dimension, "") or "") if dimension else ""
-            if value:
-                rendered = json.dumps({dimension: value}, ensure_ascii=False)
-                cells.append(f"_make_syl(attributes={rendered})")
-            else:
-                cells.append("_make_syl()")
-        constraints_code.append("[" + ", ".join(cells) + "]")
-
-    constraints_str = (
-        "[\n            " + ",\n            ".join(constraints_code) + "\n        ]"
+    tables: list[Any] = (
+        list(alternatives)
+        if alternatives
+        else ([list(constraints)] if constraints else [])
     )
+    if not tables:
+        tables = [[]]
+    rendered_tables = [_render_constraint_table(list(table or [])) for table in tables]
 
     # 生成文件的 REUSE 头。SPDX 标记拆开拼接，避免本文件源码中出现被
     # REUSE 误解析为许可证表达式的连续字面量（reuse lint 会报 invalid）。
     spdx_line = "# SPDX-License-" + "Identifier: MIT"
+    # 有数据化结构规则时，押韵与结构由 check_jinti_rules 统一校验，避免重复。
+    rhyme_import = (
+        "from .rhyme import check_rhyme_scheme\n"
+        if rhyme_scheme and not structural_rules
+        else ""
+    )
+    structural_import = (
+        "from .structural import check_jinti_rules\n" if structural_rules else ""
+    )
+    rule_parts = [
+        (
+            f"自定义格律模板：共 {lines} 行，"
+            f"每行音节数依次为 {', '.join(str(s) for s in syllables_per_line)}"
+        )
+    ]
+    if len(tables) > 1:
+        rule_parts.append(f"共 {len(tables)} 种可选音节约束，满足任意一种即可")
+    from src.templates.rhyme import rhyme_scheme_description
+
+    rhyme_desc = rhyme_scheme_description(rhyme_scheme)
+    if rhyme_desc:
+        rule_parts.append(
+            rhyme_desc + ("（不同韵组须互不相同）" if rhyme_distinct else "")
+        )
+    if structural_rules:
+        rule_parts.append("近体诗结构规则（平仄骨架/三平尾/孤平/押韵）随转化保留")
+    rule_description = "；".join(rule_parts) + "。"
     code_body = (
         f"# Copyright (c) 2026 xhdlphzr\n"
         f"{spdx_line}\n"
         f"# Auto-generated custom template: {name}\n\n"
         f"from . import PoetryTemplate, _make_syl, register\n"
-        f"from . import {language} as rules\n\n\n"
+        f"from . import {language} as rules\n"
+        f"{rhyme_import}{structural_import}\n"
         f"class {class_name}(PoetryTemplate):\n"
         f"    name = {json.dumps(name, ensure_ascii=False)}\n"
         f'    language = "{language}"\n'
         f"    lines = {lines}\n"
-        f"    syllables_per_line = {syllables_per_line}\n\n"
+        f"    syllables_per_line = {syllables_per_line}\n"
+        f"    rhyme_scheme = {json.dumps(rhyme_scheme, ensure_ascii=False)}\n"
+        f"    rhyme_distinct = {rhyme_distinct!r}\n"
+        f"    custom_code = {json.dumps(custom_code, ensure_ascii=False)}\n"
+        f"    structural_rules = {structural_rules!r}\n"
+        f"    rule_note = {json.dumps(rule_note, ensure_ascii=False)}\n"
+        f"    rule_description = {json.dumps(rule_description, ensure_ascii=False)}\n\n"
         f"    def get_syllable_constraints(self):\n"
-        f"        return {constraints_str}\n\n"
-        f"    def validate_full(self, poem, syllables):\n"
-        f"        errors = []\n"
+        f"        return {rendered_tables[0]}\n\n"
     )
+    if len(rendered_tables) > 1:
+        alternatives_str = (
+            "[\n"
+            + ",\n".join("            " + table for table in rendered_tables)
+            + "\n        ]"
+        )
+        code_body += (
+            "    def get_syllable_constraint_alternatives(self):\n"
+            f"        return {alternatives_str}\n\n"
+        )
+    code_body += "    def validate_full(self, poem, syllables):\n        errors = []\n"
+    if structural_rules:
+        code_body += (
+            f"        errors.extend(\n"
+            f"            check_jinti_rules(\n"
+            f"                {json.dumps(language, ensure_ascii=False)},\n"
+            f"                poem,\n"
+            f"                syllables,\n"
+            f"                self.structural_rules,\n"
+            f"            )\n"
+            f"        )\n"
+        )
+    elif rhyme_scheme:
+        code_body += (
+            f"        errors.extend(\n"
+            f"            check_rhyme_scheme(\n"
+            f"                {json.dumps(language, ensure_ascii=False)},\n"
+            f"                poem,\n"
+            f"                {json.dumps(rhyme_scheme, ensure_ascii=False)},\n"
+            f"                distinct={rhyme_distinct!r},\n"
+            f"                syllables=syllables,\n"
+            f"            )\n"
+            f"        )\n"
+        )
     if custom_code:
         for line in custom_code.split("\n"):
             if line.strip():
@@ -664,6 +805,131 @@ def _build_custom_template_code(
     code_body += f"def register_custom_{file_key.replace('custom_', '')}():\n"
     code_body += f'    register("{file_key}", {class_name}())\n'
     return code_body
+
+
+def _create_custom_template(
+    name: str,
+    language: str,
+    lines: int,
+    syllables_per_line: list[int],
+    alternatives: list[Any],
+    custom_code: str,
+    rhyme_scheme: str = "",
+    rhyme_distinct: bool = False,
+    structural_rules: dict[str, Any] | None = None,
+    rule_note: str = "",
+) -> tuple[int, dict[str, Any]]:
+    """落盘并热注册一个自定义模板.
+
+    Args:
+        name: 模板显示名。
+        language: 语言代码。
+        lines: 行数。
+        syllables_per_line: 每行音节数。
+        alternatives: 多份逐位约束表。
+        custom_code: 自定义整体校验代码。
+        rhyme_scheme: 归一化韵式。
+        rhyme_distinct: 不同韵组是否须互不相同。
+        structural_rules: 已数据化的结构规则（可选）。
+        rule_note: 用户填写的模板规则描述（可选，作为写作 AI 的 prompt）。
+
+    Returns:
+        (HTTP 状态码, 响应载荷)；成功载荷含模板 key。
+
+    """
+    import importlib
+    import re
+    from pathlib import Path
+
+    safe_name = re.sub(r"\W+", "_", name).strip("_")
+    if not safe_name:
+        return 400, {
+            "status": "error",
+            "message": "模板名需包含字母或数字（当前名称无法生成合法标识符）",
+        }
+
+    from src.templates.rhyme import normalize_rhyme_scheme
+    from src.templates.structural import normalize_structural_rules
+
+    rhyme_scheme, rhyme_error = normalize_rhyme_scheme(rhyme_scheme, lines)
+    if rhyme_error:
+        return 400, {"status": "error", "message": rhyme_error}
+    structural, structural_error = normalize_structural_rules(structural_rules)
+    if structural_error:
+        return 400, {"status": "error", "message": structural_error}
+
+    class_name = f"Custom{safe_name.title().replace('_', '')}Template"
+    file_key = f"custom_{safe_name}"
+    file_path = Path(__file__).parent / "src" / "templates" / f"{file_key}.py"
+
+    dimension, _value_options = custom_template_schemes().get(language, ("", ()))
+    code_body = _build_custom_template_code(
+        name=name,
+        language=language,
+        lines=lines,
+        syllables_per_line=syllables_per_line,
+        dimension=dimension,
+        constraints=list(alternatives[0]) if alternatives else [],
+        custom_code=custom_code,
+        class_name=class_name,
+        file_key=file_key,
+        alternatives=list(alternatives),
+        rhyme_scheme=rhyme_scheme,
+        rhyme_distinct=rhyme_distinct,
+        structural_rules=structural,
+        rule_note=rule_note,
+    )
+
+    try:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(code_body, encoding="utf-8")
+    except OSError as e:
+        return 500, {"status": "error", "message": f"模板文件写入失败: {e}"}
+
+    try:
+        module = importlib.import_module(f"src.templates.{file_key}")
+        reg_func = getattr(module, f"register_custom_{safe_name}", None)
+        if reg_func:
+            reg_func()
+    except Exception as e:  # noqa: BLE001 - 用户代码模板注册兜底：任何导入/执行错误回报 500
+        return 500, {"status": "error", "message": f"注册失败: {e}"}
+
+    socketio.emit("templates_updated", {"count": len(list_dicts())})
+    logger.info("自定义模板已创建: %s (%s, %d 行)", name, language, lines)
+    return 200, {
+        "status": "ok",
+        "message": f"模板'{name}'已创建并注册",
+        "count": len(list_dicts()),
+        "key": file_key,
+    }
+
+
+def _create_custom_template_from_draft(
+    draft: Any,
+) -> tuple[int, dict[str, Any]]:
+    """把模板编辑 AI 的草稿落盘并注册.
+
+    Args:
+        draft: TemplateDraft 实例。
+
+    Returns:
+        (HTTP 状态码, 响应载荷)。
+
+    """
+    return _create_custom_template(
+        name=str(draft.name),
+        language=str(draft.language),
+        lines=int(draft.lines),
+        syllables_per_line=list(draft.syllables_per_line),
+        alternatives=[list(table) for table in draft.constraint_tables()],
+        custom_code=str(draft.code),
+        rhyme_scheme=str(draft.rhyme_scheme),
+        rhyme_distinct=bool(draft.rhyme_distinct),
+        structural_rules=(
+            dict(draft.structural_rules) if draft.structural_rules else None
+        ),
+        rule_note=str(draft.rule_note),
+    )
 
 
 @app.route("/api/templates/custom", methods=["POST"])
@@ -678,10 +944,6 @@ def api_create_custom_template() -> Any:
         403: CSRF 令牌校验失败。
 
     """
-    import importlib
-    import re
-    from pathlib import Path
-
     if not _require_csrf():
         return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
 
@@ -714,57 +976,146 @@ def api_create_custom_template() -> Any:
             {"status": "error", "message": "音节数列表长度必须等于行数"}
         ), 400
 
-    safe_name = re.sub(r"\W+", "_", name).strip("_")
-    if not safe_name:
-        return (
-            jsonify(
-                {
-                    "status": "error",
-                    "message": "模板名需包含字母或数字（当前名称无法生成合法标识符）",
-                }
-            ),
-            400,
-        )
-    class_name = f"Custom{safe_name.title().replace('_', '')}Template"
-    file_key = f"custom_{safe_name}"
-    file_path = Path(__file__).parent / "src" / "templates" / f"{file_key}.py"
+    raw_alternatives = data.get("alternatives")
+    if isinstance(raw_alternatives, list) and raw_alternatives:
+        alternatives = [
+            table if isinstance(table, list) else [] for table in raw_alternatives
+        ]
+    else:
+        alternatives = [constraints]
 
-    dimension, _value_options = schemes[language]
-    code_body = _build_custom_template_code(
+    from src.templates.rhyme import normalize_rhyme_scheme
+
+    rhyme_scheme, rhyme_error = normalize_rhyme_scheme(
+        str(data.get("rhyme_scheme", "")), lines
+    )
+    if rhyme_error:
+        return jsonify({"status": "error", "message": rhyme_error}), 400
+    rhyme_distinct = bool(data.get("rhyme_distinct", False))
+    raw_structural = data.get("structural_rules")
+    structural_rules = raw_structural if isinstance(raw_structural, dict) else None
+    rule_note = str(data.get("rule_note", "") or "").strip()
+    if len(rule_note) > 4000:
+        return jsonify(
+            {"status": "error", "message": "模板规则描述不能超过 4000 字"}
+        ), 400
+
+    status, payload = _create_custom_template(
         name=name,
         language=language,
         lines=lines,
         syllables_per_line=syllables_per_line,
-        dimension=dimension,
-        constraints=list(constraints),
+        alternatives=alternatives,
         custom_code=custom_code,
-        class_name=class_name,
-        file_key=file_key,
+        rhyme_scheme=rhyme_scheme,
+        rhyme_distinct=rhyme_distinct,
+        structural_rules=structural_rules,
+        rule_note=rule_note,
     )
+    return jsonify(payload), status
 
-    try:
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_text(code_body, encoding="utf-8")
-    except OSError as e:
-        return jsonify({"status": "error", "message": f"模板文件写入失败: {e}"}), 500
 
-    try:
-        module = importlib.import_module(f"src.templates.{file_key}")
-        reg_func = getattr(module, f"register_custom_{safe_name}", None)
-        if reg_func:
-            reg_func()
-    except Exception as e:  # noqa: BLE001 - 用户代码模板注册兜底：任何导入/执行错误回报 500
-        return jsonify({"status": "error", "message": f"注册失败: {e}"}), 500
+@socketio.on("edit_template")
+def handle_edit_template(data: dict[str, Any]) -> None:
+    """模板编辑 AI：后台线程配置模板并实时推送思考/回答/工具调用.
 
-    socketio.emit("templates_updated", {"count": len(list_dicts())})
-    logger.info("自定义模板已创建: %s (%s, %d 行)", name, language, lines)
-    return jsonify(
-        {
-            "status": "ok",
-            "message": f"模板'{name}'已创建并注册",
-            "count": len(list_dicts()),
-        }
-    )
+    Args:
+        data: 事件负载（prompt 用户描述；draft 当前模板草稿）。
+
+    """
+    from src.agents.editor_ai import TemplateEditorAI
+    from src.config import get_config
+
+    prompt = str(data.get("prompt", "")).strip()
+    raw_draft = data.get("draft")
+    draft_payload = raw_draft if isinstance(raw_draft, dict) else {}
+    session_id = request.sid  # type: ignore[attr-defined]  # flask_socketio 注入
+
+    if not prompt:
+        socketio.emit(
+            "template_ai_done",
+            {"status": "error", "message": "请先描述想要的模板"},
+            to=session_id,
+        )
+        return
+
+    editor_config = get_config().editor
+    if not editor_config.get("api_key"):
+        socketio.emit(
+            "template_ai_done",
+            {
+                "status": "error",
+                "message": "模板AI未配置，请先在设置中填写模板AI的 API Key",
+            },
+            to=session_id,
+        )
+        return
+
+    logger.info("edit_template 开始 session=%s prompt=%r", session_id, prompt)
+
+    def run() -> None:
+        """在后台线程运行模板编辑 AI 并推送事件."""
+        try:
+            agent = TemplateEditorAI(editor_config)
+
+            def on_event(event: dict[str, Any]) -> None:
+                """推送一条模板AI事件到该会话.
+
+                Args:
+                    event: 事件字典。
+
+                """
+                socketio.emit("template_ai", event, to=session_id)
+
+            result = agent.edit(prompt, draft_payload, emit=on_event)
+        except Exception as e:  # noqa: BLE001 - 模板AI线程兜底：任何失败转为前端错误事件
+            logger.error("edit_template 失败 session=%s: %s", session_id, e)
+            socketio.emit(
+                "template_ai_done",
+                {"status": "error", "message": f"模板AI处理失败: {e}"},
+                to=session_id,
+            )
+            return
+
+        draft_result = result.draft.to_payload()
+        if not result.submitted:
+            socketio.emit(
+                "template_ai_done",
+                {
+                    "status": "ok",
+                    "draft": draft_result,
+                    "created_key": None,
+                    "message": result.message,
+                },
+                to=session_id,
+            )
+            return
+
+        status, body = _create_custom_template_from_draft(result.draft)
+        if status == 200:
+            logger.info("模板AI已创建模板: %s", body.get("key"))
+            socketio.emit(
+                "template_ai_done",
+                {
+                    "status": "ok",
+                    "draft": draft_result,
+                    "created_key": body.get("key"),
+                    "message": str(body.get("message", "")),
+                },
+                to=session_id,
+            )
+        else:
+            socketio.emit(
+                "template_ai_done",
+                {
+                    "status": "error",
+                    "draft": draft_result,
+                    "message": str(body.get("message", "创建模板失败")),
+                },
+                to=session_id,
+            )
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 _HISTORY_DB_PATH: Path | None = None

@@ -90,6 +90,8 @@ class TerzaRimaTemplate(PoetryTemplate):
     name = "三行体"
     language = "it"
     lines = 14
+    special_rules = ("第10音节须重读",)
+    rhyme_scheme = "ABABCBCDCDEDEE"
     syllables_per_line: ClassVar[list[int]] = [11] * 14
     rule_description = (
         "格律规则：每行11音节（跨词元音连读 sinalefe 合并计数）；"
@@ -139,6 +141,8 @@ class OttavaRimaTemplate(PoetryTemplate):
     name = "八行体"
     language = "it"
     lines = 8
+    special_rules = ("第10音节须重读",)
+    rhyme_scheme = "ABABABCC"
     syllables_per_line: ClassVar[list[int]] = [11] * 8
     rule_description = (
         "格律规则：每行11音节（跨词元音连读 sinalefe 合并计数）；"
@@ -186,6 +190,12 @@ class CanzoneTemplate(PoetryTemplate):
     name = "歌谣"
     language = "it"
     lines = 13
+    special_rules = (
+        "韵脚数不超过4个",
+        "同一韵脚连续出现不超过2次",
+        "末三行韵脚各不相同",
+        "末音节重读",
+    )
     syllables_per_line: ClassVar[list[int]] = [
         11,
         7,

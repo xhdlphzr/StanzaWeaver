@@ -102,6 +102,7 @@ class HexameterTemplate(PoetryTemplate):
     name = "六步格"
     language = "la"
     lines = 1
+    special_rules = ("六步格音步结构", "第5音步须为扬抑抑格")
     syllables_per_line: ClassVar[list[tuple[int, int]]] = [(13, 17)]
     rule_description = (
         "格律规则：共6音步；第1-4音步可为扬抑抑格(长短短)或扬扬格(长长)自由替换；"
@@ -143,6 +144,12 @@ class DistichonTemplate(PoetryTemplate):
     name = "哀歌双行体"
     language = "la"
     lines = 2
+    special_rules = (
+        "六步格/五步格音步结构",
+        "第2行后6音节须为两个扬抑抑格",
+        "第2行中部caesura",
+    )
+    rhyme_scheme = "AA"
     syllables_per_line: ClassVar[list[tuple[int, int]]] = [(13, 17), (11, 13)]
     rule_description = (
         "格律规则：第1行完全遵循六步格规则；"
@@ -238,6 +245,7 @@ class HendecasyllabusTemplate(PoetryTemplate):
     name = "十一音节诗"
     language = "la"
     lines = 1
+    special_rules = ("十一音节音步结构", "第5/6音节之间须为词边界")
     syllables_per_line: ClassVar[list[int]] = [11]
     rule_description = (
         "格律规则：共5音步11音节；第1音步为扬扬格或扬抑格（首音节必长）；"

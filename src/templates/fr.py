@@ -64,6 +64,8 @@ class RondeauTemplate(PoetryTemplate):
     name = "回旋诗"
     language = "fr"
     lines = 15
+    special_rules = ("叠句须原样重复",)
+    rhyme_scheme = "AABBAAABAAABBAA"
     # 每行允许 8 或 10 音节（经典回旋诗可统一为 10 音节）
     syllables_per_line: ClassVar[list[int | tuple[int, int]]] = [(8, 10)] * 15
     _refrain_lines: ClassVar[list[int]] = [8, 14]  # 0-based: 叠句出现在第 9、15 行
@@ -120,6 +122,8 @@ class TrioletTemplate(PoetryTemplate):
     name = "三韵叠句诗"
     language = "fr"
     lines = 8
+    special_rules = ("叠句须原样重复",)
+    rhyme_scheme = "ABAAABAB"
     syllables_per_line = [8] * 8
     rule_description = (
         "格律规则：8行，每行8音节；韵式 ABaAabAB："
@@ -172,6 +176,8 @@ class BalladeTemplate(PoetryTemplate):
     name = "叙事歌"
     language = "fr"
     lines = 28
+    special_rules = ("叠句须原样重复", "全诗音节数须统一")
+    rhyme_scheme = "ABABBCBCABABBCBCABABBCBCBCBC"
     syllables_per_line: ClassVar[list[int | tuple[int, int]]] = []
     _refrain_line = 27
     rule_description = (
