@@ -119,6 +119,17 @@ dev = [
 [tool.uv]
 package = false
 
+# 用户在 UI 中生成的自定义模板（src/templates/custom_*.py）属于本地数据，
+# 不参与静态检查与覆盖率统计（避免本地生成物导致 CI/本地校验误报）。
+[tool.ruff]
+extend-exclude = ["src/templates/custom_*.py"]
+
+[tool.mypy]
+exclude = "^src/templates/custom_.*\\.py$"
+
+[tool.coverage.run]
+omit = ["src/templates/custom_*.py"]
+
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
