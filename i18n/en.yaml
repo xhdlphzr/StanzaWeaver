@@ -203,3 +203,7 @@ template_manage:
   order_saved: Template order saved
   order_failed: Failed to save template order
   builtin: Built-in
+  reset: Reset order
+  reset_confirm: Reset template order? Built-in templates return to their default order; custom templates keep their relative order after them.
+  reset_ok: Template order reset
+  reset_failed: Failed to reset template order

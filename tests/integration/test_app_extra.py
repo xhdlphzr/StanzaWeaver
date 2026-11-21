@@ -575,6 +575,87 @@ def _restore_order(snapshot: list[str]) -> None:
     set_order(snapshot)
 
 
+def test_default_template_order_keeps_custom_relative_order() -> None:
+    """默认顺序：内置用注册顺序，自定义保持相对顺序排在内置之后，其它追加."""
+    from src.templates import _registry
+
+    snapshot = dict(_registry)
+    try:
+        _register_delete_dummy("custom_order_a")
+        _register_delete_dummy("custom_order_b")
+        _register_delete_dummy("other_order_x")
+        from src.templates import set_order as _set_order
+
+        _set_order(["custom_order_b", "zh_qijue", "other_order_x", "custom_order_a"])
+        ordered = app_module._default_template_order()
+        builtin_order = [
+            key for key in app_module._DEFAULT_BUILTIN_ORDER if key in _registry
+        ]
+        assert ordered[: len(builtin_order)] == builtin_order
+        custom_ordered = [key for key in ordered if key.startswith("custom_")]
+        assert custom_ordered[:2] == ["custom_order_b", "custom_order_a"]
+        assert set(custom_ordered) == {
+            key for key in _registry if key.startswith("custom_")
+        }
+        assert ordered[-1] == "other_order_x"
+        assert set(ordered) == set(_registry)
+    finally:
+        _registry.clear()
+        _registry.update(snapshot)
+
+
+def test_reset_template_order_requires_csrf(client: FlaskClient) -> None:
+    """重置顺序接口需要 CSRF."""
+    assert client.post("/api/templates/order/reset").status_code == 403
+
+
+def test_reset_template_order_success(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """重置顺序：内置回到默认顺序，自定义保持相对顺序排在后面并落盘."""
+    import json as _json
+
+    from src.templates import _registry
+    from src.templates import set_order as _set_order
+
+    snapshot = dict(_registry)
+    path = tmp_path / "order.json"
+    monkeypatch.setattr(app_module, "_template_order_path", lambda: path)
+    try:
+        _register_delete_dummy("custom_reset_a")
+        _register_delete_dummy("custom_reset_b")
+        _set_order(["custom_reset_b", "custom_reset_a", "zh_qijue"])
+        resp = client.post("/api/templates/order/reset", headers=_csrf_headers())
+        assert resp.status_code == 200
+        data = resp.get_json()
+        builtin_order = [
+            key for key in app_module._DEFAULT_BUILTIN_ORDER if key in _registry
+        ]
+        assert data["order"][: len(builtin_order)] == builtin_order
+        assert data["order"][len(builtin_order) : len(builtin_order) + 2] == [
+            "custom_reset_b",
+            "custom_reset_a",
+        ]
+        saved = _json.loads(path.read_text(encoding="utf-8"))
+        assert saved == data["order"]
+    finally:
+        _registry.clear()
+        _registry.update(snapshot)
+
+
+def test_reset_template_order_save_failure(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """顺序文件写入失败返回 500."""
+    monkeypatch.setattr(
+        app_module,
+        "_save_template_order",
+        lambda keys: (_ for _ in ()).throw(OSError("ro")),
+    )
+    resp = client.post("/api/templates/order/reset", headers=_csrf_headers())
+    assert resp.status_code == 500
+
+
 def test_reorder_templates_requires_csrf(client: FlaskClient) -> None:
     """排序接口需要 CSRF."""
     assert client.post("/api/templates/order", json={"order": []}).status_code == 403

@@ -521,6 +521,13 @@
         <div id="template-manage-list" class="template-manage-list"></div>
         <div class="modal-actions">
           <button
+            id="btn-reset-order"
+            class="btn-secondary"
+            data-i18n="template_manage.reset"
+          >
+            重置顺序
+          </button>
+          <button
             id="btn-close-manage"
             class="btn-secondary"
             data-i18n="template_manage.close"
@@ -633,6 +640,9 @@
         document
           .getElementById("btn-close-manage")
           .addEventListener("click", closeTemplateManage);
+        document
+          .getElementById("btn-reset-order")
+          .addEventListener("click", resetTemplateOrder);
         var manageList = document.getElementById("template-manage-list");
         manageList.addEventListener("dragstart", function (e) {
           var target = e.target && e.target.closest
@@ -661,11 +671,12 @@
             : null;
           if (!dragging || !target || target === dragging) return;
           var rect = target.getBoundingClientRect();
-          if (e.clientY < rect.top + rect.height / 2) {
-            manageList.insertBefore(dragging, target);
-          } else {
-            manageList.insertBefore(dragging, target.nextSibling);
-          }
+          moveManageItem(
+            manageList,
+            dragging,
+            target,
+            e.clientY < rect.top + rect.height / 2,
+          );
         });
         manageList.addEventListener("drop", function (e) {
           e.preventDefault();
@@ -913,6 +924,62 @@
           }
           container.appendChild(row);
         });
+      }
+
+      // FLIP 动画：移动拖动行时让其它行平滑上/下移动，避免瞬间跳变。
+      function moveManageItem(list, dragging, target, insertBefore) {
+        var siblings = Array.prototype.filter.call(
+          list.children,
+          function (el) {
+            return el !== dragging;
+          },
+        );
+        var firstTops = siblings.map(function (el) {
+          return el.getBoundingClientRect().top;
+        });
+        if (insertBefore) {
+          list.insertBefore(dragging, target);
+        } else {
+          list.insertBefore(dragging, target.nextSibling);
+        }
+        siblings.forEach(function (el, index) {
+          var lastTop = el.getBoundingClientRect().top;
+          var delta = firstTops[index] - lastTop;
+          if (!delta) return;
+          el.style.transition = "none";
+          el.style.transform = "translateY(" + delta + "px)";
+          void el.offsetHeight;
+          requestAnimationFrame(function () {
+            el.style.transition = "transform 180ms ease";
+            el.style.transform = "";
+          });
+        });
+      }
+
+      function resetTemplateOrder() {
+        if (!window.confirm(t("template_manage.reset_confirm"))) return;
+        fetch("/api/templates/order/reset", {
+          method: "POST",
+          headers: csrfHeaders(),
+        })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (resp) {
+            if (!resp || resp.status !== "ok") {
+              showToast(
+                (resp && resp.message) || t("template_manage.reset_failed"),
+                "error",
+              );
+              return;
+            }
+            showToast(t("template_manage.reset_ok"), "success");
+            openTemplateManage();
+            loadTemplates();
+          })
+          .catch(function () {
+            showToast(t("template_manage.reset_failed"), "error");
+          });
       }
 
       function persistTemplateOrder() {
