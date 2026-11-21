@@ -65,6 +65,7 @@ config_modal:
   lang_en: 英语
   writer: 编写AI
   checker: 检查AI
+  editor: 模板AI
   save: 保存
   cancel: 取消
 
@@ -86,10 +87,51 @@ template_modal:
   lines_label: 行数
   syllables_label: 每行音节
   syllables_placeholder: 逗号分隔
+  kind_count_label: 约束种类
+  convert_label: 从其它模板转化
+  convert_none: "-- 不转换 --"
+  convert_mapping_label: "属性映射：{source} → {target}"
+  convert_apply: 应用转换
+  convert_no_mapping: 目标语言没有逐位属性：将只复制行数、音节、押韵与代码
+  convert_no_source_constraints: 源模板没有逐位约束：将只复制行数、音节、押韵与自定义代码
+  convert_source_rhyme: "源模板韵式：{scheme}（将被一并复制）"
+  convert_source_code: 源模板含自定义校验代码（将被一并复制）
+  convert_copies: 行数、每行音节、押韵韵式与自定义代码会一并复制，仅逐位音节约束按映射转换
+  convert_carried_label: "将携带："
+  convert_dropped_label: "不会携带的语言专属特殊规则："
+  convert_carried_constraints: 音节约束（按映射转换）
+  convert_carried_multiple_kinds: 多重约束（任一满足即可）
+  convert_carried_rhyme: 押韵韵式
+  convert_carried_custom_code: 自定义校验代码
+  convert_carried_jinti: 近体诗结构规则（平仄骨架/三平尾/孤平/押韵）
+  convert_carried_rule_note: 模板规则描述（写作 AI prompt）
+  convert_done: 已应用模板转换
   constraints_title: 每行音节约束
+  constraint_kind: "约束种类 {n}"
+  rhyme_title: 押韵
+  rhyme_scheme_placeholder: "如 ABAB CDCD EFEF GG，- 表示不押韵"
+  rhyme_scheme_hint: "用字母标记每行的韵脚，相同字母押同一个韵；-、. 或 x 表示该行不押韵。"
+  rhyme_none: 不押韵
+  rhyme_distinct_label: 不同韵脚必须互不相同（如商籁体 A/B 韵不同）
+  rule_note_label: 模板规则描述（会作为 prompt 提供给生成 AI）
+  rule_note_placeholder: 例如：模仿某词牌，上下片需情景相生，注意领字与对仗……
+  rule_note_hint: 这段描述会随模板保存，并在生成诗歌时作为格律要求提示发给写作 AI。
   custom_code_label: 自定义检测代码（Python，可选）
   code_hint: "可选：在 validate_full 中编写整体规则并追加到 errors。本语言可复用的辅助函数（经 rules 前缀调用）：{helpers}"
   code_hint_empty: "可选：在 validate_full 中编写整体规则并追加到 errors（该语言无逐位辅助函数）。"
+  ai_title: 模板AI
+  ai_placeholder: 描述你想要的模板，AI 会调用工具配置它…
+  ai_send: 发送
+  ai_running: 配置中...
+  ai_thinking: 思考
+  ai_message: 消息
+  ai_user: 用户
+  ai_args: "参数:"
+  ai_result: "结果:"
+  ai_error: 出错
+  ai_applied: 已应用 AI 配置，请检查后点击生成模板
+  ai_created: AI 已创建模板
+  ai_empty_prompt: 请先描述你想要的模板
   create: 生成模板
   cancel: 取消
 
@@ -127,3 +169,19 @@ syllable_constraints:
   free: 自由
   light: 平
   heavy: 仄
+
+constraint:
+  attributes:
+    tone: 平仄
+    stress: 重轻
+    length: 长短
+  values:
+    tone:
+      "平": 平
+      "仄": 仄
+    stress:
+      light: 轻
+      heavy: 重
+    length:
+      long: 长
+      short: 短

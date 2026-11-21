@@ -263,6 +263,12 @@
           <label>API Key <input type="password" id="cfg-checker-key" /></label>
           <label>Model <input type="text" id="cfg-checker-model" /></label>
         </div>
+        <div class="config-group">
+          <h3 data-i18n="config_modal.editor">模板AI</h3>
+          <label>Base URL <input type="text" id="cfg-editor-url" /></label>
+          <label>API Key <input type="password" id="cfg-editor-key" /></label>
+          <label>Model <input type="text" id="cfg-editor-model" /></label>
+        </div>
         <div class="modal-actions">
           <button
             id="btn-save-config"
@@ -337,6 +343,15 @@
             <input type="number" id="tmpl-lines" value="4" min="1" max="30"
           /></label>
           <label
+            ><span data-i18n="template_modal.kind_count_label">约束种类</span>
+            <input
+              type="number"
+              id="tmpl-kind-count"
+              value="1"
+              min="1"
+              max="8"
+          /></label>
+          <label
             ><span data-i18n="template_modal.syllables_label">每行音节</span>
             <input
               type="text"
@@ -347,6 +362,30 @@
           /></label>
         </div>
         <div class="config-group">
+          <label
+            ><span data-i18n="template_modal.convert_label"
+              >从其它模板转化</span
+            >
+            <select id="tmpl-base-template">
+              <option value="" data-i18n="template_modal.convert_none">
+                -- 不转换 --
+              </option>
+            </select>
+          </label>
+          <div id="tmpl-conversion" class="tmpl-conversion hidden">
+            <div id="tmpl-convert-mapping" class="tmpl-convert-mapping"></div>
+            <button
+              type="button"
+              id="btn-apply-convert"
+              class="btn-secondary btn-small"
+              data-i18n="template_modal.convert_apply"
+            >
+              应用转换
+            </button>
+            <div id="tmpl-convert-report" class="convert-report hidden"></div>
+          </div>
+        </div>
+        <div class="config-group">
           <div
             class="section-header"
             style="margin-top: 8px"
@@ -354,13 +393,86 @@
           >
             每行音节约束
           </div>
-          <div id="tmpl-syllable-table" class="syllable-table"></div>
+          <div id="tmpl-syllable-table" class="syllable-alternatives"></div>
+        </div>
+        <div class="config-group">
+          <div
+            class="section-header"
+            style="margin-top: 8px"
+            data-i18n="template_modal.rhyme_title"
+          >
+            押韵
+          </div>
+          <label>
+            <input
+              type="text"
+              id="tmpl-rhyme-scheme"
+              data-i18n-placeholder="template_modal.rhyme_scheme_placeholder"
+              placeholder="如 ABAB CDCD EFEF GG，- 表示不押韵"
+            />
+          </label>
+          <p class="rhyme-hint" data-i18n="template_modal.rhyme_scheme_hint">
+            用字母标记每行的韵脚，相同字母押同一个韵；-、. 或 x
+            表示该行不押韵。
+          </p>
+          <label class="checkbox-label">
+            <input type="checkbox" id="tmpl-rhyme-distinct" />
+            <span data-i18n="template_modal.rhyme_distinct_label"
+              >不同韵脚必须互不相同（如商籁体 A/B 韵不同）</span
+            >
+          </label>
+          <div id="tmpl-rhyme-lines" class="rhyme-lines"></div>
+        </div>
+        <div class="config-group">
+          <label
+            for="tmpl-rule-note"
+            data-i18n="template_modal.rule_note_label"
+            >模板规则描述（会作为 prompt 提供给生成 AI）</label
+          >
+          <textarea
+            id="tmpl-rule-note"
+            class="rule-note-input"
+            rows="3"
+            data-i18n-placeholder="template_modal.rule_note_placeholder"
+            placeholder="例如：模仿某词牌，上下片需情景相生，注意领字与对仗……"
+          ></textarea>
+          <p class="rhyme-hint" data-i18n="template_modal.rule_note_hint">
+            这段描述会随模板保存，并在生成诗歌时作为格律要求提示发给写作 AI。
+          </p>
         </div>
         <div class="config-group">
           <label data-i18n="template_modal.custom_code_label"
             >自定义检测代码（Python，可选）</label
           >
           <div id="tmpl-code" class="code-editor"></div>
+        </div>
+        <div class="config-group">
+          <div id="tmpl-ai-panel" class="tmpl-ai-panel">
+            <div class="tmpl-ai-header">
+              <span
+                class="tmpl-ai-title"
+                data-i18n="template_modal.ai_title"
+                >模板AI</span
+              >
+              <span id="tmpl-ai-status" class="tmpl-ai-status"></span>
+            </div>
+            <div id="tmpl-ai-log" class="tmpl-ai-log"></div>
+            <div class="tmpl-ai-input-row">
+              <textarea
+                id="tmpl-ai-input"
+                data-i18n-placeholder="template_modal.ai_placeholder"
+                placeholder="描述你想要的模板，AI 会调用工具配置它…"
+              ></textarea>
+              <button
+                type="button"
+                id="btn-tmpl-ai-send"
+                class="btn-secondary btn-small"
+                data-i18n="template_modal.ai_send"
+              >
+                发送
+              </button>
+            </div>
+          </div>
         </div>
         <div class="modal-actions">
           <button
@@ -500,34 +612,73 @@
         document
           .getElementById("tmpl-lines")
           .addEventListener("change", function () {
-            const n = parseInt(this.value) || 4;
-            const raw = document
-              .getElementById("tmpl-syl-per-line")
-              .value.trim();
-            const arr = raw
-              ? raw.split(",").map(function (s) {
-                  return parseInt(s.trim()) || 7;
-                })
-              : [];
-            while (arr.length < n)
-              arr.push(arr.length > 0 ? arr[arr.length - 1] : 7);
-            document.getElementById("tmpl-syl-per-line").value = arr
-              .slice(0, n)
-              .join(",");
-            rebuildSyllableTable();
+            var lines = clampTplLines(this.value);
+            this.value = lines;
+            syncSylCountsToLines(lines);
+            renderSyllableTables();
+            renderRhymeLines();
           });
         document
           .getElementById("tmpl-syl-per-line")
-          .addEventListener("change", rebuildSyllableTable);
+          .addEventListener("change", function () {
+            normalizeSylInput();
+            renderSyllableTables();
+            renderRhymeLines();
+          });
+        document
+          .getElementById("tmpl-kind-count")
+          .addEventListener("change", function () {
+            this.value = clampKindCount();
+            renderSyllableTables();
+          });
         document
           .getElementById("tmpl-language")
-          .addEventListener("change", refreshTplEditor);
+          .addEventListener("change", handleTplLanguageChange);
+        document
+          .getElementById("tmpl-base-template")
+          .addEventListener("change", handleBaseTemplateChange);
+        document
+          .getElementById("tmpl-convert-mapping")
+          .addEventListener("change", handleConversionMappingChange);
+        document
+          .getElementById("btn-apply-convert")
+          .addEventListener("click", applyTemplateConversion);
+        document
+          .getElementById("tmpl-syllable-table")
+          .addEventListener("change", handleSylCellChange);
+        document
+          .getElementById("tmpl-rhyme-scheme")
+          .addEventListener("input", handleRhymeSchemeInput);
+        document
+          .getElementById("tmpl-rhyme-scheme")
+          .addEventListener("change", handleRhymeSchemeChange);
+        document
+          .getElementById("tmpl-rhyme-lines")
+          .addEventListener("change", handleRhymeLineChange);
+        document
+          .getElementById("tmpl-rhyme-distinct")
+          .addEventListener("change", function () {
+            TPL_STATE.rhymeDistinct = !!this.checked;
+          });
+        document
+          .getElementById("btn-tmpl-ai-send")
+          .addEventListener("click", sendTemplateAi);
+        document
+          .getElementById("tmpl-ai-input")
+          .addEventListener("keydown", function (e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+              e.preventDefault();
+              sendTemplateAi();
+            }
+          });
 
         socket.on("progress", handleProgress);
         socket.on("done", handleDone);
         socket.on("sequence_progress", handleSequenceProgress);
         socket.on("sequence_done", handleSequenceDone);
         socket.on("error", handleError);
+        socket.on("template_ai", handleTemplateAi);
+        socket.on("template_ai_done", handleTemplateAiDone);
         socket.on("templates_updated", function () {
           loadTemplates();
         });
@@ -593,6 +744,10 @@
               "</option>" +
               templateOptionsHtml();
             rebuildSequenceMeters();
+            var templateModal = document.getElementById("template-modal");
+            if (templateModal && !templateModal.classList.contains("hidden")) {
+              renderBaseTemplateOptions();
+            }
           });
       }
 
@@ -915,10 +1070,19 @@
               "</div>";
           }
         }
-        if (data.formatted_poem) {
-          renderFormattedPoem(data.formatted_poem, data.centered);
-        } else if (data.draft && data.draft.length > 0) {
-          updatePoemDisplay(data.draft, data.title, data.centered);
+        if (
+          data.formatted_poem ||
+          data.title ||
+          (data.draft && data.draft.length > 0)
+        ) {
+          renderPoemContent(
+            document.getElementById("poem-display"),
+            data.title,
+            data.formatted_poem,
+            data.draft,
+            data.centered,
+            false,
+          );
         }
 
         if (data.last_tool) {
@@ -989,38 +1153,83 @@
         return wrapper;
       }
 
-      function renderFormattedPoem(text, centered) {
-        if (text === lastFormatted) return;
-        lastFormatted = text;
-        const display = document.getElementById("poem-display");
-        display.innerHTML = "";
-        const pre = document.createElement("pre");
+      // ---- 统一的诗稿渲染（诗稿进行中 / 最终展示 / 诗组共用） ----
+
+      // 格式化文本首行通常就是标题；把它拆出来单独用标题样式渲染。
+      function splitFormattedTitle(text, title) {
+        var content = typeof text === "string" ? text : "";
+        var expected = typeof title === "string" ? title.trim() : "";
+        if (!content) return { title: expected, body: "" };
+        var newline = content.indexOf("\n");
+        var firstLine = (newline >= 0 ? content.slice(0, newline) : content).trim();
+        if (expected && firstLine === expected) {
+          return {
+            title: expected,
+            body: newline >= 0 ? content.slice(newline + 1) : "",
+          };
+        }
+        return { title: expected, body: content };
+      }
+
+      function stripTitleFromLines(lines, title) {
+        var list = Array.isArray(lines) ? lines.slice() : [];
+        var expected = typeof title === "string" ? title.trim() : "";
+        if (expected && list.length && String(list[0]).trim() === expected) {
+          list.shift();
+        }
+        return list;
+      }
+
+      function buildPoemTitle(title, centered) {
+        var el = document.createElement("div");
+        el.className = "poem-title" + (centered === false ? " poem-left" : "");
+        el.textContent = title;
+        return el;
+      }
+
+      function buildPoemBody(text, centered) {
+        var pre = document.createElement("pre");
         pre.className =
           "poem-formatted" + (centered === false ? " poem-left" : "");
         pre.textContent = text;
-        display.appendChild(pre);
+        return pre;
       }
 
-      function updatePoemDisplay(poem, title, centered) {
-        if (JSON.stringify(poem) === JSON.stringify(lastPoem)) return;
-        lastPoem = [...poem];
-        lastFormatted = "";
-
-        const display = document.getElementById("poem-display");
-        display.innerHTML = "";
-        const leftClass = centered === false ? " poem-left" : "";
-        if (title) {
-          const titleDiv = document.createElement("div");
-          titleDiv.className = "poem-title" + leftClass;
-          titleDiv.textContent = title;
-          display.appendChild(titleDiv);
+      // 把“加粗放大的标题 + 诗体正文”渲染进容器；相同内容不重复渲染以免闪动。
+      // force=true 用于最终定稿（即使内容相同也强制刷新一次）。
+      function renderPoemContent(
+        container,
+        title,
+        formattedText,
+        fallbackLines,
+        centered,
+        force,
+      ) {
+        if (!container) return;
+        var parts = splitFormattedTitle(formattedText, title);
+        var displayTitle = parts.title || "";
+        var body = parts.body;
+        if (!body) {
+          body = stripTitleFromLines(fallbackLines, displayTitle).join("\n");
         }
-        poem.forEach((line) => {
-          const div = document.createElement("div");
-          div.className = "poem-line" + leftClass;
-          div.textContent = line;
-          display.appendChild(div);
-        });
+        if (!displayTitle && !body) return;
+        var key = [displayTitle, body, centered === false ? "1" : "0"].join(
+          "\u0000",
+        );
+        if (
+          !force &&
+          key === container.dataset.poemRenderKey &&
+          container.innerHTML !== "" &&
+          !container.querySelector(".stream-text")
+        ) {
+          return;
+        }
+        container.dataset.poemRenderKey = key;
+        container.innerHTML = "";
+        if (displayTitle) {
+          container.appendChild(buildPoemTitle(displayTitle, centered));
+        }
+        if (body) container.appendChild(buildPoemBody(body, centered));
       }
 
       function handleDone(data) {
@@ -1029,18 +1238,17 @@
 
         const poem = data.final_poem || data.draft || [];
         const display = document.getElementById("poem-display");
-        display.innerHTML = "";
-
-        if (data.formatted_poem) {
-          lastFormatted = data.formatted_poem;
-          const pre = document.createElement("pre");
-          pre.className =
-            "poem-formatted" + (data.centered === false ? " poem-left" : "");
-          pre.textContent = data.formatted_poem;
-          display.appendChild(pre);
-        } else {
-          updatePoemDisplay(poem, data.title, data.centered);
-        }
+        lastPoem = [...poem];
+        lastFormatted = data.formatted_poem || "";
+        // 最终展示与诗稿进行中完全同一套渲染（标题加粗放大）。
+        renderPoemContent(
+          display,
+          data.title,
+          data.formatted_poem,
+          poem,
+          data.centered,
+          true,
+        );
 
         document.getElementById("tool-status").classList.add("hidden");
 
@@ -1105,23 +1313,25 @@
       function renderSequencePoems(data) {
         const display = document.getElementById("poem-display");
         display.innerHTML = "";
-        const titleEl = document.createElement("div");
-        titleEl.className = "poem-title";
-        titleEl.textContent = "《" + (data.title || "") + "》";
-        display.appendChild(titleEl);
+        delete display.dataset.poemRenderKey;
+        display.appendChild(
+          buildPoemTitle("\u300a" + (data.title || "") + "\u300b", true),
+        );
         (data.poems || []).forEach(function (p) {
           const wrap = document.createElement("div");
           wrap.className = "sequence-poem";
-          const name = document.createElement("div");
-          name.className = "sequence-poem-title";
-          name.textContent = "《" + (p.title || p.planned_title || "") + "》";
-          wrap.appendChild(name);
-          const pre = document.createElement("pre");
-          pre.className =
-            "poem-formatted" + (p.centered === false ? " poem-left" : "");
-          pre.textContent =
-            p.formatted_poem || (p.draft || []).join("\n") || "\u2026";
-          wrap.appendChild(pre);
+          const poemTitle = p.title || p.planned_title || "";
+          const parts = splitFormattedTitle(p.formatted_poem, poemTitle);
+          if (poemTitle) {
+            wrap.appendChild(
+              buildPoemTitle("\u300a" + poemTitle + "\u300b", p.centered),
+            );
+          }
+          let body = parts.body;
+          if (!body) {
+            body = stripTitleFromLines(p.draft, poemTitle).join("\n");
+          }
+          wrap.appendChild(buildPoemBody(body || "\u2026", p.centered));
           const status = document.createElement("div");
           status.className = p.checker_pass ? "sequence-poem-ok" : "sequence-poem-bad";
           if (p.done) {
@@ -1228,6 +1438,14 @@
               cfg.checker.api_key;
             document.getElementById("cfg-checker-model").value =
               cfg.checker.model;
+            // 后端旧版本可能没有 editor 配置，缺失时按空值处理。
+            var editor = cfg.editor || {};
+            document.getElementById("cfg-editor-url").value =
+              editor.base_url || "";
+            document.getElementById("cfg-editor-key").value =
+              editor.api_key || "";
+            document.getElementById("cfg-editor-model").value =
+              editor.model || "";
             document.getElementById("cfg-language").value =
               cfg.language || "zh";
           });
@@ -1249,6 +1467,11 @@
             base_url: document.getElementById("cfg-checker-url").value,
             api_key: document.getElementById("cfg-checker-key").value,
             model: document.getElementById("cfg-checker-model").value,
+          },
+          editor: {
+            base_url: document.getElementById("cfg-editor-url").value,
+            api_key: document.getElementById("cfg-editor-key").value,
+            model: document.getElementById("cfg-editor-model").value,
           },
           language: document.getElementById("cfg-language").value,
         };
@@ -1278,10 +1501,10 @@
         var parts = [];
         var sequencePoems = document.querySelectorAll(".sequence-poem");
         if (sequencePoems.length) {
-          var sequenceTitle = document.querySelector(".poem-title");
+          var sequenceTitle = document.querySelector("#poem-display > .poem-title");
           if (sequenceTitle) parts.push(sequenceTitle.textContent);
           sequencePoems.forEach(function (item) {
-            var name = item.querySelector(".sequence-poem-title");
+            var name = item.querySelector(".poem-title");
             var pre = item.querySelector(".poem-formatted");
             if (name) parts.push(name.textContent);
             if (pre) parts.push(pre.textContent);
@@ -1417,8 +1640,975 @@
         return hint;
       }
 
+      // ---- 自定义模板编辑器状态 ----
+      // DOM 只是渲染结果；真实选择保存在 TPL_STATE 中，重建表格时据此恢复。
+      var TPL_STATE = {
+        // 每种约束（或）一张表：alternatives[种类][行][音节] = canonical 值或 ""
+        alternatives: [],
+        rhymeScheme: "",
+        rhymeDistinct: false,
+        baseTemplateKey: "",
+        mapping: {},
+        // 转化携带的数据化结构规则（如近体诗平仄骨架/三平尾/孤平）。
+        structuralRules: null,
+        aiBusy: false,
+      };
+
+      function constraintAttributeLabel(attribute) {
+        if (!attribute) return "";
+        var key = "constraint.attributes." + attribute;
+        var label = t(key);
+        return label === key ? attribute : label;
+      }
+
+      function constraintValueLabel(attribute, value) {
+        if (value === undefined || value === null || value === "") return "";
+        var key = "constraint.values." + attribute + "." + value;
+        var label = t(key);
+        return label === key ? value : label;
+      }
+
+      function tplLanguageLabel(lang) {
+        var key = "template_modal.lang_" + lang;
+        var label = t(key);
+        return label === key ? lang : label;
+      }
+
+      function clampTplLines(value) {
+        var n = parseInt(value, 10);
+        if (isNaN(n)) n = 4;
+        return Math.max(1, Math.min(n, 30));
+      }
+
+      function clampKindCount() {
+        var el = document.getElementById("tmpl-kind-count");
+        var n = parseInt(el.value, 10);
+        if (isNaN(n)) n = 1;
+        n = Math.max(1, Math.min(n, 8));
+        el.value = n;
+        return n;
+      }
+
+      function parseSylCountsRaw() {
+        var raw = document.getElementById("tmpl-syl-per-line").value.trim();
+        if (!raw) return [];
+        return raw.split(",").map(function (s) {
+          var n = parseInt(s.trim(), 10);
+          return isNaN(n) || n < 1 ? 7 : n;
+        });
+      }
+
+      function currentSylCounts(lines) {
+        var counts = parseSylCountsRaw();
+        if (!counts.length) counts = [7];
+        while (counts.length < lines) counts.push(counts[counts.length - 1]);
+        return counts.slice(0, lines);
+      }
+
+      function syncSylInput(counts, lines) {
+        document.getElementById("tmpl-syl-per-line").value = counts
+          .slice(0, lines)
+          .join(",");
+      }
+
+      function syncSylCountsToLines(lines) {
+        syncSylInput(currentSylCounts(lines), lines);
+      }
+
+      function normalizeSylInput() {
+        var lines = clampTplLines(document.getElementById("tmpl-lines").value);
+        document.getElementById("tmpl-lines").value = lines;
+        syncSylInput(currentSylCounts(lines), lines);
+      }
+
+      // 按当前输入框的行数/每行音节/约束种类规整状态（保留已有选择、截断多余部分）。
+      function ensureTplState() {
+        var lines = clampTplLines(document.getElementById("tmpl-lines").value);
+        var counts = currentSylCounts(lines);
+        var kinds = clampKindCount();
+        var next = [];
+        for (var k = 0; k < kinds; k++) {
+          var existingTable = TPL_STATE.alternatives[k] || [];
+          var table = [];
+          for (var i = 0; i < lines; i++) {
+            var existingLine = existingTable[i] || [];
+            var row = [];
+            var cnt = counts[i] || 7;
+            for (var j = 0; j < cnt; j++) {
+              row.push(
+                typeof existingLine[j] === "string" ? existingLine[j] : "",
+              );
+            }
+            table.push(row);
+          }
+          next.push(table);
+        }
+        TPL_STATE.alternatives = next;
+        return { lines: lines, counts: counts, kinds: kinds };
+      }
+
+      function buildSylRow(kind, line, count) {
+        var row = document.createElement("div");
+        row.className = "syl-row";
+        var label = document.createElement("span");
+        label.className = "syl-row-label";
+        label.textContent = t("line_label", { n: line + 1 });
+        row.appendChild(label);
+        var scheme = tplScheme(document.getElementById("tmpl-language").value);
+        var optionHtml =
+          '<option value="">' +
+          escapeHtml(t("syllable_constraints.free")) +
+          "</option>";
+        (scheme.values || []).forEach(function (value) {
+          optionHtml +=
+            '<option value="' +
+            escapeHtml(value) +
+            '">' +
+            escapeHtml(constraintValueLabel(scheme.attribute, value)) +
+            "</option>";
+        });
+        for (var pos = 0; pos < count; pos++) {
+          var sel = document.createElement("select");
+          sel.className = "syl-cell";
+          sel.dataset.kind = kind;
+          sel.dataset.line = line;
+          sel.dataset.pos = pos;
+          sel.innerHTML = optionHtml;
+          var current = TPL_STATE.alternatives[kind][line][pos] || "";
+          sel.value = current;
+          if (sel.value !== current) sel.value = "";
+          row.appendChild(sel);
+        }
+        return row;
+      }
+
+      function renderSyllableTables() {
+        var info = ensureTplState();
+        var container = document.getElementById("tmpl-syllable-table");
+        if (!container) return;
+        container.innerHTML = "";
+        for (var k = 0; k < info.kinds; k++) {
+          var group = document.createElement("div");
+          group.className = "syl-kind";
+          var title = document.createElement("div");
+          title.className = "syl-kind-title";
+          title.textContent = t("template_modal.constraint_kind", { n: k + 1 });
+          group.appendChild(title);
+          var table = document.createElement("div");
+          table.className = "syllable-table";
+          for (var i = 0; i < info.lines; i++) {
+            table.appendChild(buildSylRow(k, i, info.counts[i] || 7));
+          }
+          group.appendChild(table);
+          container.appendChild(group);
+        }
+      }
+
+      function handleSylCellChange(e) {
+        var sel = e.target;
+        if (!sel || !sel.classList.contains("syl-cell")) return;
+        var kind = parseInt(sel.dataset.kind, 10);
+        var line = parseInt(sel.dataset.line, 10);
+        var pos = parseInt(sel.dataset.pos, 10);
+        if (isNaN(kind) || isNaN(line) || isNaN(pos)) return;
+        if (!TPL_STATE.alternatives[kind]) return;
+        if (!TPL_STATE.alternatives[kind][line]) return;
+        TPL_STATE.alternatives[kind][line][pos] = sel.value || "";
+      }
+
+      // 状态 -> 后端 constraints/alternatives 的 dict 单元格表。
+      function collectAlternatives() {
+        ensureTplState();
+        var scheme = tplScheme(document.getElementById("tmpl-language").value);
+        return TPL_STATE.alternatives.map(function (table) {
+          return table.map(function (row) {
+            return row.map(function (value) {
+              var attributes = { tone: "", stress: "", length: "" };
+              if (scheme.attribute && value) {
+                attributes[scheme.attribute] = value;
+              }
+              return {
+                onset: "",
+                nucleus: "",
+                coda: "",
+                attributes: attributes,
+              };
+            });
+          });
+        });
+      }
+
+      // ---- 押韵 ----
+
+      function parseRhymeScheme(text, lines) {
+        var compact = String(text || "").replace(/\s+/g, "");
+        var groups = [];
+        for (var i = 0; i < lines; i++) {
+          var ch = i < compact.length ? compact.charAt(i) : "";
+          groups.push(/^[A-Ja-j]$/.test(ch) ? ch.toUpperCase() : "");
+        }
+        return groups;
+      }
+
+      function buildRhymeScheme(groups) {
+        var chunks = [];
+        for (var i = 0; i < groups.length; i += 4) {
+          var part = "";
+          for (var j = i; j < Math.min(i + 4, groups.length); j++) {
+            part += groups[j] || "-";
+          }
+          chunks.push(part);
+        }
+        return chunks.join(" ");
+      }
+
+      function currentRhymeGroups() {
+        var lines = clampTplLines(document.getElementById("tmpl-lines").value);
+        return parseRhymeScheme(TPL_STATE.rhymeScheme, lines);
+      }
+
+      function renderRhymeLines() {
+        var container = document.getElementById("tmpl-rhyme-lines");
+        if (!container) return;
+        var lines = clampTplLines(document.getElementById("tmpl-lines").value);
+        var groups = currentRhymeGroups();
+        var letters = "ABCDEFGHIJ";
+        var optionHtml =
+          '<option value="">' +
+          escapeHtml(t("template_modal.rhyme_none")) +
+          "</option>";
+        for (var i = 0; i < letters.length; i++) {
+          var letter = letters.charAt(i);
+          optionHtml +=
+            '<option value="' + letter + '">' + letter + "</option>";
+        }
+        container.innerHTML = "";
+        for (var line = 0; line < lines; line++) {
+          var row = document.createElement("div");
+          row.className = "rhyme-line-row";
+          var label = document.createElement("span");
+          label.className = "rhyme-line-label";
+          label.textContent = t("line_label", { n: line + 1 });
+          row.appendChild(label);
+          var sel = document.createElement("select");
+          sel.className = "rhyme-line-select";
+          sel.dataset.line = line;
+          sel.innerHTML = optionHtml;
+          sel.value = groups[line] || "";
+          row.appendChild(sel);
+          container.appendChild(row);
+        }
+      }
+
+      function handleRhymeSchemeInput() {
+        TPL_STATE.rhymeScheme =
+          document.getElementById("tmpl-rhyme-scheme").value;
+        renderRhymeLines();
+      }
+
+      function handleRhymeSchemeChange() {
+        var input = document.getElementById("tmpl-rhyme-scheme");
+        var lines = clampTplLines(document.getElementById("tmpl-lines").value);
+        TPL_STATE.rhymeScheme = buildRhymeScheme(
+          parseRhymeScheme(input.value, lines),
+        );
+        input.value = TPL_STATE.rhymeScheme;
+        renderRhymeLines();
+      }
+
+      function handleRhymeLineChange(e) {
+        var sel = e.target;
+        if (!sel || !sel.classList.contains("rhyme-line-select")) return;
+        var line = parseInt(sel.dataset.line, 10);
+        if (isNaN(line)) return;
+        var lines = clampTplLines(document.getElementById("tmpl-lines").value);
+        var groups = parseRhymeScheme(TPL_STATE.rhymeScheme, lines);
+        groups[line] = sel.value || "";
+        TPL_STATE.rhymeScheme = buildRhymeScheme(groups);
+        document.getElementById("tmpl-rhyme-scheme").value =
+          TPL_STATE.rhymeScheme;
+      }
+
+      // ---- 从其它模板转化 ----
+
+      function getBaseTemplate() {
+        if (!TPL_STATE.baseTemplateKey) return null;
+        for (var i = 0; i < TEMPLATES.length; i++) {
+          if (TEMPLATES[i].key === TPL_STATE.baseTemplateKey) {
+            return TEMPLATES[i];
+          }
+        }
+        return null;
+      }
+
+      function sourceConstraintTable(item) {
+        if (!item) return null;
+        var table = item.syllable_constraints;
+        if ((!table || !table.length) && item.syllable_constraint_alternatives) {
+          table = item.syllable_constraint_alternatives[0];
+        }
+        return table && table.length ? table : null;
+      }
+
+      function collectSourceValues(item) {
+        var table = sourceConstraintTable(item);
+        var entries = [];
+        if (!table) return entries;
+        table.forEach(function (line) {
+          (line || []).forEach(function (cell) {
+            var attrs = (cell && cell.attributes) || {};
+            Object.keys(attrs).forEach(function (key) {
+              var value = attrs[key];
+              if (!value) return;
+              var seen = entries.some(function (entry) {
+                return entry.value === value;
+              });
+              if (!seen) entries.push({ value: value, attribute: key });
+            });
+          });
+        });
+        return entries;
+      }
+
+      function renderBaseTemplateOptions() {
+        var select = document.getElementById("tmpl-base-template");
+        if (!select) return;
+        var current = TPL_STATE.baseTemplateKey;
+        select.innerHTML =
+          '<option value="">' +
+          escapeHtml(t("template_modal.convert_none")) +
+          "</option>" +
+          TEMPLATES.map(function (item) {
+            return (
+              '<option value="' +
+              escapeHtml(item.key) +
+              '">' +
+              escapeHtml(item.display_name || item.name) +
+              "</option>"
+            );
+          }).join("");
+        var exists = TEMPLATES.some(function (item) {
+          return item.key === current;
+        });
+        select.value = exists ? current : "";
+        TPL_STATE.baseTemplateKey = select.value;
+        renderConversionPanel();
+      }
+
+      function renderConversionPanel() {
+        var panel = document.getElementById("tmpl-conversion");
+        if (!panel) return;
+        var item = getBaseTemplate();
+        if (!item) {
+          panel.classList.add("hidden");
+          renderConvertReport([], []);
+          return;
+        }
+        panel.classList.remove("hidden");
+        var targetLang = document.getElementById("tmpl-language").value;
+        var targetScheme = tplScheme(targetLang);
+        var mapping = document.getElementById("tmpl-convert-mapping");
+        mapping.innerHTML = "";
+        var title = document.createElement("div");
+        title.className = "convert-mapping-title";
+        title.textContent = t("template_modal.convert_mapping_label", {
+          source: tplLanguageLabel(item.language),
+          target: tplLanguageLabel(targetLang),
+        });
+        mapping.appendChild(title);
+        if (item.rhyme_scheme) {
+          var rhymeInfo = document.createElement("div");
+          rhymeInfo.className = "convert-source-info";
+          rhymeInfo.textContent = t("template_modal.convert_source_rhyme", {
+            scheme: item.rhyme_scheme,
+          });
+          mapping.appendChild(rhymeInfo);
+        }
+        if (item.custom_code) {
+          var codeInfo = document.createElement("div");
+          codeInfo.className = "convert-source-info";
+          codeInfo.textContent = t("template_modal.convert_source_code");
+          mapping.appendChild(codeInfo);
+        }
+        var entries = collectSourceValues(item);
+        if (!entries.length) {
+          TPL_STATE.mapping = {};
+          var empty = document.createElement("div");
+          empty.className = "convert-mapping-empty";
+          empty.textContent = t(
+            "template_modal.convert_no_source_constraints",
+          );
+          mapping.appendChild(empty);
+          appendConvertCopiesHint(mapping);
+          renderSourceConvertReport(item);
+          return;
+        }
+        if (!(targetScheme.values || []).length) {
+          TPL_STATE.mapping = {};
+          var emptyTarget = document.createElement("div");
+          emptyTarget.className = "convert-mapping-empty";
+          emptyTarget.textContent = t("template_modal.convert_no_mapping");
+          mapping.appendChild(emptyTarget);
+          appendConvertCopiesHint(mapping);
+          renderSourceConvertReport(item);
+          return;
+        }
+        entries.forEach(function (entry) {
+          var row = document.createElement("div");
+          row.className = "convert-mapping-row";
+          var sourceLabel = document.createElement("span");
+          sourceLabel.className = "convert-source-label";
+          sourceLabel.textContent = constraintValueLabel(
+            entry.attribute,
+            entry.value,
+          );
+          row.appendChild(sourceLabel);
+          var arrow = document.createElement("span");
+          arrow.className = "convert-arrow";
+          arrow.textContent = "→";
+          row.appendChild(arrow);
+          var select = document.createElement("select");
+          select.className = "tmpl-map-target";
+          select.dataset.source = entry.value;
+          select.innerHTML = (targetScheme.values || [])
+            .map(function (value) {
+              return (
+                '<option value="' +
+                escapeHtml(value) +
+                '">' +
+                escapeHtml(
+                  constraintValueLabel(targetScheme.attribute, value),
+                ) +
+                "</option>"
+              );
+            })
+            .join("");
+          var previous = TPL_STATE.mapping[entry.value];
+          if ((targetScheme.values || []).indexOf(previous) === -1) {
+            previous =
+              targetScheme.values.indexOf(entry.value) >= 0
+                ? entry.value
+                : targetScheme.values[0];
+          }
+          select.value = previous;
+          TPL_STATE.mapping[entry.value] = select.value;
+          row.appendChild(select);
+          mapping.appendChild(row);
+        });
+        appendConvertCopiesHint(mapping);
+        renderSourceConvertReport(item);
+      }
+
+      // 说明转化会一并复制韵式与自定义代码（仅逐位约束按映射转换）。
+      function appendConvertCopiesHint(container) {
+        var hint = document.createElement("div");
+        hint.className = "convert-copies-hint";
+        hint.textContent = t("template_modal.convert_copies");
+        container.appendChild(hint);
+      }
+
+      var CONVERT_CARRIED_KEYS = {
+        constraints: "template_modal.convert_carried_constraints",
+        multiple_kinds: "template_modal.convert_carried_multiple_kinds",
+        rhyme: "template_modal.convert_carried_rhyme",
+        custom_code: "template_modal.convert_carried_custom_code",
+        jinti: "template_modal.convert_carried_jinti",
+        rule_note: "template_modal.convert_carried_rule_note",
+      };
+
+      // 显示“会携带/不会携带哪些规则”，明确转化范围。
+      function renderConvertReport(carried, dropped) {
+        var box = document.getElementById("tmpl-convert-report");
+        if (!box) return;
+        box.innerHTML = "";
+        var hasContent = false;
+        if (carried && carried.length) {
+          var carriedTexts = carried
+            .map(function (code) {
+              var key = CONVERT_CARRIED_KEYS[code];
+              return key ? t(key) : code;
+            })
+            .filter(function (text) {
+              return !!text;
+            });
+          if (carriedTexts.length) {
+            var carriedDiv = document.createElement("div");
+            carriedDiv.className = "convert-report-line convert-report-carried";
+            carriedDiv.textContent =
+              t("template_modal.convert_carried_label") +
+              carriedTexts.join("、");
+            box.appendChild(carriedDiv);
+            hasContent = true;
+          }
+        }
+        if (dropped && dropped.length) {
+          var droppedDiv = document.createElement("div");
+          droppedDiv.className = "convert-report-line convert-report-dropped";
+          droppedDiv.textContent =
+            t("template_modal.convert_dropped_label") + dropped.join("；");
+          box.appendChild(droppedDiv);
+          hasContent = true;
+        }
+        box.classList.toggle("hidden", !hasContent);
+      }
+
+      function renderSourceConvertReport(item) {
+        if (!item) {
+          renderConvertReport([], []);
+          return;
+        }
+        var carried = ["constraints"];
+        var tables = item.syllable_constraint_alternatives;
+        if (Array.isArray(tables) && tables.length > 1) carried.push("multiple_kinds");
+        if (item.rhyme_scheme) carried.push("rhyme");
+        if (item.custom_code) carried.push("custom_code");
+        if (item.structural_rules) carried.push("jinti");
+        if (item.rule_note || item.rule_description) carried.push("rule_note");
+        renderConvertReport(carried, item.special_rules || []);
+      }
+
+      function handleBaseTemplateChange() {
+        TPL_STATE.baseTemplateKey =
+          document.getElementById("tmpl-base-template").value;
+        TPL_STATE.mapping = {};
+        renderConversionPanel();
+      }
+
+      function handleConversionMappingChange(e) {
+        var select = e.target;
+        if (!select || !select.classList.contains("tmpl-map-target")) return;
+        TPL_STATE.mapping[select.dataset.source] = select.value;
+      }
+
+      // 把后端转化接口返回的完整规格回填到表单：
+      // 行数/音节数/约束表/韵式/自定义代码一并落地，约束值取目标语言属性。
+      function applyConvertedSpec(spec) {
+        var lines = clampTplLines(spec.lines || 4);
+        document.getElementById("tmpl-lines").value = lines;
+        var counts = (spec.syllables_per_line || [])
+          .slice(0, lines)
+          .map(function (count) {
+            var n = parseInt(count, 10);
+            return isNaN(n) || n < 1 ? 7 : n;
+          });
+        if (!counts.length) counts = [7];
+        while (counts.length < lines) counts.push(counts[counts.length - 1]);
+        counts = counts.slice(0, lines);
+        document.getElementById("tmpl-syl-per-line").value = counts.join(",");
+
+        var language = document.getElementById("tmpl-language").value;
+        var scheme = tplScheme(language);
+        var rawAlternatives = Array.isArray(spec.alternatives)
+          ? spec.alternatives
+          : [];
+        var valueTables = rawAlternatives.map(function (table) {
+          var rows = [];
+          for (var line = 0; line < lines; line++) {
+            var cells = Array.isArray(table) && Array.isArray(table[line])
+              ? table[line]
+              : [];
+            var values = [];
+            for (var pos = 0; pos < counts[line]; pos++) {
+              var cell = cells[pos] || {};
+              var attrs = cell.attributes || {};
+              var value = scheme.attribute ? attrs[scheme.attribute] || "" : "";
+              if ((scheme.values || []).indexOf(value) === -1) value = "";
+              values.push(value);
+            }
+            rows.push(values);
+          }
+          return rows;
+        });
+        if (!valueTables.length) valueTables = [[]];
+        document.getElementById("tmpl-kind-count").value = valueTables.length;
+        TPL_STATE.alternatives = valueTables;
+
+        var rhymeScheme =
+          typeof spec.rhyme_scheme === "string" ? spec.rhyme_scheme : "";
+        TPL_STATE.rhymeScheme = rhymeScheme.trim()
+          ? buildRhymeScheme(parseRhymeScheme(rhymeScheme, lines))
+          : "";
+        document.getElementById("tmpl-rhyme-scheme").value =
+          TPL_STATE.rhymeScheme;
+        TPL_STATE.rhymeDistinct = !!spec.rhyme_distinct;
+        document.getElementById("tmpl-rhyme-distinct").checked =
+          TPL_STATE.rhymeDistinct;
+
+        if (typeof spec.code === "string" && cmEditor) {
+          cmEditor.setValue(spec.code);
+        }
+        if (typeof spec.rule_note === "string" && spec.rule_note.trim()) {
+          document.getElementById("tmpl-rule-note").value = spec.rule_note;
+        }
+        TPL_STATE.structuralRules =
+          spec.structural_rules && typeof spec.structural_rules === "object"
+            ? spec.structural_rules
+            : null;
+        renderConvertReport(spec.carried_rules || [], spec.dropped_rules || []);
+        var nameInput = document.getElementById("tmpl-name");
+        if (!nameInput.value.trim() && spec.source_name) {
+          nameInput.value =
+            spec.source_name + "-" + tplLanguageLabel(spec.language || language);
+        }
+        renderSyllableTables();
+        renderRhymeLines();
+      }
+
+      // 统一转化接口：把“仅转换逐位约束、其余原样复制”的逻辑交给后端，
+      // 前端只负责提供源模板/目标语言/映射并回填结果。
+      function applyTemplateConversion() {
+        var item = getBaseTemplate();
+        if (!item) return;
+        var button = document.getElementById("btn-apply-convert");
+        if (button) button.disabled = true;
+        fetch("/api/templates/convert", {
+          method: "POST",
+          headers: Object.assign(
+            { "Content-Type": "application/json" },
+            csrfHeaders(),
+          ),
+          body: JSON.stringify({
+            base_template_key: TPL_STATE.baseTemplateKey,
+            language: document.getElementById("tmpl-language").value,
+            mapping: TPL_STATE.mapping,
+          }),
+        })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (resp) {
+            if (!resp || resp.status !== "ok") {
+              showToast(
+                (resp && resp.message) || t("toast.error_default"),
+                "error",
+              );
+              return;
+            }
+            applyConvertedSpec(resp);
+            showToast(t("template_modal.convert_done"), "success");
+          })
+          .catch(function () {
+            showToast(t("toast.error_default"), "error");
+          })
+          .finally(function () {
+            if (button) button.disabled = false;
+          });
+      }
+
+      // ---- 模板 AI 面板 ----
+
+      function setTemplateAiBusy(busy) {
+        TPL_STATE.aiBusy = !!busy;
+        var button = document.getElementById("btn-tmpl-ai-send");
+        if (button) button.disabled = !!busy;
+        var status = document.getElementById("tmpl-ai-status");
+        if (status) {
+          status.textContent = busy ? t("template_modal.ai_running") : "";
+        }
+      }
+
+      function scrollTemplateAiLog() {
+        var log = document.getElementById("tmpl-ai-log");
+        if (log) log.scrollTop = log.scrollHeight;
+      }
+
+      function appendTemplateAiEntry(className, text) {
+        var log = document.getElementById("tmpl-ai-log");
+        if (!log) return null;
+        var entry = document.createElement("div");
+        entry.className = "tmpl-ai-entry " + className;
+        if (text !== undefined && text !== null) entry.textContent = text;
+        log.appendChild(entry);
+        scrollTemplateAiLog();
+        return entry;
+      }
+
+      // 工具参数/结果中的 canonical 约束值与属性名按界面语言本地化显示。
+      function constraintDisplayPairs() {
+        var pairs = [];
+        var meta = TPL_META || TPL_META_DEFAULT;
+        Object.keys(meta).forEach(function (lang) {
+          var scheme = meta[lang] || {};
+          var attribute = scheme.attribute || "";
+          (scheme.values || []).forEach(function (value) {
+            var label = constraintValueLabel(attribute, value);
+            if (label !== value) pairs.push({ value: value, label: label });
+          });
+        });
+        return pairs;
+      }
+
+      function localizeConstraintJson(value) {
+        var text;
+        try {
+          text = JSON.stringify(value, null, 2);
+        } catch (e) {
+          text = String(value);
+        }
+        if (text === undefined || text === null) return "";
+        constraintDisplayPairs().forEach(function (pair) {
+          var pattern = new RegExp(
+            '"' + pair.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + '"',
+            "g",
+          );
+          text = text.replace(pattern, '"' + pair.label + '"');
+        });
+        var meta = TPL_META || TPL_META_DEFAULT;
+        Object.keys(meta).forEach(function (lang) {
+          var attribute = (meta[lang] || {}).attribute || "";
+          if (!attribute) return;
+          var label = constraintAttributeLabel(attribute);
+          if (label === attribute) return;
+          var pattern = new RegExp('"' + attribute + '"(?=\\s*:)', "g");
+          text = text.replace(pattern, '"' + label + '"');
+        });
+        return text;
+      }
+
+      function appendTemplateAiTool(payload) {
+        var entry = appendTemplateAiEntry("tmpl-ai-tool", "");
+        if (!entry) return;
+        var name = document.createElement("div");
+        name.className = "tmpl-ai-tool-name";
+        var strong = document.createElement("strong");
+        strong.textContent = payload.name || "tool";
+        name.appendChild(strong);
+        entry.appendChild(name);
+        var argsLabel = document.createElement("div");
+        argsLabel.className = "tmpl-ai-json-label";
+        argsLabel.textContent = t("template_modal.ai_args");
+        entry.appendChild(argsLabel);
+        var argsPre = document.createElement("pre");
+        argsPre.className = "tmpl-ai-json";
+        argsPre.textContent = localizeConstraintJson(
+          payload.arguments === undefined ? {} : payload.arguments,
+        );
+        entry.appendChild(argsPre);
+        if (payload.result !== undefined && payload.result !== null) {
+          var details = document.createElement("details");
+          details.className = "tmpl-ai-result";
+          var summary = document.createElement("summary");
+          summary.textContent = t("template_modal.ai_result");
+          details.appendChild(summary);
+          var resultPre = document.createElement("pre");
+          resultPre.className = "tmpl-ai-json";
+          resultPre.textContent = localizeConstraintJson(payload.result);
+          details.appendChild(resultPre);
+          entry.appendChild(details);
+        }
+        scrollTemplateAiLog();
+      }
+
+      function handleTemplateAi(payload) {
+        if (!payload || !payload.type) return;
+        var content =
+          payload.content === undefined || payload.content === null
+            ? ""
+            : String(payload.content);
+        if (payload.type === "thinking") {
+          appendTemplateAiEntry(
+            "tmpl-ai-thinking",
+            t("template_modal.ai_thinking") + ": " + content,
+          );
+        } else if (payload.type === "message") {
+          appendTemplateAiEntry(
+            "tmpl-ai-message",
+            t("template_modal.ai_message") + ": " + content,
+          );
+        } else if (payload.type === "tool") {
+          appendTemplateAiTool(payload);
+        } else if (payload.type === "info") {
+          appendTemplateAiEntry("tmpl-ai-info", content);
+        } else if (payload.type === "error") {
+          appendTemplateAiEntry(
+            "tmpl-ai-error",
+            t("template_modal.ai_error") + ": " + content,
+          );
+        }
+      }
+
+      function sendTemplateAi() {
+        if (TPL_STATE.aiBusy) return;
+        var input = document.getElementById("tmpl-ai-input");
+        var prompt = input.value.trim();
+        if (!prompt) {
+          showToast(t("template_modal.ai_empty_prompt"), "warning");
+          return;
+        }
+        var draft = collectDraftForAi();
+        setTemplateAiBusy(true);
+        appendTemplateAiEntry(
+          "tmpl-ai-user",
+          t("template_modal.ai_user") + ": " + prompt,
+        );
+        input.value = "";
+        socket.emit("edit_template", { prompt: prompt, draft: draft });
+      }
+
+      function handleTemplateAiDone(payload) {
+        setTemplateAiBusy(false);
+        payload = payload || {};
+        if (payload.status === "ok") {
+          if (payload.draft) applyDraftToForm(payload.draft);
+          if (payload.created_key) {
+            showToast(
+              payload.message || t("template_modal.ai_created"),
+              "success",
+            );
+            closeTemplateModal();
+            loadTemplates();
+          } else {
+            showToast(t("template_modal.ai_applied"), "success");
+          }
+        } else {
+          var message = payload.message || t("toast.error_default");
+          showToast(message, "error");
+          appendTemplateAiEntry(
+            "tmpl-ai-error",
+            t("template_modal.ai_error") + ": " + message,
+          );
+        }
+      }
+
+      // ---- 草稿收集 / 回填（与后端 edit_template 契约一致） ----
+
+      function collectDraftForAi() {
+        var info = ensureTplState();
+        var lines = info.lines;
+        var rhymeScheme = TPL_STATE.rhymeScheme.trim()
+          ? buildRhymeScheme(parseRhymeScheme(TPL_STATE.rhymeScheme, lines))
+          : "";
+        return {
+          name: document.getElementById("tmpl-name").value.trim(),
+          language: document.getElementById("tmpl-language").value,
+          lines: lines,
+          syllables_per_line: info.counts.slice(0, lines),
+          alternatives: TPL_STATE.alternatives.map(function (table) {
+            return table.map(function (row) {
+              return row.slice();
+            });
+          }),
+          rhyme_scheme: rhymeScheme,
+          rhyme_distinct: !!document.getElementById("tmpl-rhyme-distinct")
+            .checked,
+          code: cmEditor ? cmEditor.getValue() : "",
+          rule_note: document.getElementById("tmpl-rule-note").value,
+          structural_rules: TPL_STATE.structuralRules || null,
+        };
+      }
+
+      function applyDraftToForm(draft) {
+        if (!draft) return;
+        if (typeof draft.name === "string") {
+          document.getElementById("tmpl-name").value = draft.name;
+        }
+
+        var languageSelect = document.getElementById("tmpl-language");
+        if (draft.language) {
+          var hasLanguage = Array.prototype.some.call(
+            languageSelect.options,
+            function (option) {
+              return option.value === draft.language;
+            },
+          );
+          if (hasLanguage) languageSelect.value = draft.language;
+        }
+
+        var lines = clampTplLines(
+          draft.lines || (draft.syllables_per_line || []).length || 4,
+        );
+        document.getElementById("tmpl-lines").value = lines;
+        var counts = (draft.syllables_per_line || [])
+          .slice(0, lines)
+          .map(function (count) {
+            var n = parseInt(count, 10);
+            return isNaN(n) || n < 1 ? 7 : n;
+          });
+        if (!counts.length) counts = [7];
+        while (counts.length < lines) counts.push(counts[counts.length - 1]);
+        counts = counts.slice(0, lines);
+        document.getElementById("tmpl-syl-per-line").value = counts.join(",");
+
+        var scheme = tplScheme(languageSelect.value);
+        var rawAlternatives = Array.isArray(draft.alternatives)
+          ? draft.alternatives
+          : [];
+        var kinds = rawAlternatives.length
+          ? Math.max(1, Math.min(rawAlternatives.length, 8))
+          : 1;
+        document.getElementById("tmpl-kind-count").value = kinds;
+        var alternatives = [];
+        for (var k = 0; k < kinds; k++) {
+          var rawTable = Array.isArray(rawAlternatives[k])
+            ? rawAlternatives[k]
+            : [];
+          var table = [];
+          for (var line = 0; line < lines; line++) {
+            var rawLine = Array.isArray(rawTable[line]) ? rawTable[line] : [];
+            var row = [];
+            for (var pos = 0; pos < counts[line]; pos++) {
+              var value = rawLine[pos];
+              row.push(
+                typeof value === "string" &&
+                  (scheme.values || []).indexOf(value) >= 0
+                  ? value
+                  : "",
+              );
+            }
+            table.push(row);
+          }
+          alternatives.push(table);
+        }
+        TPL_STATE.alternatives = alternatives;
+
+        var rhymeScheme =
+          typeof draft.rhyme_scheme === "string" ? draft.rhyme_scheme : "";
+        TPL_STATE.rhymeScheme =
+          rhymeScheme.trim() === ""
+            ? ""
+            : buildRhymeScheme(parseRhymeScheme(rhymeScheme, lines));
+        document.getElementById("tmpl-rhyme-scheme").value =
+          TPL_STATE.rhymeScheme;
+        TPL_STATE.rhymeDistinct = !!draft.rhyme_distinct;
+        document.getElementById("tmpl-rhyme-distinct").checked =
+          TPL_STATE.rhymeDistinct;
+
+        if (typeof draft.code === "string" && cmEditor) {
+          cmEditor.setValue(draft.code);
+        }
+        if (typeof draft.rule_note === "string") {
+          document.getElementById("tmpl-rule-note").value = draft.rule_note;
+        }
+        TPL_STATE.structuralRules =
+          draft.structural_rules && typeof draft.structural_rules === "object"
+            ? draft.structural_rules
+            : null;
+        renderSyllableTables();
+        renderRhymeLines();
+      }
+
+      function handleTplLanguageChange() {
+        // 切换语言后 canonical 值集合改变，清空已选约束（保持原有行为）。
+        TPL_STATE.alternatives = [];
+        TPL_STATE.mapping = {};
+        TPL_STATE.structuralRules = null;
+        renderConversionPanel();
+        refreshTplEditor();
+      }
+
       function openTemplateModal() {
         document.getElementById("template-modal").classList.remove("hidden");
+        renderBaseTemplateOptions();
+        if (!TEMPLATES.length) {
+          fetch("/api/templates")
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (list) {
+              TEMPLATES = list;
+              renderBaseTemplateOptions();
+            });
+        }
         if (!TPL_META) {
           fetch("/api/templates/meta")
             .then(function (r) {
@@ -1427,9 +2617,11 @@
             .then(function (d) {
               TPL_META = d;
               refreshTplEditor();
+              renderConversionPanel();
             });
         }
         refreshTplEditor();
+        renderConversionPanel();
       }
 
       function closeTemplateModal() {
@@ -1438,7 +2630,6 @@
 
       function refreshTplEditor() {
         const lang = document.getElementById("tmpl-language").value;
-        rebuildSyllableTable();
         if (!cmEditor) {
           cmEditor = CodeMirror(document.getElementById("tmpl-code"), {
             value: "",
@@ -1454,56 +2645,11 @@
           cmEditor.setOption("placeholder", templateCodeHint(lang));
           cmEditor.setValue("");
         }
+        renderSyllableTables();
+        renderRhymeLines();
         setTimeout(function () {
           cmEditor.refresh();
         }, 50);
-      }
-
-      function rebuildSyllableTable() {
-        const lines =
-          parseInt(document.getElementById("tmpl-lines").value) || 4;
-        const raw = document.getElementById("tmpl-syl-per-line").value.trim();
-        const sylCounts = raw
-          ? raw.split(",").map(function (s) {
-              return parseInt(s.trim()) || 7;
-            })
-          : [];
-        while (sylCounts.length < lines)
-          sylCounts.push(
-            sylCounts.length > 0 ? sylCounts[sylCounts.length - 1] : 7,
-          );
-        document.getElementById("tmpl-syl-per-line").value = sylCounts
-          .slice(0, lines)
-          .join(",");
-
-        const lang = document.getElementById("tmpl-language").value;
-        const scheme = tplScheme(lang);
-        const freeLabel = t("syllable_constraints.free");
-        const table = document.getElementById("tmpl-syllable-table");
-        table.innerHTML = "";
-
-        for (let i = 0; i < lines; i++) {
-          const row = document.createElement("div");
-          row.className = "syl-row";
-          const label = document.createElement("span");
-          label.className = "syl-row-label";
-          label.textContent = t("line_label", { n: i + 1 });
-          row.appendChild(label);
-          const cnt = sylCounts[i] || 7;
-          for (let j = 0; j < cnt; j++) {
-            const sel = document.createElement("select");
-            sel.className = "syl-cell";
-            sel.dataset.line = i;
-            sel.dataset.pos = j;
-            let html = '<option value="">' + freeLabel + "</option>";
-            (scheme.values || []).forEach(function (v) {
-              html += '<option value="' + v + '">' + v + "</option>";
-            });
-            sel.innerHTML = html;
-            row.appendChild(sel);
-          }
-          table.appendChild(row);
-        }
       }
 
       function createTemplate() {
@@ -1513,42 +2659,22 @@
           return;
         }
         const language = document.getElementById("tmpl-language").value;
-        const lines =
-          parseInt(document.getElementById("tmpl-lines").value) || 4;
-        const raw = document.getElementById("tmpl-syl-per-line").value.trim();
-        const sylCounts = raw
-          ? raw.split(",").map(function (s) {
-              return parseInt(s.trim()) || 7;
-            })
-          : [];
-        while (sylCounts.length < lines) sylCounts.push(7);
+        const info = ensureTplState();
+        const lines = info.lines;
+        const syllables_per_line = info.counts.slice(0, lines);
+        const alternatives = collectAlternatives();
+        const constraints = alternatives[0] || [];
         const code = cmEditor ? cmEditor.getValue() : "";
 
-        const syllables_per_line = sylCounts.slice(0, lines);
-        const scheme = tplScheme(language);
-        const constraints = [];
-        for (let i = 0; i < lines; i++) {
-          const lineConstraints = [];
-          const cnt = syllables_per_line[i];
-          const cells = document.querySelectorAll(
-            '.syl-cell[data-line="' + i + '"]',
-          );
-          let j = 0;
-          cells.forEach(function (sel) {
-            if (j >= cnt) return;
-            const attributes = { tone: "", stress: "", length: "" };
-            const val = sel.value || "";
-            if (scheme.attribute && val) attributes[scheme.attribute] = val;
-            lineConstraints.push({
-              onset: "",
-              nucleus: "",
-              coda: "",
-              attributes: attributes,
-            });
-            j++;
-          });
-          constraints.push(lineConstraints);
-        }
+        const rhymeRaw = document
+          .getElementById("tmpl-rhyme-scheme")
+          .value.trim();
+        const rhyme_scheme = rhymeRaw
+          ? buildRhymeScheme(parseRhymeScheme(rhymeRaw, lines))
+          : "";
+        const rhyme_distinct = document.getElementById(
+          "tmpl-rhyme-distinct",
+        ).checked;
 
         fetch("/api/templates/custom", {
           method: "POST",
@@ -1562,7 +2688,14 @@
             lines: lines,
             syllables_per_line: syllables_per_line,
             constraints: constraints,
+            alternatives: alternatives,
+            rhyme_scheme: rhyme_scheme,
+            rhyme_distinct: rhyme_distinct,
             code: code,
+            rule_note: document
+              .getElementById("tmpl-rule-note")
+              .value.trim(),
+            structural_rules: TPL_STATE.structuralRules || null,
           }),
         })
           .then(function (r) {
