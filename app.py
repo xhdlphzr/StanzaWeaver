@@ -49,6 +49,9 @@ register_italian_templates()
 register_french_templates()
 register_latin_templates()
 
+#: 内置模板的默认显示顺序（注册顺序；用于“重置模板顺序”）。
+_DEFAULT_BUILTIN_ORDER: list[str] = [item["key"] for item in list_dicts()]
+
 _vocab_importing = True
 
 
@@ -310,6 +313,30 @@ def _save_template_order(keys: list[str]) -> None:
     )
 
 
+def _default_template_order() -> list[str]:
+    """计算“重置为默认”后的模板顺序.
+
+    内置模板按注册默认顺序排列；自定义模板保持当前相对顺序并追加在内置
+    模板之后；其余模板保持当前顺序追加在最后。
+
+    Returns:
+        按默认规则排列的完整 key 顺序。
+    """
+    current = [item["key"] for item in list_dicts()]
+    current_set = set(current)
+    builtins = [key for key in _DEFAULT_BUILTIN_ORDER if key in current_set]
+    builtin_set = set(builtins)
+    customs = [
+        key for key in current if key.startswith("custom_") and key not in builtin_set
+    ]
+    extras = [
+        key
+        for key in current
+        if key not in builtin_set and not key.startswith("custom_")
+    ]
+    return builtins + customs + extras
+
+
 def _apply_saved_template_order() -> None:
     """启动时应用已保存的模板顺序（测试环境跳过，避免外部数据影响测试）."""
     if os.environ.get("STANZA_WEAVER_TEST") == "1":
@@ -484,6 +511,32 @@ def api_reorder_templates() -> Any:
         return jsonify({"status": "error", "message": f"保存模板顺序失败: {e}"}), 500
     socketio.emit("templates_updated", {"count": len(list_dicts())})
     logger.info("模板顺序已更新: %d 个模板", len(ordered))
+    return jsonify({"status": "ok", "order": ordered})
+
+
+@app.route("/api/templates/order/reset", methods=["POST"])
+def api_reset_template_order() -> Any:
+    """把模板顺序重置为默认顺序.
+
+    内置模板恢复默认顺序，自定义模板保持相对顺序并排在内置模板之后。
+
+    Returns:
+        JSON Response：成功时返回重置后的 key 顺序。
+
+    Raises:
+        403: CSRF 令牌校验失败。
+        500: 顺序文件写入失败。
+
+    """
+    if not _require_csrf():
+        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+    ordered = set_order(_default_template_order())
+    try:
+        _save_template_order(ordered)
+    except OSError as e:
+        return jsonify({"status": "error", "message": f"保存模板顺序失败: {e}"}), 500
+    socketio.emit("templates_updated", {"count": len(list_dicts())})
+    logger.info("模板顺序已重置为默认: %d 个模板", len(ordered))
     return jsonify({"status": "ok", "order": ordered})
 
 

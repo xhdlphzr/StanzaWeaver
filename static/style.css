@@ -1771,7 +1771,12 @@ html[lang="en"] .slogan {
   background: rgba(255, 255, 255, 0.5);
   cursor: grab;
   user-select: none;
-  transition: all 0.2s;
+  will-change: transform;
+  transition:
+    transform 0.18s ease,
+    border-color 0.2s,
+    background 0.2s,
+    opacity 0.2s;
 }
 
 .template-manage-item:hover {
@@ -1783,6 +1788,7 @@ html[lang="en"] .slogan {
   opacity: 0.45;
   border-style: dashed;
   cursor: grabbing;
+  transition: none;
 }
 
 .template-manage-handle {
