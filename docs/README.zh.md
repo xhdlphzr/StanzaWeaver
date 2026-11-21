@@ -202,7 +202,7 @@ flowchart TD
 - **依赖**：直接用项目完整依赖（由 [uv](https://docs.astral.sh/uv/) 依据 `pyproject.toml` 声明、`uv.lock` 锁定；含桌面 GUI 与嵌入重排组件，功能与本地一致）；Linux 镜像会同时包含这些依赖，镜像较大、首次构建较慢，但构建一次后可复用。
 - **数据持久化**：配置、词库、历史记录、日志通过 volume `stanzaweaver-data` 持久化到容器内 `~/.stanza_weaver`。
 - **安全设计**：应用仅接受 `localhost`/`127.0.0.1` 的 Host 头（`app.py` 的 `_guard_local_access`），Docker 部署需通过 `http://localhost:5000` 访问；Linux 下也可改用 `network_mode: host`（见 `docker-compose.yml` 注释）。
-- **自定义模板**：通过 UI 创建的自定义模板写入容器内 `/app/src/templates/`，容器重建后需重新创建（源码未挂载）。
+- **自定义模板**：镜像设置了 `STANZAWEAVER_TEMPLATES_DIR=/home/stanzaweaver/.stanza_weaver/templates`，通过 UI 创建的模板（含约束表、韵式、规则描述与自定义代码）会存到 `stanzaweaver-data` 卷中，容器重建后仍然保留；不挂载该卷则会随容器丢失。
 - **日志**：容器内日志文件位于 `~/.stanza_weaver/logs/stanza.log`（随 volume 持久化），`STANZAWEAVER_LOG_DIR` 可重定向；`docker compose logs` 可看标准输出。
 
 ---
@@ -318,6 +318,7 @@ StanzaWeaver/
 | 规则描述 | 一段自由文本，随模板保存，生成时与符号约束一起注入写作 AI 的 prompt——用于表达用词、对仗、意象结构、翻译要求等无法数值化的规则；转化时会复用源模板的描述，之后仍可自行修改。 |
 | 自定义校验代码 | 可选 Python 代码，追加到 `validate_full` 中做整体规则校验。 |
 | 模板 AI | 第三个可独立配置的 LLM 端点；通过工具修改与界面上完全相同的字段，并实时显示其思考、回答与每次工具调用（名称 + 参数 + 结果）。 |
+| 模板存放位置 | 源码运行：`src/templates/custom_*.py`；PyInstaller 编译版：`~/.stanza_weaver/templates/custom_*.py`，目录可写且升级不丢失；旧版编译版在安装目录 `_internal/src/templates` 下的模板会自动迁移。可用 `STANZAWEAVER_TEMPLATES_DIR` 覆盖目录。 |
 
 ### 跨语言模板转化
 

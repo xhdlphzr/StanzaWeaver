@@ -202,7 +202,7 @@ Notes:
 - **Dependencies** – Uses the full project dependencies declared in `pyproject.toml` and locked by `uv.lock` (managed with [uv](https://docs.astral.sh/uv/); includes desktop GUI and embedded reranking components, same functionality as local). The Linux image includes all these dependencies, so the image is large and initial build is slow, but can be reused after the first build.
 - **Data Persistence** – Configuration, lexicon, history, and logs are persisted via the `stanzaweaver-data` volume, mounted to `~/.stanza_weaver` inside the container.
 - **Security** – The application only accepts `localhost`/`127.0.0.1` Host headers (via `app.py`’s `_guard_local_access`). Docker deployment must access via `http://localhost:5000`; on Linux you can also use `network_mode: host` (see comments in `docker-compose.yml`).
-- **Custom Templates** – Templates created via the UI (including their constraint tables, rhyme scheme, rule description and custom code) are written to `/app/src/templates/` inside the container; they will be lost when the container is rebuilt (source is not mounted). To persist them, you would need to mount the directory.
+- **Custom Templates** – The image sets `STANZAWEAVER_TEMPLATES_DIR=/home/stanzaweaver/.stanza_weaver/templates`, so templates created via the UI (including constraint tables, rhyme scheme, rule description and custom code) are stored in the `stanzaweaver-data` volume and persist across container rebuilds; without the volume they are lost with the container.
 - **Logs** – Container log files are located at `~/.stanza_weaver/logs/stanza.log` (persisted via the volume); you can override with `STANZAWEAVER_LOG_DIR`. `docker compose logs` shows standard output.
 
 ---
@@ -318,6 +318,7 @@ The “+ Custom” dialog builds a complete template without writing Python by h
 | Rule description | A free‑form text stored with the template and injected into the Writer AI prompt together with the symbolic constraints — use it for diction, parallelism, imagery structure, translation requirements, etc. It is reused by conversion and can be edited afterwards. |
 | Custom validation code | Optional Python appended to `validate_full` for whole‑form rules. |
 | AI template editor | A third configurable LLM endpoint (“Template AI”). It edits exactly the same fields through tools and streams its thinking, answers and every tool call (name + arguments + result) into the dialog. |
+| Where templates are stored | Running from source: `src/templates/custom_*.py`. Packaged (PyInstaller) builds: `~/.stanza_weaver/templates/custom_*.py`, so templates are writable and survive app upgrades; templates created by older builds under `_internal/src/templates` are migrated automatically. Override the directory with `STANZAWEAVER_TEMPLATES_DIR`. |
 
 ### Cross‑Language Template Conversion
 
