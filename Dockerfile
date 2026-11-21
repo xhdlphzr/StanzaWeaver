@@ -27,6 +27,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_LINK_MODE=copy \
     STANZAWEAVER_HOST=127.0.0.1 \
     STANZAWEAVER_PORT=5000 \
+    STANZAWEAVER_TEMPLATES_DIR=/home/stanzaweaver/.stanza_weaver/templates \
     PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app

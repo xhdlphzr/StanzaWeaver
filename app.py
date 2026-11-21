@@ -9,9 +9,12 @@
 - 首次运行自动导入词库（后台线程）。
 """
 
+import importlib.util
 import json
 import os
 import secrets
+import shutil
+import sys
 import threading
 import time
 from pathlib import Path
@@ -133,21 +136,127 @@ _llm_status: dict[str, str] = {
 _llm_ping_event = threading.Event()
 
 
-def _register_custom_templates() -> None:
-    """注册 src/templates/custom_*.py 中的自定义模板（重启自动恢复）."""
-    import importlib
+#: 环境变量：覆盖自定义模板目录（Docker/便携部署可指向持久化目录）。
+_CUSTOM_TEMPLATES_DIR_ENV = "STANZAWEAVER_TEMPLATES_DIR"
 
-    tpl_dir = Path(__file__).parent / "src" / "templates"
-    if not tpl_dir.exists():
+
+def _custom_templates_dir() -> Path:
+    """返回自定义模板文件所在目录.
+
+    源码运行时使用仓库内的 ``src/templates``（开发方便）；PyInstaller 编译版
+    的程序目录通常不可写、且升级会整体替换，因此改用用户数据目录
+    ``~/.stanza_weaver/templates``。可用 ``STANZAWEAVER_TEMPLATES_DIR`` 覆盖。
+
+    Returns:
+        自定义模板目录路径（不保证已存在）。
+
+    """
+    override = os.environ.get(_CUSTOM_TEMPLATES_DIR_ENV, "").strip()
+    if override:
+        return Path(override)
+    if getattr(sys, "frozen", False):
+        return Path.home() / ".stanza_weaver" / "templates"
+    return Path(__file__).parent / "src" / "templates"
+
+
+def _legacy_custom_templates_dir() -> Path | None:
+    """返回编译版旧版本的自定义模板目录（安装目录内，用于兼容/迁移）.
+
+    Returns:
+        旧目录路径；源码模式或与新目录相同时返回 None。
+
+    """
+    if not getattr(sys, "frozen", False):
+        return None
+    legacy = Path(__file__).parent / "src" / "templates"
+    try:
+        if legacy.resolve() == _custom_templates_dir().resolve():
+            return None
+    except OSError:
+        pass
+    return legacy
+
+
+def _migrate_legacy_custom_templates(primary: Path, legacy: Path | None) -> None:
+    """把旧版本安装目录内的自定义模板复制到新目录（已存在则跳过）.
+
+    Args:
+        primary: 新的自定义模板目录。
+        legacy: 旧模板目录（可为 None）。
+
+    """
+    if legacy is None or not legacy.exists():
         return
-    for f in sorted(tpl_dir.glob("custom_*.py")):
+    try:
+        primary.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        logger.warning("[StanzaWeaver] 自定义模板目录创建失败 %s: %s", primary, e)
+        return
+    for f in sorted(legacy.glob("custom_*.py")):
+        dest = primary / f.name
+        if dest.exists():
+            continue
         try:
-            module = importlib.import_module(f"src.templates.{f.stem}")
-            for attr in dir(module):
-                if attr.startswith("register_custom_"):
-                    getattr(module, attr)()
-        except Exception as e:  # noqa: BLE001 - 自定义模板可含任意用户代码，注册失败仅记录
-            logger.error("[StanzaWeaver] 自定义模板注册失败 %s: %s", f.name, e)
+            shutil.copy2(f, dest)
+            logger.info("[StanzaWeaver] 已迁移自定义模板 %s -> %s", f.name, primary)
+        except OSError as e:
+            logger.warning("[StanzaWeaver] 自定义模板迁移失败 %s: %s", f.name, e)
+
+
+def _load_custom_template_module(file_path: Path) -> Any:
+    """从文件加载自定义模板模块（支持编译版的用户数据目录）.
+
+    生成的模板通过相对导入复用 ``src.templates`` 包内的基类与语言模块，
+    因此模块名固定为 ``src.templates.<文件名>``，与模块所在目录无关。
+
+    Args:
+        file_path: 模板源码文件路径。
+
+    Returns:
+        已执行的模块对象。
+
+    Raises:
+        ImportError: 无法为文件创建有效的模块规格。
+
+    """
+    module_name = f"src.templates.{file_path.stem}"
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"无法加载模板模块: {file_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except BaseException:
+        sys.modules.pop(module_name, None)
+        raise
+    return module
+
+
+def _register_custom_templates() -> None:
+    """注册自定义模板（重启自动恢复）.
+
+    源码模式读取 ``src/templates``；编译版读取用户数据目录，并兼容迁移
+    旧版安装目录（``_internal/src/templates``）内的模板。旧目录先加载、
+    新目录后加载，同名模板以用户目录版本为准。
+    """
+    primary = _custom_templates_dir()
+    legacy = _legacy_custom_templates_dir()
+    _migrate_legacy_custom_templates(primary, legacy)
+    directories: list[Path] = []
+    if legacy is not None and legacy.exists():
+        directories.append(legacy)
+    if primary.exists():
+        directories.append(primary)
+    for tpl_dir in directories:
+        for f in sorted(tpl_dir.glob("custom_*.py")):
+            try:
+                module = _load_custom_template_module(f)
+                for attr in dir(module):
+                    if attr.startswith("register_custom_"):
+                        getattr(module, attr)()
+            except Exception as e:  # noqa: BLE001 - 自定义模板可含任意用户代码，注册失败仅记录
+                logger.error("[StanzaWeaver] 自定义模板注册失败 %s: %s", f.name, e)
 
 
 _register_custom_templates()
@@ -837,9 +946,7 @@ def _create_custom_template(
         (HTTP 状态码, 响应载荷)；成功载荷含模板 key。
 
     """
-    import importlib
     import re
-    from pathlib import Path
 
     safe_name = re.sub(r"\W+", "_", name).strip("_")
     if not safe_name:
@@ -860,7 +967,7 @@ def _create_custom_template(
 
     class_name = f"Custom{safe_name.title().replace('_', '')}Template"
     file_key = f"custom_{safe_name}"
-    file_path = Path(__file__).parent / "src" / "templates" / f"{file_key}.py"
+    file_path = _custom_templates_dir() / f"{file_key}.py"
 
     dimension, _value_options = custom_template_schemes().get(language, ("", ()))
     code_body = _build_custom_template_code(
@@ -887,7 +994,7 @@ def _create_custom_template(
         return 500, {"status": "error", "message": f"模板文件写入失败: {e}"}
 
     try:
-        module = importlib.import_module(f"src.templates.{file_key}")
+        module = _load_custom_template_module(file_path)
         reg_func = getattr(module, f"register_custom_{safe_name}", None)
         if reg_func:
             reg_func()

@@ -6,7 +6,6 @@
 全部使用桩 LLM 与临时写盘，避免真实网络请求与污染仓库。
 """
 
-import importlib
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -189,18 +188,14 @@ def _patch_write(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _patch_register(monkeypatch: pytest.MonkeyPatch, calls: list[str]) -> None:
-    """把模板模块导入替换为返回带注册函数的命名空间."""
-    monkeypatch.setattr(
-        importlib,
-        "import_module",
-        lambda name: SimpleNamespace(
-            **{
-                name.rsplit(".", 1)[-1].replace("custom_", "register_custom_"): (
-                    lambda: calls.append(name)
-                )
-            }
-        ),
-    )
+    """把模板模块加载替换为返回带注册函数的命名空间."""
+
+    def _fake_load(file_path: Path) -> Any:
+        name = f"src.templates.{file_path.stem}"
+        register_name = file_path.stem.replace("custom_", "register_custom_")
+        return SimpleNamespace(**{register_name: lambda: calls.append(name)})
+
+    monkeypatch.setattr(app_module, "_load_custom_template_module", _fake_load)
 
 
 def test_create_custom_template_success(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -277,9 +272,9 @@ def test_create_custom_template_register_error(
     """注册失败返回 500."""
     _patch_write(monkeypatch)
     monkeypatch.setattr(
-        importlib,
-        "import_module",
-        lambda name: (_ for _ in ()).throw(ImportError("boom")),
+        app_module,
+        "_load_custom_template_module",
+        lambda file_path: (_ for _ in ()).throw(ImportError("boom")),
     )
     status, payload = app_module._create_custom_template(
         name="注册失败",

@@ -247,37 +247,272 @@ def test_register_custom_templates_dir_missing(monkeypatch: pytest.MonkeyPatch) 
 def test_register_custom_templates_import_error(
     monkeypatch: pytest.MonkeyPatch, caplog: Any
 ) -> None:
-    """自定义模板导入失败仅记录日志."""
-    import importlib
-
+    """自定义模板加载失败仅记录日志."""
     fake = Path("src/templates/custom_nope.py")
     monkeypatch.setattr(Path, "glob", lambda self, pat: iter([fake]))
     monkeypatch.setattr(
-        importlib,
-        "import_module",
-        lambda name: (_ for _ in ()).throw(ImportError("boom")),
+        app_module,
+        "_load_custom_template_module",
+        lambda file_path: (_ for _ in ()).throw(ImportError("boom")),
     )
     with caplog.at_level("ERROR"):
         app_module._register_custom_templates()
     assert "自定义模板注册失败" in caplog.text
 
 
-def test_register_custom_templates_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    """自定义模板成功导入并执行注册函数."""
-    import importlib
+def test_custom_templates_dir_source_override_and_legacy(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """源码模式使用 src/templates；环境变量可覆盖；源码模式无旧目录."""
+    monkeypatch.delenv("STANZAWEAVER_TEMPLATES_DIR", raising=False)
+    assert (
+        app_module._custom_templates_dir()
+        == Path(app_module.__file__).parent / "src" / "templates"
+    )
+    override = tmp_path / "override"
+    monkeypatch.setenv("STANZAWEAVER_TEMPLATES_DIR", str(override))
+    assert app_module._custom_templates_dir() == override
+    assert app_module._legacy_custom_templates_dir() is None
 
+
+def test_custom_templates_dir_frozen(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """编译版使用用户数据目录，旧目录为安装目录；二者相同时返回 None."""
+    monkeypatch.delenv("STANZAWEAVER_TEMPLATES_DIR", raising=False)
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(app_module, "__file__", str(tmp_path / "app" / "app.py"))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    assert (
+        app_module._custom_templates_dir()
+        == tmp_path / "home" / ".stanza_weaver" / "templates"
+    )
+    assert (
+        app_module._legacy_custom_templates_dir()
+        == tmp_path / "app" / "src" / "templates"
+    )
+    monkeypatch.setenv(
+        "STANZAWEAVER_TEMPLATES_DIR", str(tmp_path / "app" / "src" / "templates")
+    )
+    assert app_module._legacy_custom_templates_dir() is None
+
+
+def test_legacy_custom_templates_dir_resolve_oserror(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """解析路径失败时仍返回旧目录（覆盖 OSError 兜底）."""
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(app_module, "__file__", str(tmp_path / "app" / "app.py"))
+    monkeypatch.setattr(
+        Path, "resolve", lambda self: (_ for _ in ()).throw(OSError("x"))
+    )
+    assert app_module._legacy_custom_templates_dir() == (
+        tmp_path / "app" / "src" / "templates"
+    )
+
+
+def test_migrate_legacy_custom_templates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """旧目录模板复制到新目录：跳过已存在/缺失/失败场景."""
+    legacy = tmp_path / "legacy"
+    legacy.mkdir()
+    (legacy / "custom_a.py").write_text("A", encoding="utf-8")
+    primary = tmp_path / "primary"
+    app_module._migrate_legacy_custom_templates(primary, legacy)
+    assert (primary / "custom_a.py").read_text(encoding="utf-8") == "A"
+
+    (primary / "custom_a.py").write_text("NEW", encoding="utf-8")
+    app_module._migrate_legacy_custom_templates(primary, legacy)
+    assert (primary / "custom_a.py").read_text(encoding="utf-8") == "NEW"
+
+    app_module._migrate_legacy_custom_templates(primary, None)
+    app_module._migrate_legacy_custom_templates(primary, tmp_path / "missing")
+
+    monkeypatch.setattr(
+        Path, "mkdir", lambda self, *a, **k: (_ for _ in ()).throw(OSError("ro"))
+    )
+    app_module._migrate_legacy_custom_templates(tmp_path / "cannot", legacy)
+
+    monkeypatch.setattr(Path, "mkdir", lambda self, *a, **k: None)
+    monkeypatch.setattr(
+        "shutil.copy2",
+        lambda *a, **k: (_ for _ in ()).throw(OSError("copy")),
+    )
+    app_module._migrate_legacy_custom_templates(tmp_path / "copyfail", legacy)
+    assert not (tmp_path / "copyfail" / "custom_a.py").exists()
+
+
+def test_load_custom_template_module(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """从任意目录加载模板模块；执行失败清理 sys.modules."""
+    good = tmp_path / "good_mod.py"
+    good.write_text("VALUE = 7\n", encoding="utf-8")
+    module = app_module._load_custom_template_module(good)
+    assert module.VALUE == 7
+    assert "src.templates.good_mod" in sys.modules
+
+    bad = tmp_path / "bad_mod.py"
+    bad.write_text("raise RuntimeError('boom')\n", encoding="utf-8")
+    with pytest.raises(RuntimeError):
+        app_module._load_custom_template_module(bad)
+    assert "src.templates.bad_mod" not in sys.modules
+
+    monkeypatch.setattr(
+        "importlib.util.spec_from_file_location",
+        lambda *a, **k: None,
+    )
+    with pytest.raises(ImportError):
+        app_module._load_custom_template_module(good)
+    monkeypatch.setattr(
+        "importlib.util.spec_from_file_location",
+        lambda *a, **k: SimpleNamespace(loader=None),
+    )
+    with pytest.raises(ImportError):
+        app_module._load_custom_template_module(good)
+
+
+def _write_custom_module(path: Path, display_name: str) -> None:
+    """写一个最小可注册的自定义模板模块."""
+    path.write_text(
+        "from src.templates import PoetryTemplate, register\n\n"
+        "class T(PoetryTemplate):\n"
+        f"    name = {display_name!r}\n"
+        '    language = "zh"\n'
+        "    lines = 1\n"
+        "    syllables_per_line = [1]\n\n"
+        "def register_custom_testmod():\n"
+        '    register("custom_testmod", T())\n',
+        encoding="utf-8",
+    )
+
+
+def test_register_custom_templates_from_user_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """编译版从用户数据目录加载自定义模板."""
+    from src.templates import _registry
+
+    user_dir = tmp_path / "user_templates"
+    user_dir.mkdir()
+    _write_custom_module(user_dir / "custom_testmod.py", "用户目录模板")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(app_module, "__file__", str(tmp_path / "app" / "app.py"))
+    monkeypatch.setenv("STANZAWEAVER_TEMPLATES_DIR", str(user_dir))
+    try:
+        app_module._register_custom_templates()
+        assert _registry["custom_testmod"].name == "用户目录模板"
+    finally:
+        _registry.pop("custom_testmod", None)
+
+
+def test_register_custom_templates_migrates_legacy(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """编译版旧安装目录的模板迁移到用户目录并注册；用户目录版本优先."""
+    from src.templates import _registry
+
+    app_dir = tmp_path / "app"
+    legacy = app_dir / "src" / "templates"
+    legacy.mkdir(parents=True)
+    _write_custom_module(legacy / "custom_testmod.py", "旧版模板")
+    user_dir = tmp_path / "user_templates"
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(app_module, "__file__", str(app_dir / "app.py"))
+    monkeypatch.setenv("STANZAWEAVER_TEMPLATES_DIR", str(user_dir))
+    try:
+        app_module._register_custom_templates()
+        assert (user_dir / "custom_testmod.py").exists()
+        assert _registry["custom_testmod"].name == "旧版模板"
+
+        # 用户目录中的同名模板优先于旧目录
+        user_dir.mkdir(exist_ok=True)
+        _write_custom_module(user_dir / "custom_testmod.py", "用户新版模板")
+        app_module._register_custom_templates()
+        assert _registry["custom_testmod"].name == "用户新版模板"
+    finally:
+        _registry.pop("custom_testmod", None)
+
+
+def test_create_custom_template_in_user_dir_loads_generated_module(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """编译版目录下的生成模板可被加载（验证相对导入仍指向 src.templates）."""
+    from src.templates import _registry
+
+    templates_dir = tmp_path / "user_templates"
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setenv("STANZAWEAVER_TEMPLATES_DIR", str(templates_dir))
+    cell = {
+        "onset": "",
+        "nucleus": "",
+        "coda": "",
+        "attributes": {"tone": "", "stress": "", "length": ""},
+    }
+    try:
+        status, _payload = app_module._create_custom_template(
+            name="相对导入模板",
+            language="zh",
+            lines=1,
+            syllables_per_line=[2],
+            alternatives=[[[cell, cell]]],
+            custom_code="",
+        )
+        assert status == 200
+        assert (templates_dir / "custom_相对导入模板.py").exists()
+        template = _registry["custom_相对导入模板"]
+        assert template.name == "相对导入模板"
+        assert template.language == "zh"
+    finally:
+        _registry.pop("custom_相对导入模板", None)
+
+
+def test_create_custom_template_writes_user_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """编译版创建模板时写入用户数据目录."""
+    templates_dir = tmp_path / "user_templates"
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setenv("STANZAWEAVER_TEMPLATES_DIR", str(templates_dir))
+    written: list[Path] = []
+    monkeypatch.setattr(
+        Path, "write_text", lambda self, data, **k: written.append(self)
+    )
+    loaded: list[Path] = []
+
+    def _fake_load(file_path: Path) -> Any:
+        loaded.append(file_path)
+        return SimpleNamespace(register_custom_ok=lambda: None)
+
+    monkeypatch.setattr(app_module, "_load_custom_template_module", _fake_load)
+    status, _payload = app_module._create_custom_template(
+        name="用户目录新模板",
+        language="zh",
+        lines=1,
+        syllables_per_line=[1],
+        alternatives=[[]],
+        custom_code="",
+    )
+    assert status == 200
+    assert written == [templates_dir / "custom_用户目录新模板.py"]
+    assert loaded == written
+
+
+def test_register_custom_templates_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    """自定义模板成功加载并执行注册函数."""
     calls: list[str] = []
     fake = Path("src/templates/custom_hit.py")
 
-    def _fake_import(name: str) -> Any:
+    def _fake_load(file_path: Path) -> Any:
         mod = SimpleNamespace()
-        mod.register_custom_hit = lambda: calls.append(name)
+        mod.register_custom_hit = lambda: calls.append(file_path.as_posix())
         return mod
 
     monkeypatch.setattr(Path, "glob", lambda self, pat: iter([fake]))
-    monkeypatch.setattr(importlib, "import_module", _fake_import)
+    monkeypatch.setattr(app_module, "_load_custom_template_module", _fake_load)
     app_module._register_custom_templates()
-    assert calls == ["src.templates.custom_hit"]
+    assert calls == ["src/templates/custom_hit.py"]
 
 
 # --------------------------------------------------------------------------- #
@@ -565,13 +800,11 @@ def test_custom_template_registration_error(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """注册失败返回 500（写盘被 mock 为空操作，避免污染仓库）."""
-    import importlib
-
     monkeypatch.setattr(Path, "write_text", lambda self, *a, **k: None)
     monkeypatch.setattr(
-        importlib,
-        "import_module",
-        lambda name: (_ for _ in ()).throw(ImportError("boom")),
+        app_module,
+        "_load_custom_template_module",
+        lambda file_path: (_ for _ in ()).throw(ImportError("boom")),
     )
     resp = client.post(
         "/api/templates/custom",
@@ -593,16 +826,15 @@ def test_custom_template_success(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """成功创建并注册模板（写盘与注册均被 mock，避免污染仓库）."""
-    import importlib
-
     calls: list[str] = []
     emitted: list[Any] = []
     monkeypatch.setattr(Path, "write_text", lambda self, *a, **k: None)
-    monkeypatch.setattr(
-        importlib,
-        "import_module",
-        lambda name: SimpleNamespace(register_custom_ok=lambda: calls.append(name)),
-    )
+
+    def _fake_load(file_path: Path) -> Any:
+        calls.append(str(file_path))
+        return SimpleNamespace(register_custom_ok=lambda: None)
+
+    monkeypatch.setattr(app_module, "_load_custom_template_module", _fake_load)
     monkeypatch.setattr(app_module.socketio, "emit", lambda *a, **k: emitted.append(a))
     resp = client.post(
         "/api/templates/custom",
@@ -618,7 +850,7 @@ def test_custom_template_success(
     )
     assert resp.status_code == 200
     assert resp.get_json()["status"] == "ok"
-    assert calls == ["src.templates.custom_ok"]
+    assert calls and calls[0].endswith("custom_ok.py")
     assert any(e[0] == "templates_updated" for e in emitted)
 
 
