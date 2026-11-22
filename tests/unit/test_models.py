@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""符号层（src.models）单元测试：Syllable 与 Word 数据模型."""
+"""Unit tests for the symbol layer (src.models): Syllable and Word data models."""
 
 from src.models.syllable import Syllable
 from src.models.word import Word
@@ -15,18 +15,18 @@ def _syl(
     stress: str = "",
     length: str = "",
 ) -> Syllable:
-    """构造 Syllable 桩对象.
+    """Build a Syllable stub.
 
     Args:
-        onset: 首音。
-        nucleus: 核元音。
-        coda: 尾音。
-        tone: 声调。
-        stress: 重音。
-        length: 音长。
+        onset: Onset.
+        nucleus: Nucleus vowel.
+        coda: Coda.
+        tone: Tone attribute.
+        stress: Stress attribute.
+        length: Length attribute.
 
     Returns:
-        预填好的 Syllable 实例。
+        A pre-filled Syllable instance.
 
     """
     return Syllable(
@@ -38,44 +38,44 @@ def _syl(
 
 
 def test_syllable_text_concatenates() -> None:
-    """验证 syllable text concatenates."""
+    """Verify syllable text concatenation."""
     s = Syllable(onset="str", nucleus="IY", coda="T")
     assert s.text == "strIYT"
 
 
 def test_syllable_text_empty() -> None:
-    """验证 syllable text empty."""
+    """Verify the text of an empty syllable."""
     assert Syllable().text == ""
 
 
 def test_syllable_match_constraint_empty_is_true() -> None:
-    """验证 syllable match constraint empty is true."""
+    """Verify an empty syllable constraint always matches."""
     assert _syl().match_constraint({}) is True
 
 
 def test_syllable_match_constraint_onset() -> None:
-    """验证 syllable match constraint onset."""
+    """Verify the syllable onset constraint."""
     s = _syl(onset="zh")
     assert s.match_constraint({"onset": "zh"}) is True
     assert s.match_constraint({"onset": "ch"}) is False
 
 
 def test_syllable_match_constraint_nucleus() -> None:
-    """验证 syllable match constraint nucleus."""
+    """Verify the syllable nucleus constraint."""
     s = _syl(nucleus="iao")
     assert s.match_constraint({"nucleus": "iao"}) is True
     assert s.match_constraint({"nucleus": "a"}) is False
 
 
 def test_syllable_match_constraint_coda() -> None:
-    """验证 syllable match constraint coda."""
+    """Verify the syllable coda constraint."""
     s = _syl(coda="ng")
     assert s.match_constraint({"coda": "ng"}) is True
     assert s.match_constraint({"coda": "n"}) is False
 
 
 def test_syllable_match_constraint_attributes() -> None:
-    """验证 syllable match constraint attributes."""
+    """Verify the syllable attribute constraints."""
     s = _syl(tone="平", stress="heavy", length="long")
     assert s.match_constraint({"attributes": {"tone": "平"}}) is True
     assert s.match_constraint({"attributes": {"tone": "仄"}}) is False
@@ -84,14 +84,14 @@ def test_syllable_match_constraint_attributes() -> None:
 
 
 def test_syllable_match_constraint_attributes_non_dict() -> None:
-    """验证 syllable match constraint attributes non dict."""
-    # attributes 约束不是 dict 时视为无附加约束，应忽略并返回 True（覆盖 line 60）
+    """Verify a non-dict attributes constraint is ignored."""
+    # A non-dict attributes constraint means no extra constraint: ignore it and return True (line 60).
     s = _syl(tone="平")
     assert s.match_constraint({"attributes": "not-a-dict"}) is True
 
 
 def test_syllable_to_dict() -> None:
-    """验证 syllable to dict."""
+    """Verify Syllable.to_dict."""
     s = _syl(onset="zh", nucleus="a", coda="ng", tone="平", stress="", length="short")
     assert s.to_dict() == {
         "onset": "zh",
@@ -102,7 +102,7 @@ def test_syllable_to_dict() -> None:
 
 
 def test_syllable_from_dict() -> None:
-    """验证 syllable from dict."""
+    """Verify Syllable.from_dict."""
     d = {
         "onset": "str",
         "nucleus": "IY",
@@ -117,22 +117,22 @@ def test_syllable_from_dict() -> None:
 
 
 def test_syllable_from_dict_attributes_non_dict() -> None:
-    """验证 syllable from dict attributes non dict."""
-    # attributes 不是 dict 时回退为空属性（覆盖 line 98）
+    """Verify non-dict attributes fall back to empty attributes in from_dict."""
+    # A non-dict attributes value falls back to empty attributes (line 98).
     s = Syllable.from_dict({"attributes": "bad", "onset": "b"})
     assert s.attributes == {"tone": "", "stress": "", "length": ""}
     assert s.onset == "b"
 
 
 def test_word_syllable_count() -> None:
-    """验证 word syllable count."""
+    """Verify Word.syllable_count."""
     w = Word(text="X", language="en", syllables=[_syl(), _syl(), _syl()])
     assert w.syllable_count == 3
     assert Word(text="X", language="en").syllable_count == 0
 
 
 def test_word_to_dict_with_syllables() -> None:
-    """验证 word to dict with syllables."""
+    """Verify Word.to_dict with syllables."""
     w = Word(
         text="ZHONG",
         language="zh",
@@ -155,13 +155,13 @@ def test_word_to_dict_with_syllables() -> None:
 
 
 def test_word_to_dict_empty_syllables() -> None:
-    """验证 word to dict empty syllables."""
+    """Verify Word.to_dict with no syllables."""
     w = Word(text="X", language="en")
     assert w.to_dict()["syllables"] == []
 
 
 def test_word_from_dict_with_dict_syllables() -> None:
-    """验证 word from dict with dict syllables."""
+    """Verify Word.from_dict with dict syllable entries."""
     d = {
         "text": "AQUA",
         "language": "la",
@@ -181,7 +181,7 @@ def test_word_from_dict_with_dict_syllables() -> None:
 
 
 def test_word_from_dict_with_syllable_instances() -> None:
-    """验证 word from dict with syllable instances."""
+    """Verify Word.from_dict with Syllable instances."""
     d = {
         "text": "HI",
         "language": "en",
@@ -194,15 +194,15 @@ def test_word_from_dict_with_syllable_instances() -> None:
 
 
 def test_word_from_dict_skips_non_syllable_non_dict() -> None:
-    """验证 word from dict skips non syllable non dict."""
-    # 列表中既非 Syllable 也非 dict 的元素应被跳过（循环非空但不命中任一分支）
+    """Verify Word.from_dict skips entries that are neither Syllable nor dict."""
+    # Entries that are neither Syllable nor dict are skipped (loop runs but matches no branch).
     d = {"text": "X", "language": "en", "syllables": [None, 123]}
     w = Word.from_dict(d)
     assert w.syllables == []
 
 
 def test_word_from_dict_missing_fields_default_empty() -> None:
-    """验证 word from dict missing fields default empty."""
+    """Verify Word.from_dict defaults missing fields to empty values."""
     w = Word.from_dict({})
     assert w.text == ""
     assert w.language == ""

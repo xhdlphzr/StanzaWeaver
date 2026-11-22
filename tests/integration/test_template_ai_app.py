@@ -1,9 +1,10 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""模板编辑 AI 的 app 层集成测试（自定义模板新字段/配置 editor/编辑模板 socket）.
+"""App-level integration tests for the template-editing AI.
 
-全部使用桩 LLM 与临时写盘，避免真实网络请求与污染仓库。
+Covers new custom-template fields, editor config, and the edit-template socket.
+All flows use stub LLMs and temp writes: no real network, no repo pollution.
 """
 
 import inspect
@@ -22,14 +23,14 @@ from src.tools.template_tools import TemplateDraft
 
 @pytest.fixture()
 def client() -> Any:
-    """提供 Flask 测试客户端."""
+    """Provide a Flask test client."""
     app_module.app.testing = True
     with app_module.app.test_client() as c:
         yield c
 
 
 def _csrf_headers() -> dict[str, str]:
-    """返回含 CSRF 与 JSON 类型的请求头."""
+    """Return request headers with CSRF and JSON content type."""
     return {
         "X-CSRF-Token": app_module._CSRF_TOKEN,
         "Content-Type": "application/json",
@@ -37,7 +38,7 @@ def _csrf_headers() -> dict[str, str]:
 
 
 def _sio_client() -> Any:
-    """创建 socketio 测试客户端."""
+    """Create a SocketIO test client."""
     return app_module.socketio.test_client(app_module.app)
 
 
@@ -45,7 +46,7 @@ _RECEIVED: dict[int, list[dict[str, Any]]] = {}
 
 
 def _wait_event(sio: Any, name: str, timeout: float = 8.0) -> dict[str, Any]:
-    """轮询等待某个 socket 事件（未匹配事件暂存，避免丢失）."""
+    """Poll for a socket event, buffering unmatched events so none are lost."""
     buffer = _RECEIVED.setdefault(id(sio), [])
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -59,7 +60,7 @@ def _wait_event(sio: Any, name: str, timeout: float = 8.0) -> dict[str, Any]:
 
 
 def _cell(value: str = "") -> dict[str, Any]:
-    """构造约束单元格."""
+    """Build a constraint cell."""
     return {
         "onset": "",
         "nucleus": "",
@@ -69,10 +70,10 @@ def _cell(value: str = "") -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- #
-# 配置：editor 端点
+# Config: editor endpoint
 # --------------------------------------------------------------------------- #
 def test_config_get_includes_editor(client: FlaskClient) -> None:
-    """GET /api/config 返回 editor 端点."""
+    """GET /api/config returns the editor endpoint."""
     resp = client.get("/api/config", headers=_csrf_headers())
     data = resp.get_json()
     assert "editor" in data
@@ -82,7 +83,7 @@ def test_config_get_includes_editor(client: FlaskClient) -> None:
 def test_config_save_editor(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """POST /api/config 保存 editor 端点."""
+    """POST /api/config saves the editor endpoint."""
     saved: list[dict[str, Any]] = []
     monkeypatch.setattr(
         app_module,
@@ -104,23 +105,23 @@ def test_config_save_editor(
 
 
 def test_config_save_editor_invalid(client: FlaskClient) -> None:
-    """POST /api/config editor 非 dict 返回 400."""
+    """POST /api/config with a non-dict editor returns 400."""
     resp = client.post("/api/config", json={"editor": "bad"}, headers=_csrf_headers())
     assert resp.status_code == 400
 
 
 def test_llm_ping_includes_editor(client: FlaskClient) -> None:
-    """手动 ping 包含 editor 状态."""
+    """A manual ping includes the editor status."""
     resp = client.post("/api/llm-ping", headers=_csrf_headers())
     data = resp.get_json()
     assert "editor" in data
 
 
 # --------------------------------------------------------------------------- #
-# 模板源码生成：多约束 / 韵式
+# Template source generation: multiple constraints / rhyme
 # --------------------------------------------------------------------------- #
 def test_build_code_alternatives_and_rhyme() -> None:
-    """多约束 + 韵式生成源码可编译且包含对应方法/调用."""
+    """Multi-constraint + rhyme source compiles and includes the expected calls."""
     alternatives = [
         [[_cell("平")]],
         [[_cell("仄")]],
@@ -143,14 +144,14 @@ def test_build_code_alternatives_and_rhyme() -> None:
     assert "get_syllable_constraint_alternatives" in code
     assert "from .rhyme import check_rhyme_scheme" in code
     assert "distinct=True" in code
-    assert "2 种可选音节约束" in code
+    assert "可选音节约束" in code
     assert "errors.append('x')" in code
     assert 'rhyme_scheme = "A-"' in code
     assert "custom_code" in code
 
 
 def test_build_code_empty_tables() -> None:
-    """无约束时生成空表源码且可编译（含非列表行的容错）."""
+    """No constraints yields empty-table source that compiles (non-list rows too)."""
     code = app_module._build_custom_template_code(
         name="空",
         language="fr",
@@ -181,15 +182,15 @@ def test_build_code_empty_tables() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# 落盘注册助手
+# Persist-and-register helpers
 # --------------------------------------------------------------------------- #
 def _patch_write(monkeypatch: pytest.MonkeyPatch) -> None:
-    """把模板写盘替换为空操作."""
+    """Replace template writes with a no-op."""
     monkeypatch.setattr(Path, "write_text", lambda self, *a, **k: None)
 
 
 def _patch_register(monkeypatch: pytest.MonkeyPatch, calls: list[str]) -> None:
-    """把模板模块加载替换为返回带注册函数的命名空间."""
+    """Replace module loading with a namespace exposing the register function."""
 
     def _fake_load(file_path: Path) -> Any:
         name = f"src.templates.{file_path.stem}"
@@ -200,7 +201,7 @@ def _patch_register(monkeypatch: pytest.MonkeyPatch, calls: list[str]) -> None:
 
 
 def test_create_custom_template_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    """_create_custom_template 成功返回 200 与 key."""
+    """_create_custom_template returns 200 and the key on success."""
     calls: list[str] = []
     emitted: list[Any] = []
     _patch_write(monkeypatch)
@@ -220,7 +221,7 @@ def test_create_custom_template_success(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 def test_create_custom_template_bad_name() -> None:
-    """模板名无法生成标识符时返回 400."""
+    """A name that cannot form an identifier returns 400."""
     status, payload = app_module._create_custom_template(
         name="!!!",
         language="zh",
@@ -230,11 +231,11 @@ def test_create_custom_template_bad_name() -> None:
         custom_code="",
     )
     assert status == 400
-    assert "模板名" in payload["message"]
+    assert "Template name" in payload["message"]
 
 
 def test_create_custom_template_bad_rhyme_scheme() -> None:
-    """落盘助手校验韵式，长度不符返回 400."""
+    """The persist helper validates rhyme scheme; a length mismatch returns 400."""
     status, payload = app_module._create_custom_template(
         name="坏韵式",
         language="zh",
@@ -245,11 +246,11 @@ def test_create_custom_template_bad_rhyme_scheme() -> None:
         rhyme_scheme="ABAB",
     )
     assert status == 400
-    assert "韵式" in payload["message"]
+    assert "Rhyme scheme" in payload["message"]
 
 
 def test_create_custom_template_write_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """写盘失败返回 500."""
+    """A failed write returns 500."""
 
     def _raise(self: Any, *a: Any, **k: Any) -> None:
         raise OSError("disk full")
@@ -264,13 +265,13 @@ def test_create_custom_template_write_error(monkeypatch: pytest.MonkeyPatch) -> 
         custom_code="",
     )
     assert status == 500
-    assert "写入失败" in payload["message"]
+    assert "Failed to write template file" in payload["message"]
 
 
 def test_create_custom_template_register_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """注册失败返回 500."""
+    """Registration failure returns 500."""
     _patch_write(monkeypatch)
     monkeypatch.setattr(
         app_module,
@@ -286,11 +287,11 @@ def test_create_custom_template_register_error(
         custom_code="",
     )
     assert status == 500
-    assert "注册失败" in payload["message"]
+    assert "Template registration failed" in payload["message"]
 
 
 def test_create_custom_template_from_draft(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AI 草稿可直接落盘注册."""
+    """An AI draft can be persisted and registered directly."""
     calls: list[str] = []
     _patch_write(monkeypatch)
     _patch_register(monkeypatch, calls)
@@ -304,33 +305,33 @@ def test_create_custom_template_from_draft(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 # --------------------------------------------------------------------------- #
-# 创建模板路由：新字段
+# Create-template route: new fields
 # --------------------------------------------------------------------------- #
 # --------------------------------------------------------------------------- #
-# 统一转化接口
+# Unified conversion API
 # --------------------------------------------------------------------------- #
 def test_convert_requires_csrf(client: FlaskClient) -> None:
-    """转化接口需要 CSRF 令牌."""
+    """The conversion endpoint requires a CSRF token."""
     assert client.post("/api/templates/convert", json={}).status_code == 403
 
 
 def test_convert_not_dict(client: FlaskClient) -> None:
-    """请求体非对象返回 400."""
+    """A non-object request body returns 400."""
     resp = client.post("/api/templates/convert", data="x", headers=_csrf_headers())
     assert resp.status_code == 400
 
 
 def test_convert_missing_base_key(client: FlaskClient) -> None:
-    """缺少源模板 key 返回 400."""
+    """A missing source-template key returns 400."""
     resp = client.post(
         "/api/templates/convert", json={"language": "en"}, headers=_csrf_headers()
     )
     assert resp.status_code == 400
-    assert "源模板" in resp.get_json()["message"]
+    assert "source template" in resp.get_json()["message"]
 
 
 def test_convert_unknown_key(client: FlaskClient) -> None:
-    """未知源模板返回 400."""
+    """An unknown source template returns 400."""
     resp = client.post(
         "/api/templates/convert",
         json={"base_template_key": "nope", "language": "en"},
@@ -340,7 +341,7 @@ def test_convert_unknown_key(client: FlaskClient) -> None:
 
 
 def test_convert_bad_language(client: FlaskClient) -> None:
-    """未知目标语言返回 400."""
+    """An unknown target language returns 400."""
     resp = client.post(
         "/api/templates/convert",
         json={"base_template_key": "en_sonnet", "language": "xx"},
@@ -350,7 +351,7 @@ def test_convert_bad_language(client: FlaskClient) -> None:
 
 
 def test_convert_bad_mapping(client: FlaskClient) -> None:
-    """非法映射返回 400."""
+    """An invalid mapping returns 400."""
     resp = client.post(
         "/api/templates/convert",
         json={
@@ -364,7 +365,7 @@ def test_convert_bad_mapping(client: FlaskClient) -> None:
 
 
 def test_convert_success_carries_rhyme(client: FlaskClient) -> None:
-    """转化成功：音节约束按映射转换、韵式与代码一并复制."""
+    """Success: constraints are mapped and rhyme scheme plus code are copied."""
     resp = client.post(
         "/api/templates/convert",
         json={
@@ -394,11 +395,11 @@ def test_convert_success_carries_rhyme(client: FlaskClient) -> None:
 def test_convert_success_for_custom_template(
     client: FlaskClient,
 ) -> None:
-    """转化自定义模板时自定义代码也被复制（用注册表临时模板）."""
+    """Converting a custom template also copies its custom code (temp registry)."""
     from src.templates import PoetryTemplate, _registry, register
 
     class _WithCode(PoetryTemplate):
-        """带自定义代码的临时模板."""
+        """Temporary template with custom code."""
 
         name = "带代码模板"
         language = "zh"
@@ -408,7 +409,7 @@ def test_convert_success_for_custom_template(
         custom_code = "errors.append('x')"
 
         def get_syllable_constraints(self) -> Any:
-            """逐位约束."""
+            """Per-position constraints."""
             return [
                 [
                     {
@@ -446,7 +447,7 @@ def test_convert_success_for_custom_template(
 
 
 def test_convert_success_jinti_structural(client: FlaskClient) -> None:
-    """转化绝句：三平尾/孤平/平仄骨架等结构规则随数据携带并按映射换值."""
+    """Convert a quatrain: structural rules ride along with mapped values."""
     resp = client.post(
         "/api/templates/convert",
         json={
@@ -471,7 +472,7 @@ def test_convert_success_jinti_structural(client: FlaskClient) -> None:
 
 
 def _structural_rules() -> dict[str, Any]:
-    """构造一份合法的数据化近体诗结构规则."""
+    """Build valid data-driven regulated-verse structural rules."""
     return {
         "kind": "jinti",
         "attribute": "tone",
@@ -486,7 +487,7 @@ def _structural_rules() -> dict[str, Any]:
 
 
 def test_build_code_with_structural_rules() -> None:
-    """带结构规则的模板源码：导入/引用 check_jinti_rules 且不再生成通用押韵调用."""
+    """Structural-rule source imports check_jinti_rules and skips generic rhyme."""
     alternatives = [[[_cell("平"), _cell()], [_cell("仄"), _cell()]]]
     code = app_module._build_custom_template_code(
         name="数据化结构",
@@ -511,7 +512,7 @@ def test_build_code_with_structural_rules() -> None:
 
 
 def test_build_code_with_rule_note() -> None:
-    """模板规则描述写入生成源码的 rule_note 类属性."""
+    """The rule description is written to the rule_note class attribute."""
     code = app_module._build_custom_template_code(
         name="带描述",
         language="zh",
@@ -532,7 +533,7 @@ def test_build_code_with_rule_note() -> None:
 def test_route_create_with_rule_note(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """创建路由接受规则描述并写入源码；超长时返回 400."""
+    """The create route accepts a rule note and rejects overlong ones with 400."""
     captured: list[str] = []
 
     def _capture(self: Any, data: str, *a: Any, **k: Any) -> None:
@@ -570,11 +571,11 @@ def test_route_create_with_rule_note(
 
 
 def test_convert_route_carries_rule_note(client: FlaskClient) -> None:
-    """转化接口复制源模板规则描述并报告已携带."""
+    """The conversion endpoint copies the rule note and reports it as carried."""
     from src.templates import PoetryTemplate, _registry, register
 
     class _Note(PoetryTemplate):
-        """带规则描述的临时模板."""
+        """Temporary template with a rule description."""
 
         name = "带描述来源"
         language = "zh"
@@ -583,7 +584,7 @@ def test_convert_route_carries_rule_note(client: FlaskClient) -> None:
         rule_note = "注意对仗"
 
         def get_syllable_constraints(self) -> Any:
-            """一份自由约束."""
+            """A free constraint table."""
             return [[_cell("")]]
 
     register("test_route_note", _Note())
@@ -604,7 +605,7 @@ def test_convert_route_carries_rule_note(client: FlaskClient) -> None:
 def test_create_custom_template_with_structural_rules(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """带结构规则的模板可落盘注册（写盘与导入被 mock）."""
+    """Structural-rule templates persist and register (writes and load mocked)."""
     calls: list[str] = []
     _patch_write(monkeypatch)
     _patch_register(monkeypatch, calls)
@@ -625,7 +626,7 @@ def test_create_custom_template_with_structural_rules(
 
 
 def test_create_custom_template_invalid_structural_rules() -> None:
-    """非法结构规则返回 400."""
+    """Invalid structural rules return 400."""
     status, payload = app_module._create_custom_template(
         name="坏结构",
         language="zh",
@@ -636,13 +637,13 @@ def test_create_custom_template_invalid_structural_rules() -> None:
         structural_rules={"kind": "bad"},
     )
     assert status == 400
-    assert "结构规则" in payload["message"]
+    assert "structural rule" in payload["message"]
 
 
 def test_route_create_with_structural_rules(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """创建模板路由接受并校验 structural_rules."""
+    """The create-template route accepts and validates structural_rules."""
     _patch_write(monkeypatch)
     _patch_register(monkeypatch, [])
     monkeypatch.setattr(app_module.socketio, "emit", lambda *a, **k: None)
@@ -677,7 +678,7 @@ def test_route_create_with_structural_rules(
 def test_create_from_draft_keeps_structural_rules(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AI 草稿落盘时结构规则写入生成源码."""
+    """Structural rules from an AI draft are written into the generated source."""
     captured: list[str] = []
 
     def _capture_write(self: Any, data: str, *a: Any, **k: Any) -> None:
@@ -699,10 +700,10 @@ def test_create_from_draft_keeps_structural_rules(
 
 
 # --------------------------------------------------------------------------- #
-# 源模板代码提取 / AI 代码转写选项
+# Source-template code extraction / AI rewrite options
 # --------------------------------------------------------------------------- #
 def test_template_source_code_builtin() -> None:
-    """内置模板源码包含类定义与其规则辅助函数."""
+    """Built-in template source includes the class and its rule helpers."""
     from src.templates import get
 
     code = app_module._template_source_code("zh_wujue", get("zh_wujue"))
@@ -714,7 +715,7 @@ def test_template_source_code_builtin() -> None:
 def test_template_source_code_builtin_inspect_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """无法读取类源码时返回空串."""
+    """Return an empty string when the class source cannot be read."""
     from src.templates import get
 
     monkeypatch.setattr(
@@ -728,11 +729,11 @@ def test_template_source_code_builtin_inspect_failure(
 def test_template_source_code_custom_file(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """自定义模板优先读取落盘源码."""
+    """Custom templates read the persisted source first."""
     from src.templates import PoetryTemplate, _registry, register
 
     class _Tpl(PoetryTemplate):
-        """测试模板."""
+        """Test template."""
 
         name = "源码模板"
         language = "zh"
@@ -759,11 +760,11 @@ def test_template_source_code_custom_file(
 def test_template_source_code_custom_read_error(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """读取模板源码失败时回退到按规格重建."""
+    """Fall back to rebuilding from the spec when source reading fails."""
     from src.templates import PoetryTemplate, _registry, register
 
     class _Tpl(PoetryTemplate):
-        """测试模板."""
+        """Test template."""
 
         name = "读取失败模板"
         language = "zh"
@@ -793,7 +794,7 @@ def test_template_source_code_custom_read_error(
 def test_template_source_code_builtin_helper_source_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """辅助函数源码读取失败时跳过该函数（类源码仍保留）."""
+    """Skip a helper whose source cannot be read (class source is kept)."""
     from src.templates import get
 
     real_getsource = inspect.getsource
@@ -811,11 +812,11 @@ def test_template_source_code_builtin_helper_source_failure(
 def test_template_source_code_custom_fallback(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """源码文件缺失时按模板规格重建源码."""
+    """Rebuild source from the template spec when the source file is missing."""
     from src.templates import PoetryTemplate, _registry, register
 
     class _Tpl(PoetryTemplate):
-        """测试模板."""
+        """Test template."""
 
         name = "重建模板"
         language = "zh"
@@ -823,7 +824,7 @@ def test_template_source_code_custom_fallback(
         syllables_per_line: ClassVar[list[int]] = [1]
 
         def get_syllable_constraints(self) -> Any:
-            """一份约束表."""
+            """A constraint table."""
             return [
                 [
                     _cell(""),
@@ -846,11 +847,11 @@ def test_template_source_code_custom_fallback(
 def test_template_source_code_custom_fallback_error(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """源码重建异常时返回空串（AI 转写降级）."""
+    """Return an empty string when rebuilding raises (AI rewrite degrades)."""
     from src.templates import PoetryTemplate, _registry, register
 
     class _Tpl(PoetryTemplate):
-        """to_dict 会失败的测试模板."""
+        """Test template whose to_dict fails."""
 
         name = "坏模板"
         language = "zh"
@@ -858,7 +859,7 @@ def test_template_source_code_custom_fallback_error(
         syllables_per_line: ClassVar[list[int]] = [1]
 
         def to_dict(self) -> dict[str, Any]:
-            """始终抛异常."""
+            """Always raises."""
             raise RuntimeError("boom")
 
     register("custom_bad_test", _Tpl())
@@ -876,14 +877,14 @@ def test_template_source_code_custom_fallback_error(
 
 
 def _patch_ai_rewriter(monkeypatch: pytest.MonkeyPatch, result: Any) -> dict[str, Any]:
-    """替换 TemplateCodeRewriter 并记录调用参数."""
+    """Replace TemplateCodeRewriter and record its call arguments."""
     record: dict[str, Any] = {}
     fake_class: Any
 
     if isinstance(result, Exception):
 
         class fake_class:  # type: ignore[no-redef]
-            """抛异常的桩."""
+            """Stub that raises."""
 
             def __init__(self, config: dict[str, Any]) -> None:
                 record["config"] = config
@@ -895,7 +896,7 @@ def _patch_ai_rewriter(monkeypatch: pytest.MonkeyPatch, result: Any) -> dict[str
     else:
 
         class fake_class:  # type: ignore[no-redef]
-            """返回预置结果的桩."""
+            """Stub that returns a preset result."""
 
             def __init__(self, config: dict[str, Any]) -> None:
                 record["config"] = config
@@ -909,7 +910,7 @@ def _patch_ai_rewriter(monkeypatch: pytest.MonkeyPatch, result: Any) -> dict[str
 
 
 def _editor_config(api_key: str = "k") -> SimpleNamespace:
-    """构造模板 AI 配置."""
+    """Build a template-AI config."""
     return SimpleNamespace(
         editor={"base_url": "http://x", "api_key": api_key, "model": "m"}
     )
@@ -918,7 +919,7 @@ def _editor_config(api_key: str = "k") -> SimpleNamespace:
 def test_convert_with_ai_rewrite_success(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """勾选 AI 转写时用返回代码替换确定性代码."""
+    """With AI rewrite enabled, returned code replaces the deterministic code."""
     monkeypatch.setattr("src.config.get_config", lambda: _editor_config())
     monkeypatch.setattr(app_module, "_template_source_code", lambda key, tpl: "SOURCE")
     record = _patch_ai_rewriter(
@@ -950,7 +951,7 @@ def test_convert_with_ai_rewrite_success(
 def test_convert_with_ai_rewrite_requires_api_key(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """模板 AI 未配置时降级为确定性结果并给出错误信息."""
+    """With no template AI configured, degrade and report an error message."""
     monkeypatch.setattr("src.config.get_config", lambda: _editor_config(""))
     resp = client.post(
         "/api/templates/convert",
@@ -965,13 +966,13 @@ def test_convert_with_ai_rewrite_requires_api_key(
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["ai_rewrite_applied"] is False
-    assert "未配置" in data["ai_rewrite_error"]
+    assert "not configured" in data["ai_rewrite_error"]
 
 
 def test_convert_with_ai_rewrite_source_unavailable(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """无法提取源码时降级并提示."""
+    """Degrade with a hint when the source code cannot be extracted."""
     monkeypatch.setattr("src.config.get_config", lambda: _editor_config())
     monkeypatch.setattr(app_module, "_template_source_code", lambda key, tpl: "")
     resp = client.post(
@@ -984,16 +985,16 @@ def test_convert_with_ai_rewrite_source_unavailable(
         },
         headers=_csrf_headers(),
     )
-    assert "无法获取源模板代码" in resp.get_json()["ai_rewrite_error"]
+    assert "Unable to get source template code" in resp.get_json()["ai_rewrite_error"]
 
 
 def test_convert_with_ai_rewrite_error_and_exception(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AI 返回错误或异常时降级并提示."""
+    """Degrade with a hint when the AI returns an error or raises."""
     monkeypatch.setattr("src.config.get_config", lambda: _editor_config())
     monkeypatch.setattr(app_module, "_template_source_code", lambda key, tpl: "SOURCE")
-    _patch_ai_rewriter(monkeypatch, {"status": "error", "message": "转写失败原因"})
+    _patch_ai_rewriter(monkeypatch, {"status": "error", "message": "AI rewrite failed"})
     resp = client.post(
         "/api/templates/convert",
         json={
@@ -1004,7 +1005,7 @@ def test_convert_with_ai_rewrite_error_and_exception(
         },
         headers=_csrf_headers(),
     )
-    assert "转写失败原因" in resp.get_json()["ai_rewrite_error"]
+    assert "AI rewrite failed" in resp.get_json()["ai_rewrite_error"]
 
     _patch_ai_rewriter(monkeypatch, RuntimeError("boom"))
     resp = client.post(
@@ -1017,13 +1018,13 @@ def test_convert_with_ai_rewrite_error_and_exception(
         },
         headers=_csrf_headers(),
     )
-    assert "模板代码 AI 转写失败" in resp.get_json()["ai_rewrite_error"]
+    assert "Template code AI rewrite failed" in resp.get_json()["ai_rewrite_error"]
 
 
 def test_route_create_with_alternatives_and_rhyme(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """路由接受 alternatives / rhyme_scheme / rhyme_distinct."""
+    """The route accepts alternatives / rhyme_scheme / rhyme_distinct."""
     calls: list[str] = []
     _patch_write(monkeypatch)
     _patch_register(monkeypatch, calls)
@@ -1052,7 +1053,7 @@ def test_route_create_with_alternatives_and_rhyme(
 
 
 def test_route_create_bad_rhyme_scheme(client: FlaskClient) -> None:
-    """韵式长度不符返回 400."""
+    """A rhyme-scheme length mismatch returns 400."""
     resp = client.post(
         "/api/templates/custom",
         json={
@@ -1066,13 +1067,13 @@ def test_route_create_bad_rhyme_scheme(client: FlaskClient) -> None:
         headers=_csrf_headers(),
     )
     assert resp.status_code == 400
-    assert "韵式" in resp.get_json()["message"]
+    assert "Rhyme scheme" in resp.get_json()["message"]
 
 
 def test_route_create_alternatives_with_non_list_entries(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Alternatives 中的非列表项被容错为空表."""
+    """Non-list entries in alternatives are tolerated as empty tables."""
     _patch_write(monkeypatch)
     _patch_register(monkeypatch, [])
     monkeypatch.setattr(app_module.socketio, "emit", lambda *a, **k: None)
@@ -1092,10 +1093,10 @@ def test_route_create_alternatives_with_non_list_entries(
 
 
 # --------------------------------------------------------------------------- #
-# 编辑模板 socket
+# Edit-template socket
 # --------------------------------------------------------------------------- #
 def test_edit_template_requires_prompt() -> None:
-    """空 prompt 直接返回错误."""
+    """An empty prompt returns an error directly."""
     sio = _sio_client()
     sio.emit("edit_template", {"prompt": " ", "draft": {}})
     done = _wait_event(sio, "template_ai_done")
@@ -1103,7 +1104,7 @@ def test_edit_template_requires_prompt() -> None:
 
 
 def test_edit_template_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    """模板AI 未配置 API Key 时返回错误."""
+    """Return an error when the template AI has no API key."""
     monkeypatch.setattr(
         "src.config.get_config",
         lambda: SimpleNamespace(editor={"base_url": "u", "api_key": "", "model": "m"}),
@@ -1112,11 +1113,11 @@ def test_edit_template_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None
     sio.emit("edit_template", {"prompt": "建一个模板", "draft": {}})
     done = _wait_event(sio, "template_ai_done")
     assert done["args"][0]["status"] == "error"
-    assert "API Key" in done["args"][0]["message"]
+    assert "API key" in done["args"][0]["message"]
 
 
 def _patch_editor_config(monkeypatch: pytest.MonkeyPatch) -> None:
-    """把配置替换为已填 API Key 的 editor 端点."""
+    """Replace the config with an editor endpoint that has an API key."""
     monkeypatch.setattr(
         "src.config.get_config",
         lambda: SimpleNamespace(editor={"base_url": "u", "api_key": "k", "model": "m"}),
@@ -1124,9 +1125,9 @@ def _patch_editor_config(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _fake_editor(
-    *, submitted: bool, message: str = "完成", fail: bool = False
+    *, submitted: bool, message: str = "Done", fail: bool = False
 ) -> type[Any]:
-    """构造假的模板编辑 AI 类."""
+    """Build a fake template-editing AI class."""
 
     class _Fake:
         def __init__(self, config: dict[str, Any]) -> None:
@@ -1142,7 +1143,7 @@ def _fake_editor(
             if fail:
                 raise RuntimeError("boom")
             if emit:
-                emit({"type": "message", "content": "好的"})
+                emit({"type": "message", "content": "Okay"})
             draft = TemplateDraft(name="AI模板", language="zh", lines=1)
             draft.syllables_per_line = [2]
             draft.alternatives = [[["平", ""]]]
@@ -1152,7 +1153,7 @@ def _fake_editor(
 
 
 def test_edit_template_applies_draft(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AI 未提交时返回草稿供前端回填（含事件推送）."""
+    """When the AI does not submit, return the draft for the UI (with events)."""
     _patch_editor_config(monkeypatch)
     monkeypatch.setattr(editor_ai, "TemplateEditorAI", _fake_editor(submitted=False))
     sio = _sio_client()
@@ -1167,13 +1168,13 @@ def test_edit_template_applies_draft(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_edit_template_submitted_creates(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AI 调用提交后服务端创建模板并返回 created_key."""
+    """After the AI submits, the server creates the template and returns created_key."""
     _patch_editor_config(monkeypatch)
     monkeypatch.setattr(editor_ai, "TemplateEditorAI", _fake_editor(submitted=True))
     monkeypatch.setattr(
         app_module,
         "_create_custom_template_from_draft",
-        lambda draft: (200, {"key": "custom_ai", "message": "已创建"}),
+        lambda draft: (200, {"key": "custom_ai", "message": "Created"}),
     )
     sio = _sio_client()
     sio.emit("edit_template", {"prompt": "建一个模板", "draft": {}})
@@ -1186,24 +1187,24 @@ def test_edit_template_submitted_creates(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_edit_template_submitted_create_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AI 提交后创建失败时返回错误."""
+    """Return an error when creation after an AI submit fails."""
     _patch_editor_config(monkeypatch)
     monkeypatch.setattr(editor_ai, "TemplateEditorAI", _fake_editor(submitted=True))
     monkeypatch.setattr(
         app_module,
         "_create_custom_template_from_draft",
-        lambda draft: (500, {"message": "注册失败: boom"}),
+        lambda draft: (500, {"message": "Template registration failed: boom"}),
     )
     sio = _sio_client()
     sio.emit("edit_template", {"prompt": "建一个模板", "draft": {}})
     done = _wait_event(sio, "template_ai_done")
     payload = done["args"][0]
     assert payload["status"] == "error"
-    assert "注册失败" in payload["message"]
+    assert "Template registration failed" in payload["message"]
 
 
 def test_edit_template_agent_exception(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AI 代理异常时返回错误事件."""
+    """Return an error event when the AI agent raises."""
     _patch_editor_config(monkeypatch)
     monkeypatch.setattr(
         editor_ai, "TemplateEditorAI", _fake_editor(submitted=False, fail=True)
@@ -1212,4 +1213,4 @@ def test_edit_template_agent_exception(monkeypatch: pytest.MonkeyPatch) -> None:
     sio.emit("edit_template", {"prompt": "建一个模板", "draft": {}})
     done = _wait_event(sio, "template_ai_done")
     assert done["args"][0]["status"] == "error"
-    assert "处理失败" in done["args"][0]["message"]
+    assert "processing failed" in done["args"][0]["message"]

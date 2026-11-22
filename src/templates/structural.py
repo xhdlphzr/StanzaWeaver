@@ -1,27 +1,31 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""可数据化的结构规则校验（供跨语言转化携带）.
+"""Data-driven structural rule validation (carried across language conversion).
 
-近体诗（绝句/律诗）的规则原先只写在模板类的代码里：平仄相间/相对/相粘、
-出句对句脚、三平尾、孤平、押平声韵。这些规则本质上只依赖“某个属性值”
-（汉语为平/仄，英语可映射为重/轻……），因此可以数据化为一份
-``structural_rules`` 描述，由本模块统一校验：
+The rules of regulated verse (quatrains and regulated poems) used to live only
+inside template classes: level/oblique alternation, opposition and adhesion,
+tail tones of opening and couplet lines, three level-tone tail, isolated level,
+and level-tone rhyme. These rules only depend on "some attribute value"
+(level/oblique tones in Chinese, heavy/light in English, ...), so they can be
+expressed as a ``structural_rules`` description and validated uniformly by
+this module:
 
     {
         "kind": "jinti",
-        "attribute": "tone",          # 音节属性键
-        "level_value": "平",           # 相当于“平”的属性值
-        "oblique_value": "仄",         # 相当于“仄”的属性值
-        "positions": [1, 3],           # 需要相间/相对/相粘的固定位（0-based）
-        "rhyme_lines": [1, 3],         # 必须押韵的行号（0-based）
-        "optional_first_rhyme": True,  # 首句若为 level_value 则须一并押韵
-        "forbid_sanpingwei": True,     # 禁止三平尾
-        "forbid_guping": True,          # 禁止孤平
+        "attribute": "tone",          # syllable attribute key
+        "level_value": "平",
+        "oblique_value": "仄",
+        "positions": [1, 3],           # fixed positions to alternate (0-based)
+        "rhyme_lines": [1, 3],         # lines that must rhyme (0-based)
+        "optional_first_rhyme": True,  # first line rhymes if level_value
+        "forbid_sanpingwei": True,     # forbid three level-tone tail
+        "forbid_guping": True,          # forbid isolated level
     }
 
-跨语言转化时，只需把 ``attribute``/``level_value``/``oblique_value`` 按映射
-换成目标语言的属性与值，其余字段原样复制，规则即可在新语言中生效。
+During conversion, only ``attribute``/``level_value``/``oblique_value`` are
+remapped to the target language's attribute and values; all other fields are
+copied verbatim, and the rule then takes effect in the new language.
 """
 
 from typing import Any
@@ -29,10 +33,10 @@ from typing import Any
 from ..models.syllable import Syllable
 from .rhyme import rhyme_keys
 
-#: 结构规则允许的 kind（目前只有近体诗）。
+#: Kinds allowed for structural rules (currently only regulated verse).
 STRUCTURAL_KINDS: tuple[str, ...] = ("jinti",)
 
-#: 结构规则字典的合法键。
+#: Legal keys of a structural-rule dict.
 STRUCTURAL_KEYS: tuple[str, ...] = (
     "kind",
     "attribute",
@@ -47,13 +51,13 @@ STRUCTURAL_KEYS: tuple[str, ...] = (
 
 
 def _as_int_list(value: Any) -> list[int] | None:
-    """把任意值转为非负整数列表.
+    """Convert an arbitrary value to a list of non-negative integers.
 
     Args:
-        value: 原始值。
+        value: Raw value.
 
     Returns:
-        整数列表；非法时返回 None。
+        Integer list; None when invalid.
 
     """
     if not isinstance(value, (list, tuple)):
@@ -73,31 +77,31 @@ def _as_int_list(value: Any) -> list[int] | None:
 def normalize_structural_rules(
     raw: Any,
 ) -> tuple[dict[str, Any] | None, str | None]:
-    """校验并规整结构规则数据（供创建模板接口与 AI 草稿使用）.
+    """Validate and normalize structural-rule data (for the template API and AI drafts).
 
     Args:
-        raw: 原始结构规则（可为 None）。
+        raw: Raw structural rules (may be None).
 
     Returns:
-        (规整后的规则或 None, 错误信息)；合法时错误信息为 None。
+        (Normalized rules or None, error message); error is None when valid.
 
     """
     if raw is None:
         return None, None
     if not isinstance(raw, dict):
-        return None, "structural_rules 必须是对象"
+        return None, "structural_rules must be an object"
     kind = str(raw.get("kind", "")).strip()
     if kind not in STRUCTURAL_KINDS:
-        return None, f"未知的结构规则类型 {kind!r}"
+        return None, f"Unknown structural rule kind {kind!r}"
     attribute = str(raw.get("attribute", "")).strip()
     level_value = str(raw.get("level_value", "")).strip()
     oblique_value = str(raw.get("oblique_value", "")).strip()
     if not attribute or not level_value or not oblique_value:
-        return None, "结构规则缺少 attribute/level_value/oblique_value"
+        return None, "Structural rules are missing attribute/level_value/oblique_value"
     positions = _as_int_list(raw.get("positions"))
     rhyme_lines = _as_int_list(raw.get("rhyme_lines"))
     if not positions or not rhyme_lines:
-        return None, "结构规则缺少 positions/rhyme_lines"
+        return None, "Structural rules are missing positions/rhyme_lines"
     return (
         {
             "kind": kind,
@@ -115,15 +119,15 @@ def normalize_structural_rules(
 
 
 def _value_at(syllables: list[Syllable], position: int, attribute: str) -> str:
-    """取某行固定位的属性值.
+    """Get the attribute value at a fixed position of a line.
 
     Args:
-        syllables: 一行音节。
-        position: 位置（0-based）。
-        attribute: 属性键。
+        syllables: Syllables of one line.
+        position: Position (0-based).
+        attribute: Attribute key.
 
     Returns:
-        属性值；越界或未知时返回空串。
+        Attribute value; empty string when out of range or unknown.
 
     """
     if position < 0 or position >= len(syllables):
@@ -132,14 +136,14 @@ def _value_at(syllables: list[Syllable], position: int, attribute: str) -> str:
 
 
 def _last_value(syllables: list[Syllable], attribute: str) -> str:
-    """取某行末音节的属性值.
+    """Get the attribute value of a line's last syllable.
 
     Args:
-        syllables: 一行音节。
-        attribute: 属性键。
+        syllables: Syllables of one line.
+        attribute: Attribute key.
 
     Returns:
-        属性值；空行返回空串。
+        Attribute value; empty string for an empty line.
 
     """
     if not syllables:
@@ -153,16 +157,16 @@ def check_jinti_rules(
     syllables: list[list[Syllable]],
     rules: dict[str, Any],
 ) -> list[str]:
-    """按数据化的近体诗结构规则校验整首诗.
+    """Validate a whole poem against data-driven regulated-verse rules.
 
     Args:
-        language: 语言代码（决定押韵 key 的计算口径）。
-        poem: 诗行文本。
-        syllables: 每行音节列表。
-        rules: 规整后的结构规则（见模块文档）。
+        language: Language code (determines how rhyme keys are computed).
+        poem: Poem line texts.
+        syllables: Syllables per line.
+        rules: Normalized structural rules (see module docstring).
 
     Returns:
-        错误信息列表；全部通过时返回空列表。
+        List of error messages; empty when everything passes.
 
     """
     errors: list[str] = []
@@ -193,7 +197,10 @@ def check_jinti_rules(
                 for k in (3, 2, 1)
             ]
             if level and tail == [level, level, level]:
-                errors.append(f"第{i + 1}行三平尾: 末三音节均为'{level}'")
+                errors.append(
+                    f"Line {i + 1} has three level-tone tail: "
+                    f"last three syllables are all '{level}'"
+                )
         if forbid_guping and level and last_value == level:
             level_count = sum(
                 1
@@ -201,7 +208,10 @@ def check_jinti_rules(
                 if str(syl.attributes.get(attribute, "") or "") == level
             )
             if level_count == 1:
-                errors.append(f"第{i + 1}行孤平: 平脚句全句仅一个'{level}'音节")
+                errors.append(
+                    f"Line {i + 1} has isolated level: the level-ending line "
+                    f"contains only one '{level}' syllable"
+                )
 
     prev_inner: list[str] | None = None
     for i in range(0, len(syllables) - 1, 2):
@@ -213,9 +223,15 @@ def check_jinti_rules(
             for position in fixed_positions
         ]
         if i >= 2 and syllables[i] and _last_value(syllables[i], attribute) == level:
-            errors.append(f"第{i + 1}行为出句，尾音节应为'{oblique}'，实际为'{level}'")
+            errors.append(
+                f"Line {i + 1} is a leading line; its last syllable should be "
+                f"'{oblique}' but is '{level}'"
+            )
         if syllables[i + 1] and _last_value(syllables[i + 1], attribute) == oblique:
-            errors.append(f"第{i + 2}行为对句，尾音节应为'{level}'，实际为'{oblique}'")
+            errors.append(
+                f"Line {i + 2} is a responding line; its last syllable should be "
+                f"'{level}' but is '{oblique}'"
+            )
 
         for j in range(len(fixed_positions) - 1):
             for index, values in ((i, outer), (i + 1, inner)):
@@ -223,21 +239,24 @@ def check_jinti_rules(
                 second = values[j + 1] if j + 1 < len(values) else ""
                 if first and second and first == second:
                     errors.append(
-                        f"第{index + 1}行第{fixed_positions[j] + 1}音节与"
-                        f"第{fixed_positions[j + 1] + 1}音节平仄应相间，实际均为'{first}'"
+                        f"Line {index + 1} syllables {fixed_positions[j] + 1} and "
+                        f"{fixed_positions[j + 1] + 1} should alternate in "
+                        f"level/oblique but are both '{first}'"
                     )
         for j, (first, second) in enumerate(zip(outer, inner)):
             if first and second and first == second:
                 errors.append(
-                    f"第{i + 1}行与第{i + 2}行应相对: 第{fixed_positions[j] + 1}"
-                    f"音节平仄应相反，实际均为'{first}'"
+                    f"Lines {i + 1} and {i + 2} should oppose: syllable "
+                    f"{fixed_positions[j] + 1} should have the opposite "
+                    f"level/oblique but both are '{first}'"
                 )
         if prev_inner is not None:
             for j, (first, second) in enumerate(zip(prev_inner, outer)):
                 if first and second and first != second:
                     errors.append(
-                        f"第{i + 1}行应与第{i}行相粘: 第{fixed_positions[j] + 1}"
-                        f"音节平仄应相同，实际'{first}'与'{second}'"
+                        f"Line {i + 1} should adhere to line {i}: syllable "
+                        f"{fixed_positions[j] + 1} should have the same "
+                        f"level/oblique but is '{first}' and '{second}'"
                     )
         prev_inner = inner
 
@@ -248,7 +267,8 @@ def check_jinti_rules(
         last_value = _last_value(syllables[index], attribute)
         if level and last_value != level:
             errors.append(
-                f"第{index + 1}行韵脚应为'{level}'，实际为'{last_value or '未知'}'"
+                f"Line {index + 1} rhyme should be '{level}' but is "
+                f"'{last_value or 'unknown'}'"
             )
         keys = rhyme_keys(language, poem[index], syllables[index])
         if keys is not None:
@@ -271,9 +291,10 @@ def check_jinti_rules(
             first_index, first_keys = rhyme_keys_list[0]
             last_index, last_keys = rhyme_keys_list[-1]
             errors.append(
-                f"押韵不匹配: 第{first_index + 1}行韵脚为"
-                f"'{'/'.join(sorted(key.split(':', 1)[-1] for key in first_keys))}'，"
-                f"第{last_index + 1}行韵脚为"
-                f"'{'/'.join(sorted(key.split(':', 1)[-1] for key in last_keys))}'，不押韵"
+                f"Rhyme mismatch: line {first_index + 1} rhymes with "
+                f"'{'/'.join(sorted(key.split(':', 1)[-1] for key in first_keys))}', "
+                f"line {last_index + 1} rhymes with "
+                f"'{'/'.join(sorted(key.split(':', 1)[-1] for key in last_keys))}'; "
+                f"they do not rhyme"
             )
     return errors

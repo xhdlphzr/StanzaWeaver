@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""SocketIO 集成测试：诗组 generate_sequence 事件（离线，桩流水线）."""
+"""SocketIO integration tests: sequence generate_sequence event, offline."""
 
 import time
 from typing import Any
@@ -14,13 +14,13 @@ from src.pipeline.sequence import SequencePoemState, SequenceState
 
 
 def _make_emitter(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Any]]:
-    """拦截 socketio.emit 并收集事件.
+    """Intercept socketio.emit and collect emitted events.
 
     Args:
-        monkeypatch: pytest monkeypatch 实例。
+        monkeypatch: pytest monkeypatch instance.
 
     Returns:
-        收集到的 (event, data) 列表。
+        Captured (event, data) tuples.
 
     """
     emitted: list[tuple[str, Any]] = []
@@ -33,15 +33,15 @@ def _make_emitter(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Any]]:
 
 
 def _wait(emitted: list[tuple[str, Any]], name: str, timeout: float = 10.0) -> Any:
-    """等待某个事件出现.
+    """Wait until an event appears.
 
     Args:
-        emitted: 已收集事件。
-        name: 目标事件名。
-        timeout: 超时秒数。
+        emitted: Captured events.
+        name: Target event name.
+        timeout: Timeout in seconds.
 
     Returns:
-        事件数据；超时返回 None。
+        Event data, or None on timeout.
 
     """
     done: Any = None
@@ -56,7 +56,7 @@ def _wait(emitted: list[tuple[str, Any]], name: str, timeout: float = 10.0) -> A
 
 
 class _FakeSequence:
-    """返回预置诗组状态的假流水线."""
+    """Fake pipeline returning a fixed sequence state."""
 
     last_keys: list[str] | None = None
 
@@ -69,15 +69,15 @@ class _FakeSequence:
         on_progress: Any = None,
         template_keys: list[str] | None = None,
     ) -> SequenceState:
-        """推送一次进度并返回诗组结果.
+        """Push one progress update and return the sequence result.
 
         Args:
-            topic: 诗组总目标。
-            on_progress: 进度回调。
-            template_keys: 用户固定的每首格律 key 列表。
+            topic: Overall topic of the poem sequence.
+            on_progress: Progress callback.
+            template_keys: Per-poem meter keys chosen by the user.
 
         Returns:
-            预置的诗组状态。
+            The fixed sequence state.
 
         """
         type(self).last_keys = template_keys
@@ -118,7 +118,7 @@ class _FakeSequence:
 def test_generate_sequence_emits_progress_and_done(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """generate_sequence 推送 sequence_progress 与 sequence_done，并透传 template_keys."""
+    """generate_sequence pushes progress/done events and forwards template_keys."""
     monkeypatch.setattr("src.pipeline.sequence.PoemSequencePipeline", _FakeSequence)
     emitted = _make_emitter(monkeypatch)
     client = socketio.test_client(app_module.app)
@@ -140,33 +140,33 @@ def test_generate_sequence_emits_progress_and_done(
 def test_generate_sequence_empty_topic_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """诗组主题为空时推送 error."""
+    """Push an error when the sequence topic is empty."""
     emitted = _make_emitter(monkeypatch)
     client = socketio.test_client(app_module.app)
 
     client.emit("generate_sequence", {"topic": ""})
     errors = [data for event, data in emitted if event == "error"]
     assert errors
-    assert "不能为空" in str(errors[0])
+    assert "must not be empty" in str(errors[0])
 
 
 def test_generate_sequence_empty_template_keys_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """template_keys 为空时推送 error."""
+    """Push an error when template_keys is empty."""
     emitted = _make_emitter(monkeypatch)
     client = socketio.test_client(app_module.app)
 
     client.emit("generate_sequence", {"topic": "四季", "template_keys": []})
     errors = [data for event, data in emitted if event == "error"]
     assert errors
-    assert "至少" in str(errors[0])
+    assert "Select a meter" in str(errors[0])
 
 
 def test_generate_sequence_exception_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """诗组流水线抛错时推送 error."""
+    """Push an error when the sequence pipeline raises."""
 
     class _Boom:
         def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -187,4 +187,4 @@ def test_generate_sequence_exception_errors(
     client.emit("generate_sequence", {"topic": "四季"})
     error = _wait(emitted, "error")
     assert error is not None
-    assert "诗组生成失败" in str(error)
+    assert "Sequence generation failed" in str(error)

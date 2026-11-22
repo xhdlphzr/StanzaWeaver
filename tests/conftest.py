@@ -1,11 +1,11 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""测试夹具（pytest）.
+"""Test fixtures for pytest.
 
-- 注册全部格律模板（供 MeterValidator / Pipeline 使用）；
-- 离线播种 CMUdict，使英语分析器无需联网即可测试；
-- 提供模板字典构建工具。
+- Register all meter templates (used by MeterValidator / Pipeline);
+- Seed CMUdict offline so the English analyzer can be tested without network;
+- Provide helpers to build template dictionaries.
 """
 
 import os
@@ -16,7 +16,8 @@ from typing import Any
 
 import pytest
 
-# 标记测试环境：app 的后台自动导入线程据此跳过（避免污染测试用临时词库）。
+# Mark the test environment: app's background auto-import thread skips it so
+# the temporary test vocabulary is not polluted.
 os.environ["STANZA_WEAVER_TEST"] = "1"
 
 from src.knowledge import vocabulary
@@ -30,7 +31,7 @@ from src.templates.zh import register_chinese_templates
 
 @pytest.fixture(autouse=True, scope="session")
 def _register_all_templates() -> None:
-    """会话级：注册全部内置模板."""
+    """Session-scoped fixture: register all built-in templates."""
     register_chinese_templates()
     register_english_templates()
     register_italian_templates()
@@ -40,7 +41,7 @@ def _register_all_templates() -> None:
 
 @pytest.fixture(autouse=True, scope="session")
 def _init_session_db() -> Iterator[None]:
-    """会话级：确保词库数据库已初始化（含 en_pron 表），防止 CI 无词库时崩溃."""
+    """Session-scoped fixture: initialize the vocabulary DB (with en_pron)."""
     prev = vocabulary._DB_PATH
     tmp = Path(tempfile.mkdtemp(prefix="stanza_weaver_test_"))
     vocabulary.set_db_path(tmp / "test_vocab.db")
@@ -51,7 +52,7 @@ def _init_session_db() -> Iterator[None]:
 
 @pytest.fixture(autouse=True, scope="session")
 def _redirect_history_db() -> Iterator[None]:
-    """会话级：把历史记录数据库重定向到临时文件，避免污染用户真实数据."""
+    """Session-scoped fixture: redirect the history DB to a temp file."""
     import app as app_module
 
     prev = app_module._HISTORY_DB_PATH
@@ -63,7 +64,7 @@ def _redirect_history_db() -> Iterator[None]:
 
 @pytest.fixture(autouse=True, scope="session")
 def _seed_offline_cmudict() -> None:
-    """会话级：离线播种少量 CMUdict 词条，避免英语分析器联网下载."""
+    """Session-scoped fixture: seed a few CMUdict entries offline."""
     english_module._cmudict_loaded = True
     english_module._ARPABET_TO_PHONEMES = {
         "test": [["T", "EH1", "S", "T"]],
@@ -83,15 +84,15 @@ def make_zh_template(
     per_line: int = 5,
     constraints: list[Any] | None = None,
 ) -> dict[str, Any]:
-    """构造一个最小中文模板字典（仅含数量约束）.
+    """Build a minimal Chinese template dict (only count constraints).
 
     Args:
-        lines: 行数。
-        per_line: 每行音节数。
-        constraints: 逐位约束表（默认无）。
+        lines: Number of lines.
+        per_line: Syllables per line.
+        constraints: Per-position constraint table (none by default).
 
     Returns:
-        模板字典（to_dict 同构）。
+        A template dict matching the to_dict() structure.
 
     """
     return {

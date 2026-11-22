@@ -5,54 +5,54 @@
 
 <#
 .SYNOPSIS
-运行 StanzaWeaver Docker 容器。
+Run the StanzaWeaver Docker container.
 
 .DESCRIPTION
-以 Web 服务方式启动容器：端口映射到宿主机、数据卷持久化
-（~/.stanza_weaver：配置/词库/历史/日志）、STANZAWEAVER_HOST=0.0.0.0。
-容器内无 pywebview 时 app.py 自动回退到纯 HTTP 服务。
+Starts the container as a web service: host port mapping and data volume persistence
+(~/.stanza_weaver: config/lexicon/history/logs), STANZAWEAVER_HOST=0.0.0.0.
+Without pywebview inside the container, app.py falls back to a plain HTTP service.
 
 .EXAMPLE
-.\scripts\docker-run.ps1                 # 前台运行
+.\scripts\docker-run.ps1                 # run in the foreground
 
 .EXAMPLE
-.\scripts\docker-run.ps1 -Detach         # 后台运行
-.\scripts\docker-run.ps1 -Detach -Logs   # 后台运行并跟随日志
+.\scripts\docker-run.ps1 -Detach         # run detached
+.\scripts\docker-run.ps1 -Detach -Logs   # run detached and follow logs
 
 .EXAMPLE
 .\scripts\docker-run.ps1 -Port 8080 -NoVolume
 #>
 [CmdletBinding()]
 param(
-    # 镜像标签
+    # Image tag
     [string]$Image = "stanzaweaver:latest",
-    # 容器名
+    # Container name
     [string]$Name = "stanzaweaver",
-    # 宿主机映射端口
+    # Host port mapping
     [int]$Port = 5000,
-    # 数据卷名（持久化配置/词库/历史/日志）
+    # Volume name (persists config/lexicon/history/logs)
     [string]$Volume = "stanzaweaver-data",
-    # 后台运行
+    # Run detached
     [switch]$Detach,
-    # 运行后跟随容器日志（配合 -Detach 使用）
+    # Follow container logs after starting (use with -Detach)
     [switch]$Logs,
-    # 不挂载数据卷（容器内数据不持久化）
+    # Do not mount the data volume (container data is not persisted)
     [switch]$NoVolume
 )
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "[run] 启动容器 $Name (镜像: $Image, 端口: $Port)" -ForegroundColor Cyan
+Write-Host "[run] Starting container $Name (image: $Image, port: $Port)" -ForegroundColor Cyan
 
-# 确保数据卷存在
+# Ensure the data volume exists
 if (-not $NoVolume) {
     docker volume create $Volume | Out-Null
     if ($LASTEXITCODE -ne 0) {
-        throw "创建数据卷 $Volume 失败"
+        throw "Failed to create data volume $Volume"
     }
 }
 
-# 清理同名旧容器（避免端口/名称冲突）
+# Remove any old container with the same name (avoids port/name conflicts)
 docker rm -f $Name 2>$null | Out-Null
 
 $runArgs = @("run", "--name", $Name, "-p", "${Port}:5000", "--restart", "unless-stopped")
@@ -70,12 +70,12 @@ $runArgs += $Image
 
 docker @runArgs
 if ($LASTEXITCODE -ne 0) {
-    throw "docker run 失败 (exit code $LASTEXITCODE)"
+    throw "docker run failed (exit code $LASTEXITCODE)"
 }
 
-Write-Host "[run] 访问: http://localhost:$Port" -ForegroundColor Green
+Write-Host "[run] Open: http://localhost:$Port" -ForegroundColor Green
 
 if ($Logs) {
-    Write-Host "[run] 跟随日志 (Ctrl+C 退出，容器保持运行)..." -ForegroundColor DarkGray
+    Write-Host "[run] Following logs (Ctrl+C to exit; the container keeps running)..." -ForegroundColor DarkGray
     docker logs -f $Name
 }

@@ -1,15 +1,16 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""应用日志系统（logging + RotatingFileHandler）.
+"""Application logging (logging + RotatingFileHandler).
 
-- 文件输出：~/.stanza_weaver/logs/stanza.log，RotatingFileHandler 轮转——
-  单个日志文件达到 max_bytes 后自动轮转，保留 backup_count 个备份文件
-  （stanza.log.1、stanza.log.2 ...）；超出数量的最旧备份被覆盖，
-  即"达到定量后新增直接覆盖旧日志 + 保留定量备份"。
-- 控制台输出：同步保留（桌面应用启动时可见）。
-- 每个模块通过 get_logger(__name__) 获取命名 logger；日志目录可用
-  环境变量 STANZAWEAVER_LOG_DIR 覆盖。
+- File output: ~/.stanza_weaver/logs/stanza.log, rotated by RotatingFileHandler:
+  once a log file reaches max_bytes it rotates, keeping backup_count backups
+  (stanza.log.1, stanza.log.2 ...); the oldest backups beyond that count are
+  overwritten, i.e. "new logs overwrite the oldest ones once the quota is
+  reached, keeping a fixed number of backups".
+- Console output: kept as well (visible when the desktop app starts).
+- Each module gets a named logger via get_logger(__name__); the log directory
+  can be overridden with the STANZAWEAVER_LOG_DIR environment variable.
 """
 
 import logging
@@ -19,8 +20,8 @@ from pathlib import Path
 
 DEFAULT_DIR = Path.home() / ".stanza_weaver" / "logs"
 DEFAULT_FILENAME = "stanza.log"
-DEFAULT_MAX_BYTES = 1 * 1024 * 1024  # 单个日志文件上限 1 MiB
-DEFAULT_BACKUP_COUNT = 5  # 保留的轮转备份份数
+DEFAULT_MAX_BYTES = 1 * 1024 * 1024  # Max size of a single log file: 1 MiB
+DEFAULT_BACKUP_COUNT = 5  # Number of rotated backups to keep
 
 _FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 _DATEFMT = "%Y-%m-%d %H:%M:%S"
@@ -29,10 +30,10 @@ _configured = False
 
 
 def get_logs_dir() -> Path:
-    """返回日志目录（可用环境变量 STANZAWEAVER_LOG_DIR 覆盖）.
+    """Return the log directory (overridable via STANZAWEAVER_LOG_DIR).
 
     Returns:
-        日志目录路径。
+        Log directory path.
 
     """
     env = os.environ.get("STANZAWEAVER_LOG_DIR")
@@ -47,19 +48,19 @@ def setup_logging(
     max_bytes: int = DEFAULT_MAX_BYTES,
     backup_count: int = DEFAULT_BACKUP_COUNT,
 ) -> logging.Logger:
-    """配置全局日志系统（幂等，仅首次调用生效）.
+    """Configure the global logging system (idempotent; first call wins).
 
-    同时挂载文件 RotatingFileHandler 与控制台 StreamHandler 到 root logger；
-    各模块的命名 logger 通过传播输出到两者。
+    Mount both a RotatingFileHandler and a console StreamHandler on the root
+    logger; each module's named logger propagates to both.
 
     Args:
-        logs_dir: 日志目录（缺省用 get_logs_dir()）。
-        level: 日志级别。
-        max_bytes: 单个日志文件大小上限（达到即轮转）。
-        backup_count: 保留的轮转备份份数（超出部分被覆盖）。
+        logs_dir: Log directory (defaults to get_logs_dir()).
+        level: Log level.
+        max_bytes: Max size of a single log file (rotation is triggered on reaching it).
+        backup_count: Number of rotated backups to keep (older ones are overwritten).
 
     Returns:
-        应用的根 logger（名为 "stanzaweaver"）。
+        The application's root logger (named "stanzaweaver").
 
     """
     global _configured
@@ -91,7 +92,7 @@ def setup_logging(
 
     app_logger = logging.getLogger("stanzaweaver")
     app_logger.debug(
-        "日志系统已初始化: %s (max_bytes=%s, backup_count=%s)",
+        "Logging system initialized: %s (max_bytes=%s, backup_count=%s)",
         log_file,
         max_bytes,
         backup_count,
@@ -100,13 +101,13 @@ def setup_logging(
 
 
 def get_logger(name: str) -> logging.Logger:
-    """获取命名 logger（自动按模块名组织）.
+    """Return a named logger (organized by module name).
 
     Args:
-        name: logger 名，惯例传 __name__。
+        name: Logger name; conventionally __name__.
 
     Returns:
-        logging.Logger 实例。
+        A logging.Logger instance.
 
     """
     return logging.getLogger(name)

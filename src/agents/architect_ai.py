@@ -1,11 +1,13 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""诗组架构师：多首诗的规划（Step 1）.
+"""Poem-sequence architect: planning for multiple poems (Step 1).
 
-架构师 AI 在一个规划会话里循环调用规划工具（set_sequence_title / add_poem /
-set_poem_prompt）；停止调用工具后检查每个诗题是否都有自足的创作要求，缺失则
-回灌提醒继续补齐，达到最大轮数仍未完整则返回未完成。
+The architect AI repeatedly calls planning tools (set_sequence_title / add_poem /
+set_poem_prompt) in one planning session; once it stops calling tools, every poem
+is checked for a self-contained writing brief, and missing briefs are fed back as
+reminders to keep filling in. If the plan is still incomplete after the maximum
+number of rounds, it is returned as incomplete.
 """
 
 import json
@@ -27,7 +29,7 @@ from .base import LLMClient, Message
 
 @dataclass
 class PlanResult:
-    """诗组规划结果."""
+    """Result of a poem-sequence plan."""
 
     completed: bool
     title: str
@@ -36,13 +38,13 @@ class PlanResult:
 
 
 def _catalog_text(catalog: list[dict[str, Any]]) -> str:
-    """把模板清单渲染为提示文本.
+    """Render the template catalog as prompt text.
 
     Args:
-        catalog: list_dicts() 结果。
+        catalog: list_dicts() result.
 
     Returns:
-        多行模板清单文本。
+        Multi-line template catalog text.
 
     """
     lines: list[str] = []
@@ -55,14 +57,14 @@ def _catalog_text(catalog: list[dict[str, Any]]) -> str:
 
 
 def _build_architect_system(topic: str, catalog: list[dict[str, Any]]) -> str:
-    """构造架构师的系统提示.
+    """Build the architect system prompt.
 
     Args:
-        topic: 用户给诗组的总目标。
-        catalog: 模板清单。
+        topic: Overall goal of the poem sequence given by the user.
+        catalog: Template catalog.
 
     Returns:
-        系统提示文本。
+        System prompt text.
 
     """
     return (
@@ -85,15 +87,15 @@ def _build_architect_system(topic: str, catalog: list[dict[str, Any]]) -> str:
 def _build_fixed_architect_system(
     topic: str, catalog: list[dict[str, Any]], poems: list[SequencePoemPlan]
 ) -> str:
-    """构造“诗数/格律已固定”模式下的架构师提示.
+    """Build the architect prompt for the "fixed poems/meter" mode.
 
     Args:
-        topic: 诗组总目标。
-        catalog: 模板清单。
-        poems: 已预先固定的诗单（含格律）。
+        topic: Overall goal of the poem sequence.
+        catalog: Template catalog.
+        poems: Pre-fixed poem list (including meter).
 
     Returns:
-        系统提示文本。
+        System prompt text.
 
     """
     names = {str(item["key"]): str(item["name"]) for item in catalog}
@@ -118,13 +120,13 @@ def _build_fixed_architect_system(
 
 
 class SequenceArchitect:
-    """诗组架构师：用规划工具产出诗组标题与每首诗的创作要求."""
+    """Sequence architect: produce the sequence title and writing briefs via tools."""
 
     def __init__(self, config: dict[str, Any]):
-        """初始化架构师.
+        """Initialize the architect.
 
         Args:
-            config: {"base_url", "api_key", "model"}。
+            config: {"base_url", "api_key", "model"}.
 
         """
         self.client = LLMClient(
@@ -140,17 +142,18 @@ class SequenceArchitect:
         max_rounds: int = 12,
         poems: list[SequencePoemPlan] | None = None,
     ) -> PlanResult:
-        """执行诗组规划（ReAct：调用工具 → 检查完整性 → 回灌提醒）.
+        """Run poem-sequence planning (ReAct: call tools → check → remind).
 
         Args:
-            topic: 诗组总目标。
-            catalog: 模板清单（缺省读取注册表）。
-            max_rounds: 最大规划轮数。
-            poems: 预先固定的诗单（含格律）。提供时不再向 AI 暴露 add_poem，
-                仅要求其设定诗组标题与每首创作要求。
+            topic: Overall goal of the poem sequence.
+            catalog: Template catalog (defaults to the registry).
+            max_rounds: Maximum number of planning rounds.
+            poems: Pre-fixed poem list (including meter). When provided, add_poem
+                is no longer exposed to the AI; it is only asked to set the
+                sequence title and each poem's writing brief.
 
         Returns:
-            PlanResult(completed, title, poems, log)。
+            PlanResult(completed, title, poems, log).
 
         """
         if catalog is None:
@@ -185,7 +188,7 @@ class SequenceArchitect:
                     )
                 messages.append(LLMClient.assistant_to_message(response))
                 messages.append({"role": "user", "content": problem})
-                detail.append(f"[第{round_idx}轮] 提醒: {problem}")
+                detail.append(f"[round {round_idx}] reminder: {problem}")
                 continue
 
             results: dict[str, dict[str, Any]] = {}
@@ -196,15 +199,18 @@ class SequenceArchitect:
                     result = execute_set_sequence_title(state, args)
                 elif name == "add_poem":
                     if fixed:
-                        result = {"error": "本次诗组诗数已固定，请勿新增诗"}
+                        result = {
+                            "error": "The poem count is fixed for this sequence; "
+                            "do not add poems"
+                        }
                     else:
                         result = execute_add_poem(state, args, valid_keys)
                 elif name == "set_poem_prompt":
                     result = execute_set_poem_prompt(state, args)
                 else:
-                    result = {"error": f"未知规划工具 {name}"}
+                    result = {"error": f"Unknown planning tool {name}"}
                 results[tool_call["id"]] = result
-                detail.append(f"[第{round_idx}轮] {name}: {result}")
+                detail.append(f"[round {round_idx}] {name}: {result}")
 
             messages.append(LLMClient.assistant_to_message(response))
             messages.extend(
@@ -220,13 +226,13 @@ class SequenceArchitect:
 
     @staticmethod
     def _plan_problem(state: PlanState) -> str | None:
-        """检查规划是否完整.
+        """Check whether the plan is complete.
 
         Args:
-            state: 规划状态。
+            state: Planning state.
 
         Returns:
-            需要继续补全时的提醒文本；完整时返回 None。
+            Reminder text when more work is needed; None when complete.
 
         """
         if not state.title:

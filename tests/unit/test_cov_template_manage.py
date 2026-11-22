@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""模板注册表排序与注销的单元测试."""
+"""Unit tests for template registry ordering and unregistration."""
 
 from typing import Any, ClassVar
 
@@ -16,7 +16,7 @@ from src.templates import (
 
 
 class _Tpl(PoetryTemplate):
-    """最简测试模板."""
+    """Minimal test template."""
 
     name = "测试"
     language = "zh"
@@ -25,18 +25,21 @@ class _Tpl(PoetryTemplate):
 
 
 def _snapshot() -> dict[str, Any]:
-    """快照注册表内容/顺序."""
+    """Take a snapshot of the registry contents and order."""
     return dict(_registry)
 
 
 def _restore(snapshot: dict[str, Any]) -> None:
-    """恢复注册表内容/顺序."""
+    """Restore the registry contents and order from a snapshot."""
     _registry.clear()
     _registry.update(snapshot)
 
 
 def test_set_order_reorders_and_appends() -> None:
-    """按给定 key 重排；未知/重复 key 忽略，未列出的模板保持原顺序追加."""
+    """Reorder by the given keys; unknown/duplicate keys are dropped.
+
+    Templates not listed keep their original order and are appended at the end.
+    """
     snapshot = _snapshot()
     try:
         _registry.clear()
@@ -51,7 +54,7 @@ def test_set_order_reorders_and_appends() -> None:
 
 
 def test_set_order_ignores_non_string_keys() -> None:
-    """非字符串 key 被忽略."""
+    """Non-string keys are ignored."""
     snapshot = _snapshot()
     try:
         _registry.clear()
@@ -64,7 +67,7 @@ def test_set_order_ignores_non_string_keys() -> None:
 
 
 def test_unregister() -> None:
-    """注销存在/不存在的模板."""
+    """Unregister an existing and a missing template."""
     snapshot = _snapshot()
     try:
         _registry.clear()
@@ -76,7 +79,7 @@ def test_unregister() -> None:
 
 
 def test_list_dicts_marks_custom_deletable() -> None:
-    """自定义模板标记为可删除，内置模板不可删除."""
+    """Custom templates are marked deletable; built-in templates are not."""
     snapshot = _snapshot()
     try:
         _registry.clear()

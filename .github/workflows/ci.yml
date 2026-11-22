@@ -3,26 +3,29 @@
 
 # StanzaWeaver CI/CD
 #
-# CI  (持续集成): 每次 push / PR 在 ubuntu-latest 上运行（按规范顺序）
-#   - uv lock --check           依赖锁一致性
-#   - reuse lint                REUSE 许可证合规
+# CI  (Continuous Integration): runs on ubuntu-latest for every push / PR
+#   - uv lock --check           dependency lock consistency
+#   - reuse lint                REUSE license compliance
 #   - pytest -q --cov=src --cov=app --cov-report=term-missing --cov-fail-under=100
-#                               （单测+集成，桩 LLM 无网络；强制 src + app.py 覆盖率 100%）
-#   - ruff check ./             静态检查
-#   - mypy --strict ./          类型检查（零容忍）
-#   - ruff check --select D ./  Google 风格 Docstring 检查
-#   - ruff format --check ./    代码格式
+#                               (unit + integration, stubbed LLM without network;
+#                               enforces 100% coverage of src + app.py)
+#   - ruff check ./             static analysis
+#   - mypy --strict ./          type checking (zero tolerance)
+#   - ruff check --select D ./  Google-style docstring check
+#   - ruff format --check ./    code formatting
 #
-# CD  (持续交付): Release 发布时触发，三平台打包并上传分卷 zip 到 Release 附件
-#   - Windows : uv run pyinstaller StanzaWeaver.spec --clean -> zip -s 1g 分卷
-#   - macOS   : uv run pyinstaller StanzaWeaver.spec --clean -> zip -s 1g 分卷
-#   - Linux   : uv run pyinstaller StanzaWeaver.spec --clean -> zip -s 1g 分卷
+# CD  (Continuous Delivery): triggered on Release; packages on three platforms
+#     and uploads split zips to the Release assets
+#   - Windows : uv run pyinstaller StanzaWeaver.spec --clean -> zip -s 1g split archive
+#   - macOS   : uv run pyinstaller StanzaWeaver.spec --clean -> zip -s 1g split archive
+#   - Linux   : uv run pyinstaller StanzaWeaver.spec --clean -> zip -s 1g split archive
 #
-# 注: Python 版本统一由仓库根目录 .python-version（3.14）决定，uv 会自动安装/使用。
+# Note: the Python version is pinned by .python-version (3.14) at the repo root;
+# uv installs and uses it automatically.
 
 name: CI/CD
 
-# 同一分支/PR 的新提交会取消仍在运行的旧流水线，节省资源
+# New commits on the same branch/PR cancel still-running pipelines to save resources
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -39,9 +42,10 @@ permissions:
 
 jobs:
   # ------------------------------------------------------------------
-  # CI: 代码层持续集成（代码无关平台，统一在 ubuntu-latest 上一次跑完）
-  #   顺序: uv lock --check -> reuse lint -> pytest(coverage) -> ruff check
-  #         -> mypy --strict -> ruff format --check
+  # CI: code-level continuous integration
+  #     (platform-agnostic, runs once on ubuntu-latest)
+  #   Order: uv lock --check -> reuse lint -> pytest(coverage) -> ruff check
+  #          -> mypy --strict -> ruff format --check
   # ------------------------------------------------------------------
   ci:
     name: CI
@@ -81,7 +85,8 @@ jobs:
         run: uv run ruff format --check ./
 
   # ------------------------------------------------------------------
-  # CD: Release 发布时触发，测试通过后跨平台打包并上传分卷 zip
+  # CD: triggered on Release; after tests pass, package across platforms and
+  #     upload split zips
   # ------------------------------------------------------------------
   build:
     name: Build (${{ matrix.os }})
@@ -113,15 +118,15 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get install -y zip
 
-      # ---------- Windows / macOS / Linux: PyInstaller 出包（onedir 目录） ----------
+      # ---------- Windows / macOS / Linux: PyInstaller build (onedir) ----------
       - name: Build with PyInstaller
         run: uv run pyinstaller StanzaWeaver.spec --clean
 
-      # ---------- 分卷压缩（统一 zip -s 1g） ----------
+      # ---------- Split compression (uniform zip -s 1g) ----------
       - name: Compress into 1GB volumes
         run: cd dist && zip -s 1g -r StanzaWeaver-${{ runner.os }}.zip StanzaWeaver/
 
-      # ---------- 上传到 Release 附件 ----------
+      # ---------- Upload to Release assets ----------
       - name: Upload to Release
         shell: bash
         env:

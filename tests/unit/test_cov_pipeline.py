@@ -1,14 +1,16 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""单元测试：补齐 pipeline.py 的缺失行覆盖.
+"""Unit tests that fill missing line coverage in pipeline.py.
 
-通过轻量假的 Writer/Checker 代理（子类化真实代理但绕过 LLMClient，绝不访问网络）
-触发各类错误与边界分支：
+Use lightweight fake Writer/Checker agents (subclassing the real agents but
+bypassing LLMClient, never touching the network) to trigger error and
+boundary branches:
 
-- ``CheckerAI.check`` 抛出异常：触发 except 兜底。
-- ``CheckerAI.check`` 先返回 ``pass=False`` 再返回 ``pass=True``：触发续跑反馈赋值。
-- 直接单测 ``json_dumps_safe`` 的序列化异常分支。
+- ``CheckerAI.check`` raises: hit the except fallback.
+- ``CheckerAI.check`` returns ``pass=False`` then ``pass=True``: assign the
+  continue feedback.
+- Unit-test ``json_dumps_safe``'s serialization error branches directly.
 """
 
 from typing import Any
@@ -34,13 +36,14 @@ CheckPlan = list[dict[str, Any] | Exception]
 
 
 class _FakeWriter(WriterAI):
-    """假 WriterAI：按预置 refine 结果返回，绝不构造/调用 LLMClient."""
+    """Fake WriterAI returning preset refine results, never uses LLMClient."""
 
     def __init__(self, refine_plan: RefinePlan) -> None:
-        """记录预置的 refine 返回序列，不初始化任何真实 LLM 客户端.
+        """Record the preset refine sequence; no real LLM client is created.
 
         Args:
-            refine_plan: 依次返回的 RefineResult 列表；耗尽后再调用会抛 IndexError。
+            refine_plan: RefineResults returned in order; a call after the
+                list is exhausted raises IndexError.
 
         """
         self._refine_plan: RefinePlan = list(refine_plan)
@@ -54,15 +57,15 @@ class _FakeWriter(WriterAI):
         messages: list[dict[str, Any]],
         on_stream: ChunkCallback = None,
     ) -> str:
-        """返回固定描述（Step 1）.
+        """Return a fixed description (Step 1).
 
         Args:
-            topic: 主题（未使用）。
-            messages: 共享消息列表（未使用）。
-            on_stream: 流式回调（未使用）。
+            topic: Topic (unused).
+            messages: Shared message list (unused).
+            on_stream: Streaming callback (unused).
 
         Returns:
-            描述文本。
+            Description text.
 
         """
         self.generate_description_calls += 1
@@ -76,17 +79,17 @@ class _FakeWriter(WriterAI):
         template_obj: Any = None,
         on_stream: ChunkCallback = None,
     ) -> tuple[list[str], str, list[str], str]:
-        """返回固定初稿（Step 2）.
+        """Return a fixed draft (Step 2).
 
         Args:
-            description: 主题描述（未使用）。
-            template: 模板字典（未使用）。
-            messages: 共享消息列表（未使用）。
-            template_obj: 模板对象（未使用）。
-            on_stream: 流式回调（未使用）。
+            description: Topic description (unused).
+            template: Template dict (unused).
+            messages: Shared message list (unused).
+            template_obj: Template object (unused).
+            on_stream: Streaming callback (unused).
 
         Returns:
-            (诗稿, 标题, 标点, 日志文本)。
+            (poem, title, punctuation, log text).
 
         """
         self.generate_draft_calls += 1
@@ -106,23 +109,23 @@ class _FakeWriter(WriterAI):
         title: str = "",
         punctuation: list[str] | None = None,
     ) -> RefineResult:
-        """按预置序列返回一次炼句结果，并触发 on_step 回调.
+        """Return one preset refine result and fire the on_step callback.
 
         Args:
-            description: 主题描述（未使用）。
-            poem: 当前诗稿（未使用）。
-            template: 模板字典（未使用）。
-            messages: 共享消息列表（未使用）。
-            template_obj: 模板对象（未使用）。
-            feedback: 检查 AI/用户反馈（未使用）。
-            on_step: 每步回调。
-            on_stream: 流式回调（未使用）。
-            start_round: 起始轮号（未使用）。
-            title: 当前标题（原样返回）。
-            punctuation: 当前标点（原样返回）。
+            description: Topic description (unused).
+            poem: Current poem (unused).
+            template: Template dict (unused).
+            messages: Shared message list (unused).
+            template_obj: Template object (unused).
+            feedback: Checker AI/user feedback (unused).
+            on_step: Per-step callback.
+            on_stream: Streaming callback (unused).
+            start_round: Starting round number (unused).
+            title: Current title (returned unchanged).
+            punctuation: Current punctuation (returned unchanged).
 
         Returns:
-            预置的 RefineResult（标题/标点沿用传入值）。
+            Preset RefineResult (title/punctuation come from the arguments).
 
         """
         self.feedback_log.append(feedback)
@@ -144,13 +147,14 @@ class _FakeWriter(WriterAI):
 
 
 class _FakeChecker(CheckerAI):
-    """假 CheckerAI：按预置结果/异常返回，绝不构造/调用 LLMClient."""
+    """Fake CheckerAI returning preset results/exceptions, never LLMClient."""
 
     def __init__(self, check_results: CheckPlan) -> None:
-        """记录预置的 check 返回序列（可为异常）与每次调用参数.
+        """Record the preset check sequence (may be exceptions) and calls.
 
         Args:
-            check_results: 依次返回的结果；异常元素会被原样抛出。
+            check_results: Results returned in order; exception items are
+                raised as-is.
 
         """
         self._check_results: CheckPlan = list(check_results)
@@ -163,19 +167,19 @@ class _FakeChecker(CheckerAI):
         user_prompt: str = "",
         user_feedback: str = "",
     ) -> dict[str, Any]:
-        """按预置序列返回一次终审结果；若是异常则抛出.
+        """Return one preset final review result, or raise if preset.
 
         Args:
-            poem: 诗行列表。
-            template: 模板字典。
-            user_prompt: 用户原始提示词（记录用于断言）。
-            user_feedback: 用户反馈（记录用于断言）。
+            poem: Poem lines.
+            template: Template dict.
+            user_prompt: Original user prompt (recorded for assertions).
+            user_feedback: User feedback (recorded for assertions).
 
         Returns:
-            预置的终审结果字典。
+            Preset final review result dict.
 
         Raises:
-            预置的任意异常（用于覆盖 except 兜底分支）。
+            Any preset exception (to cover the except fallback branch).
 
         """
         self.calls.append(
@@ -192,10 +196,10 @@ class _FakeChecker(CheckerAI):
 
 
 def _make_state() -> PipelineState:
-    """构造一个已加载模板、可直接进入炼句循环的最小状态.
+    """Build a minimal state with a loaded template ready for refinement.
 
     Returns:
-        PipelineState（仅含炼句循环所需字段）。
+        PipelineState with only the fields the refine loop needs.
 
     """
     return PipelineState(
@@ -209,14 +213,14 @@ def _make_state() -> PipelineState:
 
 
 def _make_pipeline(writer: _FakeWriter, checker: _FakeChecker) -> PoetryPipeline:
-    """构造流水线并注入假代理，避免任何真实 LLM 调用.
+    """Build a pipeline with fake agents, avoiding any real LLM call.
 
     Args:
-        writer: 假 WriterAI。
-        checker: 假 CheckerAI。
+        writer: Fake WriterAI.
+        checker: Fake CheckerAI.
 
     Returns:
-        已注入假代理的 PoetryPipeline。
+        PoetryPipeline with the fake agents injected.
 
     """
     pipeline = PoetryPipeline(
@@ -229,7 +233,7 @@ def _make_pipeline(writer: _FakeWriter, checker: _FakeChecker) -> PoetryPipeline
 
 
 def test_run_full_with_fakes() -> None:
-    """验证注入假代理后完整 run() 闭环（覆盖 run/step1/step2/refine 主路径）."""
+    """Verify the full run() loop with fake agents (run/step1/step2/refine)."""
     writer = _FakeWriter(
         [
             (["窗前明月光", "疑是地上霜"], [], "炼句详情", 1),
@@ -245,14 +249,14 @@ def test_run_full_with_fakes() -> None:
     assert state.final_poem == ["测试标题", "窗前明月光", "疑是地上霜"]
     assert writer.generate_description_calls == 1
     assert writer.generate_draft_calls == 1
-    # 检查 AI 必须收到用户发给创作 AI 的原始提示词，才能核对是否符合用户要求。
+    # The checker AI must receive the user's original prompt to verify it.
     assert checker.calls
     assert checker.calls[0]["user_prompt"] == "静夜思"
     assert checker.calls[0]["user_feedback"] == ""
 
 
 def test_continue_with_feedback_passes_user_message_to_checker() -> None:
-    """用户「不定稿」反馈续跑时，检查 AI 也能收到用户反馈与原始提示词."""
+    """Verify continue feedback passes user feedback and prompt to checker."""
     writer = _FakeWriter([(["床前明月光", "疑是地上霜"], [], "炼句详情", 1)])
     checker = _FakeChecker([{"pass": True, "suggestions": ""}])
     pipeline = _make_pipeline(writer, checker)
@@ -266,7 +270,7 @@ def test_continue_with_feedback_passes_user_message_to_checker() -> None:
 
 
 def test_refine_checker_exception() -> None:
-    """CheckerAI.check 抛出异常时触发 except 兜底并续跑成功."""
+    """Verify a CheckerAI.check exception hits the fallback and continues."""
     writer = _FakeWriter(
         [
             (["床前明月光", "疑是地上霜"], [], "炼句详情", 1),
@@ -284,11 +288,11 @@ def test_refine_checker_exception() -> None:
 
     assert state.checker_pass is True
     assert state.final_poem == ["测试标题", "窗前明月光", "疑是地上霜"]
-    assert any("检查AI异常: boom" in ev["checker_suggestions"] for ev in events)
+    assert any("Checker AI error: boom" in ev["checker_suggestions"] for ev in events)
 
 
 def test_refine_checker_false_then_true() -> None:
-    """CheckerAI 先 False 后 True 触发续跑反馈赋值并成功定稿."""
+    """Verify False then True assigns continue feedback and finalizes."""
     writer = _FakeWriter(
         [
             (["床前明月光", "疑是地上霜"], [], "炼句详情一", 1),
@@ -313,14 +317,14 @@ def test_refine_checker_false_then_true() -> None:
 
 
 def test_json_dumps_safe_fallback() -> None:
-    """不可序列化对象触发 str 兜底分支."""
+    """Verify an unserializable object falls back to str."""
     bad = {1, 2, 3}
     assert json_dumps_safe(bad) == str(bad)
     assert json_dumps_safe("ok") == '"ok"'
 
 
 def test_refine_zero_rounds_fallback() -> None:
-    """Refine 返回 tool_rounds=0 时触发未执行优化分支."""
+    """Verify tool_rounds=0 triggers the no-refinement branch."""
     writer = _FakeWriter(
         [
             (["床前明月光", "疑是地上霜"], [], "炼句日志末尾", 0),
@@ -334,12 +338,12 @@ def test_refine_zero_rounds_fallback() -> None:
     pipeline._run_refine_loop(state, messages)
 
     assert state.checker_pass is False
-    assert state.checker_suggestions == "未执行任何优化轮次"
+    assert state.checker_suggestions == "No refinement rounds were executed"
     assert state.final_poem == ["测试标题", "床前明月光", "疑是地上霜"]
 
 
 def test_run_zero_rounds_triggers_format_fallback() -> None:
-    """run() 中 refine 返回 tool_rounds=0 时触发 line 391-402 的 format_poem 兜底."""
+    """Verify tool_rounds=0 in run() hits the format_poem fallback (391-402)."""
     writer = _FakeWriter(
         [
             (["床前明月光", "疑是地上霜"], [], "炼句日志末尾", 0),
@@ -357,7 +361,7 @@ def test_run_zero_rounds_triggers_format_fallback() -> None:
 
 
 def test_fallback_formatted_poem_with_template_obj() -> None:
-    """checker_pass=False 且 _template_obj 有 format_poem 时走分支."""
+    """Verify the fallback when checker_pass=False and a template exists."""
     writer = _FakeWriter(
         [
             (
@@ -390,19 +394,19 @@ def test_fallback_formatted_poem_with_template_obj() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# P2-6: _load_template 无效 key
+# P2-6: _load_template invalid key
 # --------------------------------------------------------------------------- #
 def test_load_template_invalid_key() -> None:
-    """无效模板键应抛出 KeyError."""
+    """An invalid template key should raise KeyError."""
     with pytest.raises(KeyError):
         get_template("nonexistent_key_xyz")
 
 
 # --------------------------------------------------------------------------- #
-# P2-7: checker_pass=True + _template_obj=None → else 分支
+# P2-7: checker_pass=True + _template_obj=None -> else branch
 # --------------------------------------------------------------------------- #
 def test_checker_pass_no_template_obj_uses_newline_join() -> None:
-    """checker_pass=True 且 _template_obj=None 时走 else 分支（换行拼接）."""
+    """Verify checker_pass=True with no template joins lines with newlines."""
     writer = _FakeWriter(
         [
             (["床前明月光", "疑是地上霜"], [], "日志", 1),
@@ -421,10 +425,10 @@ def test_checker_pass_no_template_obj_uses_newline_join() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# P2-8: state.title 为空时 final_poem 不含标题
+# P2-8: empty state.title keeps the title out of final_poem
 # --------------------------------------------------------------------------- #
 def test_empty_title_excluded_from_final_poem() -> None:
-    """state.title 为空时 final_poem 不包含标题行."""
+    """Verify an empty state.title leaves no title line in final_poem."""
     writer = _FakeWriter(
         [
             (["床前明月光", "疑是地上霜"], [], "日志", 1),
@@ -449,7 +453,7 @@ def test_empty_title_excluded_from_final_poem() -> None:
 
 
 def test_format_current_empty_title_with_template() -> None:
-    """无标题但有模板对象时即时格式化会去掉首个空标题行."""
+    """Verify formatting drops the empty first title line when no title."""
     from src.templates.zh import WujueTemplate
 
     pipeline = _make_pipeline(_FakeWriter([]), _FakeChecker([]))
@@ -465,17 +469,17 @@ def test_format_current_empty_title_with_template() -> None:
 
 
 def test_format_current_empty_draft_returns_empty() -> None:
-    """无草稿时即时格式化为空串."""
+    """Verify formatting an empty draft returns an empty string."""
     pipeline = _make_pipeline(_FakeWriter([]), _FakeChecker([]))
     state = PipelineState(template={"language": "zh"}, draft=[], title="题")
     assert pipeline._format_current(state) == ""
 
 
 # --------------------------------------------------------------------------- #
-# P2-9: json_dumps_safe 的 ValueError / RecursionError 分支
+# P2-9: json_dumps_safe ValueError / RecursionError branches
 # --------------------------------------------------------------------------- #
 def test_json_dumps_safe_value_error() -> None:
-    """循环引用触发 ValueError 分支."""
+    """Verify a circular reference triggers the ValueError branch."""
     a: Any = [1]
     a.append(a)
     result = json_dumps_safe(a)
@@ -484,7 +488,7 @@ def test_json_dumps_safe_value_error() -> None:
 
 
 def test_json_dumps_safe_recursion_error() -> None:
-    """超深嵌套触发 RecursionError 分支."""
+    """Verify very deep nesting triggers the RecursionError branch."""
     deep: Any = "x"
     for _ in range(2000):
         deep = [deep]

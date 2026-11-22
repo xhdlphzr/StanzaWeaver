@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""agents 包单元测试：覆盖 src/agents 下全部代码（mock LLM 调用层，无真实网络）."""
+"""Unit tests for the agents package (LLM layer mocked, no real network)."""
 
 import json
 from types import SimpleNamespace
@@ -23,15 +23,15 @@ from src.agents.writer_ai import (
 def _msg(
     content: str = "", tool_calls: Any = None, reasoning: str | None = None
 ) -> Any:
-    """构造 fake 的 OpenAI message 对象.
+    """Build a fake OpenAI message object.
 
     Args:
-        content: 消息文本。
-        tool_calls: 工具调用列表。
-        reasoning: 推理内容。
+        content: Message text.
+        tool_calls: Tool call list.
+        reasoning: Reasoning content.
 
     Returns:
-        模拟 OpenAI message 的 SimpleNamespace 对象。
+        SimpleNamespace object mimicking an OpenAI message.
 
     """
     return SimpleNamespace(
@@ -40,28 +40,28 @@ def _msg(
 
 
 def _resp(message: Any) -> Any:
-    """构造 fake 的 chat.completions.create 返回值（含 choices[0].message）.
+    """Build a fake chat.completions.create result (with choices[0].message).
 
     Args:
-        message: 模拟 message 对象。
+        message: Simulated message object.
 
     Returns:
-        包装后的 ChatResult 对象。
+        Wrapped ChatResult object.
 
     """
     return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
 
 def _tc(name: str, args_json: str, tid: str = "1") -> Any:
-    """构造 fake 的 tool_call 对象（arguments 为 JSON 字符串）.
+    """Build a fake tool_call object (arguments is a JSON string).
 
     Args:
-        name: 工具名称。
-        args_json: JSON 格式的工具参数字符串。
-        tid: 调用 ID。
+        name: Tool name.
+        args_json: Tool arguments as a JSON string.
+        tid: Call ID.
 
     Returns:
-        模拟 tool_call 的 SimpleNamespace 对象。
+        SimpleNamespace object mimicking a tool_call.
 
     """
     return SimpleNamespace(
@@ -70,13 +70,13 @@ def _tc(name: str, args_json: str, tid: str = "1") -> Any:
 
 
 def _chunk(content: str) -> Any:
-    """构造流式 chunk（含 delta.content）.
+    """Build a streaming chunk (with delta.content).
 
     Args:
-        content: 文本块内容。
+        content: Chunk text content.
 
     Returns:
-        模拟流式 chunk 的 SimpleNamespace 对象。
+        SimpleNamespace object mimicking a streaming chunk.
 
     """
     return SimpleNamespace(
@@ -85,23 +85,23 @@ def _chunk(content: str) -> Any:
 
 
 def _chunk_empty() -> Any:
-    """构造空 delta 的流式 chunk.
+    """Build a streaming chunk with an empty delta.
 
     Returns:
-        choices 为空列表的 SimpleNamespace 对象。
+        SimpleNamespace object whose choices is an empty list.
 
     """
     return SimpleNamespace(choices=[])
 
 
 def _make_llm(base_url: str) -> tuple[LLMClient, MagicMock]:
-    """构造 LLMClient（OpenAI 被 mock），返回 (client, mock_httpx_client).
+    """Build an LLMClient (OpenAI mocked) and its mock HTTP client.
 
     Args:
-        base_url: API 基础地址。
+        base_url: API base URL.
 
     Returns:
-        (client, mock_httpx_client) 元组。
+        (client, mock_httpx_client) tuple.
 
     """
     with patch("src.agents.base.OpenAI", MagicMock()):
@@ -116,14 +116,14 @@ def _make_llm(base_url: str) -> tuple[LLMClient, MagicMock]:
 # _is_loopback
 # --------------------------------------------------------------------------- #
 def test_is_loopback_true() -> None:
-    """回环地址（127.0.0.1 / localhost / ::1）应返回 True."""
+    """Verify loopback addresses (127.0.0.1 / localhost / ::1) return True."""
     assert _is_loopback("http://127.0.0.1:11434/v1") is True
     assert _is_loopback("http://localhost:8000/v1") is True
     assert _is_loopback("http://[::1]:11434/v1") is True
 
 
 def test_is_loopback_false() -> None:
-    """非回环地址应返回 False."""
+    """Verify non-loopback addresses return False."""
     assert _is_loopback("https://api.openai.com/v1") is False
     assert _is_loopback("http://192.168.1.1/v1") is False
 
@@ -132,7 +132,7 @@ def test_is_loopback_false() -> None:
 # LLMClient.__init__ / _raise_with_hint
 # --------------------------------------------------------------------------- #
 def test_init_creates_http_client_for_loopback() -> None:
-    """回环地址下应创建绕过代理的 httpx2.Client（trust_env=False）."""
+    """Verify a loopback URL creates a proxy-bypassing httpx2.Client."""
     with patch("httpx2.Client") as httpx_cls:
         httpx_cls.return_value = MagicMock(trust_env=False)
         _c, _ = _make_llm("http://127.0.0.1:11434/v1")
@@ -140,14 +140,14 @@ def test_init_creates_http_client_for_loopback() -> None:
 
 
 def test_init_non_loopback_no_special_client() -> None:
-    """非回环地址下正常初始化（不抛错，不创建 trust_env=False 的 client）."""
+    """Verify non-loopback URLs initialize without a trust_env=False client."""
     with patch("httpx2.Client") as httpx_cls:
         _c, _ = _make_llm("https://api.openai.com/v1")
         httpx_cls.assert_not_called()
 
 
 def test_raise_with_hint_loopback() -> None:
-    """回环地址的错误应附带本地服务排障提示."""
+    """Verify loopback errors include a local-service troubleshooting hint."""
     c, _ = _make_llm("http://127.0.0.1:11434/v1")
     err = c._raise_with_hint(ValueError("boom"))
     assert isinstance(err, RuntimeError)
@@ -155,7 +155,7 @@ def test_raise_with_hint_loopback() -> None:
 
 
 def test_raise_with_hint_non_loopback() -> None:
-    """非回环地址的错误不附带本地提示."""
+    """Verify non-loopback errors carry no local hint."""
     c, _ = _make_llm("https://api.openai.com/v1")
     err = c._raise_with_hint(ValueError("boom"))
     assert "127.0.0.1" not in str(err)
@@ -165,7 +165,7 @@ def test_raise_with_hint_non_loopback() -> None:
 # LLMClient.chat
 # --------------------------------------------------------------------------- #
 def test_chat_plain() -> None:
-    """无工具的普通对话返回 content."""
+    """Verify a plain chat without tools returns content."""
     c, client = _make_llm("https://api.openai.com/v1")
     client.chat.completions.create = MagicMock(return_value=_resp(_msg(content="你好")))
     res = c.chat([{"role": "user", "content": "x"}])
@@ -174,7 +174,7 @@ def test_chat_plain() -> None:
 
 
 def test_chat_with_tools_and_reasoning() -> None:
-    """带工具调用且含 reasoning_content 时正确解析."""
+    """Verify tool calls and reasoning_content parse correctly."""
     c, client = _make_llm("https://api.openai.com/v1")
     msg = _msg(
         content="",
@@ -189,7 +189,7 @@ def test_chat_with_tools_and_reasoning() -> None:
 
 
 def test_chat_tool_call_invalid_json() -> None:
-    """工具参数非法 JSON 时回退为空字典."""
+    """Verify invalid tool JSON falls back to an empty dict."""
     c, client = _make_llm("https://api.openai.com/v1")
     msg = _msg(content="", tool_calls=[_tc("submit", "not-json")])
     client.chat.completions.create = MagicMock(return_value=_resp(msg))
@@ -198,7 +198,7 @@ def test_chat_tool_call_invalid_json() -> None:
 
 
 def test_chat_raises() -> None:
-    """底层调用抛错时包装为 RuntimeError."""
+    """Verify underlying errors are wrapped as RuntimeError."""
     c, client = _make_llm("https://api.openai.com/v1")
     client.chat.completions.create = MagicMock(side_effect=RuntimeError("down"))
     with pytest.raises(RuntimeError):
@@ -209,7 +209,7 @@ def test_chat_raises() -> None:
 # LLMClient.chat_stream
 # --------------------------------------------------------------------------- #
 def test_chat_stream_collects() -> None:
-    """流式对话逐 token 累积，空 delta 被跳过，on_chunk 被回调."""
+    """Verify tokens accumulate, empty deltas are skipped and on_chunk fires."""
     c, client = _make_llm("https://api.openai.com/v1")
     chunks = [_chunk("a"), _chunk("b"), _chunk_empty()]
     client.chat.completions.create = MagicMock(return_value=chunks)
@@ -222,7 +222,7 @@ def test_chat_stream_collects() -> None:
 
 
 def test_chat_stream_no_callback() -> None:
-    """无 on_chunk 时仅累积文本."""
+    """Verify text accumulates when no on_chunk is given."""
     c, client = _make_llm("https://api.openai.com/v1")
     client.chat.completions.create = MagicMock(return_value=[_chunk("xy")])
     res = c.chat_stream([{"role": "user", "content": "x"}])
@@ -230,7 +230,7 @@ def test_chat_stream_no_callback() -> None:
 
 
 def test_chat_stream_raises() -> None:
-    """流式底层抛错时包装为 RuntimeError."""
+    """Verify stream errors are wrapped as RuntimeError."""
     c, client = _make_llm("https://api.openai.com/v1")
     client.chat.completions.create = MagicMock(side_effect=RuntimeError("down"))
     with pytest.raises(RuntimeError):
@@ -241,7 +241,7 @@ def test_chat_stream_raises() -> None:
 # LLMClient.count_tokens
 # --------------------------------------------------------------------------- #
 def test_count_tokens_basic() -> None:
-    """count_tokens 返回正整数."""
+    """Verify count_tokens returns a positive integer."""
     c, _ = _make_llm("https://api.openai.com/v1")
     msgs = [
         {"role": "user", "content": "hello"},
@@ -253,7 +253,7 @@ def test_count_tokens_basic() -> None:
 
 
 def test_count_tokens_with_tool_calls() -> None:
-    """含 tool_calls 的消息也计入 token."""
+    """Verify messages with tool_calls count toward tokens."""
     c, _ = _make_llm("https://api.openai.com/v1")
     msgs = [
         {
@@ -267,14 +267,14 @@ def test_count_tokens_with_tool_calls() -> None:
 
 
 def test_count_tokens_empty() -> None:
-    """空消息列表返回少量 token（仅 overhead）."""
+    """Verify an empty message list still returns a small token count."""
     c, _ = _make_llm("https://api.openai.com/v1")
     tokens = c.count_tokens([])
     assert tokens == 0
 
 
 def test_count_tokens_unknown_model_fallback() -> None:
-    """未知模型名触发 KeyError 分支，回退到 cl100k_base."""
+    """Verify an unknown model hits KeyError and falls back to cl100k_base."""
     c, _ = _make_llm("https://api.openai.com/v1")
     c.model = "totally_unknown_model_xyz"
     msgs = [{"role": "user", "content": "hello"}]
@@ -286,7 +286,7 @@ def test_count_tokens_unknown_model_fallback() -> None:
 # LLMClient.assistant_to_message
 # --------------------------------------------------------------------------- #
 def test_assistant_to_message_full() -> None:
-    """含 content / reasoning / tool_calls 时正确转换."""
+    """Verify content, reasoning and tool_calls convert correctly."""
     resp = {
         "content": "诗",
         "reasoning_content": "思",
@@ -299,7 +299,7 @@ def test_assistant_to_message_full() -> None:
 
 
 def test_assistant_to_message_no_content() -> None:
-    """无 content 时 content 置 None."""
+    """Verify missing content becomes None."""
     msg = LLMClient.assistant_to_message({"content": "", "tool_calls": []})
     assert msg["content"] is None
 
@@ -308,26 +308,26 @@ def test_assistant_to_message_no_content() -> None:
 # _fire_stream
 # --------------------------------------------------------------------------- #
 def test_fire_stream_normal() -> None:
-    """回调正常时被调用."""
+    """Verify a normal callback is invoked."""
     seen: list[str] = []
     _fire_stream(seen.append, "x")
     assert seen == ["x"]
 
 
 def test_fire_stream_swallows_exception() -> None:
-    """回调抛错时被吞掉，不中断主流程."""
+    """Verify a callback exception is swallowed and does not interrupt."""
 
     def boom(_: str) -> None:
         raise ValueError("cb failed")
 
-    _fire_stream(boom, "x")  # 不应抛出
+    _fire_stream(boom, "x")  # Must not raise
 
 
 # --------------------------------------------------------------------------- #
 # _build_checker_system
 # --------------------------------------------------------------------------- #
 def test_build_checker_system_parallelism() -> None:
-    """五言律诗/七言律诗模板应包含对仗检查说明."""
+    """Verify regulated-verse templates include the antithesis check note."""
     text = _build_checker_system(
         ["a", "b"], {"name": "五言律诗", "language": "zh", "lines": 8}
     )
@@ -335,13 +335,13 @@ def test_build_checker_system_parallelism() -> None:
 
 
 def test_build_checker_system_no_parallelism() -> None:
-    """非中文或不足 8 行时不包含对仗说明."""
+    """Verify non-Chinese or under-8-line templates omit the antithesis note."""
     text = _build_checker_system(["a"], {"language": "en", "lines": 4})
     assert "对仗" not in text
 
 
 def test_build_checker_system_includes_user_prompt_and_rule() -> None:
-    """检查 AI 提示词必须包含用户原始提示词、模板规则描述与用户反馈."""
+    """Verify the checker prompt includes user prompt, rule note and feedback."""
     text = _build_checker_system(
         ["a"],
         {"language": "zh", "lines": 4, "rule_note": "必须使用对仗句"},
@@ -355,12 +355,12 @@ def test_build_checker_system_includes_user_prompt_and_rule() -> None:
     assert "用户修改反馈" in text
     assert "再婉约一些" in text
     assert "用户要求符合" in text
-    # 不再使用创作 AI 自己提炼的主题描述
+    # The writer AI's distilled topic description is no longer used
     assert "【主题描述】" not in text
 
 
 def test_build_checker_system_rule_description_fallback() -> None:
-    """没有 rule_note 时回退到 rule_description；空用户提示/反馈不产生空段."""
+    """Verify rule_description fallback and that empty inputs add no section."""
     text = _build_checker_system(
         ["a"],
         {"language": "zh", "lines": 4, "rule_description": "格律说明"},
@@ -378,20 +378,20 @@ def test_build_checker_system_rule_description_fallback() -> None:
 # _build_draft_system / _build_refine_system
 # --------------------------------------------------------------------------- #
 def test_build_draft_system_basic() -> None:
-    """_build_draft_system 包含语言和格律描述."""
+    """Verify _build_draft_system includes language and meter description."""
     text = _build_draft_system("zh", "语言: zh\n行数: 4")
     assert "zh" in text
     assert "语言: zh\n行数: 4" in text
 
 
 def test_build_refine_system_basic() -> None:
-    """_build_refine_system 包含格律描述."""
+    """Verify _build_refine_system includes the meter description."""
     text = _build_refine_system("语言: zh\n行数: 4")
     assert "语言: zh\n行数: 4" in text
 
 
 def test_build_refine_system_with_feedback() -> None:
-    """_build_refine_system 带 feedback 时拼装反馈段落."""
+    """Verify _build_refine_system adds a feedback section when given."""
     text = _build_refine_system("语言: zh\n行数: 4", feedback="请更婉约")
     assert "请更婉约" in text
 
@@ -400,10 +400,10 @@ def test_build_refine_system_with_feedback() -> None:
 # CheckerAI
 # --------------------------------------------------------------------------- #
 def _make_checker() -> tuple[CheckerAI, MagicMock]:
-    """创建 CheckerAI 用于测试（OpenAI 被 mock）.
+    """Create a CheckerAI for tests (OpenAI mocked).
 
     Returns:
-        (checker, mock_chat) 元组。
+        (checker, mock_chat) tuple.
 
     """
     with patch("src.agents.base.OpenAI", MagicMock()):
@@ -416,7 +416,7 @@ def _make_checker() -> tuple[CheckerAI, MagicMock]:
 
 
 def test_checker_pass_true() -> None:
-    """Submit 返回 pass=True 时通过."""
+    """Verify submit with pass=True passes."""
     checker, chat = _make_checker()
     chat.chat.return_value = {
         "content": "",
@@ -427,7 +427,7 @@ def test_checker_pass_true() -> None:
 
 
 def test_checker_pass_false() -> None:
-    """Submit 返回 pass=False 时附带建议."""
+    """Verify submit with pass=False returns suggestions."""
     checker, chat = _make_checker()
     chat.chat.return_value = {
         "content": "",
@@ -445,7 +445,7 @@ def test_checker_pass_false() -> None:
 
 
 def test_checker_tool_calls_no_submit() -> None:
-    """有工具调用但无 submit 时追加提示并继续，直至 3 轮后放弃."""
+    """Verify tool calls without submit retry, then give up after 3 rounds."""
     checker, chat = _make_checker()
     chat.chat.return_value = {
         "content": "",
@@ -453,11 +453,11 @@ def test_checker_tool_calls_no_submit() -> None:
     }
     res = checker.check(["line"], {"language": "zh", "lines": 4})
     assert res["pass"] is False
-    assert "未能给出结论" in res["suggestions"]
+    assert "did not return a verdict" in res["suggestions"]
 
 
 def test_checker_no_tool_calls() -> None:
-    """模型未调用工具时追加提醒，3 轮后放弃."""
+    """Verify a model that calls no tools is reminded, then dropped."""
     checker, chat = _make_checker()
     chat.chat.return_value = {"content": "我看看", "tool_calls": []}
     res = checker.check(["line"], {"language": "zh", "lines": 4})
@@ -465,7 +465,7 @@ def test_checker_no_tool_calls() -> None:
 
 
 def test_checker_check_sends_user_prompt_to_llm() -> None:
-    """CheckerAI.check 会把用户提示词/反馈拼进系统消息发给 LLM."""
+    """Verify check puts user prompt/feedback into the system message."""
     checker, chat = _make_checker()
     chat.chat.return_value = {
         "content": "",
@@ -486,7 +486,7 @@ def test_checker_check_sends_user_prompt_to_llm() -> None:
 
 
 def test_checker_exception_fallback() -> None:
-    """调用抛错时兜底为未通过."""
+    """Verify call errors fall back to not passing."""
     checker, chat = _make_checker()
     chat.chat.side_effect = RuntimeError("boom")
     res = checker.check(["line"], {"language": "zh", "lines": 4})
@@ -498,10 +498,10 @@ def test_checker_exception_fallback() -> None:
 # WriterAI.generate_description
 # --------------------------------------------------------------------------- #
 def _make_writer() -> tuple[WriterAI, MagicMock]:
-    """创建 WriterAI 用于测试（OpenAI 被 mock）.
+    """Create a WriterAI for tests (OpenAI mocked).
 
     Returns:
-        (writer, mock_chat) 元组。
+        (writer, mock_chat) tuple.
 
     """
     with patch("src.agents.base.OpenAI", MagicMock()):
@@ -515,7 +515,7 @@ def _make_writer() -> tuple[WriterAI, MagicMock]:
 
 
 def test_generate_description_stream() -> None:
-    """带 on_stream 时走 chat_stream."""
+    """Verify on_stream routes through chat_stream."""
     writer, chat = _make_writer()
     chat.chat_stream.return_value = {"content": "描述文本", "tool_calls": []}
     msgs: list[dict[str, Any]] = []
@@ -524,7 +524,7 @@ def test_generate_description_stream() -> None:
 
 
 def test_generate_description_plain() -> None:
-    """无 on_stream 时走普通 chat."""
+    """Verify no on_stream routes through plain chat."""
     writer, chat = _make_writer()
     chat.chat.return_value = {"content": "描述文本", "tool_calls": []}
     msgs: list[dict[str, Any]] = []
@@ -536,7 +536,7 @@ def test_generate_description_plain() -> None:
 # WriterAI.generate_draft
 # --------------------------------------------------------------------------- #
 def test_generate_draft_template_obj_describe() -> None:
-    """提供模板对象时使用其 describe() 生成约束描述."""
+    """Verify a template object supplies its describe() constraint text."""
     from src.templates.zh import WujueTemplate
 
     writer, chat = _make_writer()
@@ -554,17 +554,17 @@ def test_generate_draft_template_obj_describe() -> None:
 
 
 def test_generate_draft_submit_wrong_lines_then_retry() -> None:
-    """Submit 时行数不对→提示重试；最终通过."""
+    """Verify a wrong line count retries, then passes."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
-        # 第一次 submit: 行数不对
+        # First submit: wrong line count
         {
             "content": "一行",
             "tool_calls": [
                 {"id": "1", "name": "submit", "arguments": {"title": "标题"}}
             ],
         },
-        # 第二次 submit: 正确
+        # Second submit: correct
         {
             "content": "一二三四五\n六七八九十",
             "tool_calls": [
@@ -584,7 +584,7 @@ def test_generate_draft_submit_wrong_lines_then_retry() -> None:
 
 
 def test_generate_draft_stream_retry() -> None:
-    """on_stream 回调被触发."""
+    """Verify the on_stream callback fires."""
     writer, chat = _make_writer()
     chat.chat.return_value = {
         "content": "一二三四五\n六七八九十",
@@ -604,11 +604,11 @@ def test_generate_draft_stream_retry() -> None:
         "主题", template, msgs, on_stream=lambda t: fired.append(t)
     )
     assert len(poem) == 2
-    assert any("思考中" in f for f in fired)
+    assert any("thinking" in f for f in fired)
 
 
 def test_generate_draft_submit_poem_arg_and_bad_punct() -> None:
-    """Submit 提供 poem 整首替换；标点数量不符先拒绝再通过."""
+    """Verify submit replaces the poem; bad punctuation retries."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
         {
@@ -670,14 +670,14 @@ def test_generate_draft_submit_poem_arg_and_bad_punct() -> None:
 # WriterAI.refine
 # --------------------------------------------------------------------------- #
 def _refine_seq(writer: WriterAI, seq: list[dict[str, Any]]) -> Any:
-    """生成 modify 序列.
+    """Install a preset chat response sequence.
 
     Args:
-        writer: WriterAI 实例。
-        seq: 预置的 chat 返回值序列。
+        writer: WriterAI instance.
+        seq: Preset chat return value sequence.
 
     Returns:
-        配置好的 writer 实例。
+        The configured writer instance.
 
     """
     writer.client.chat.side_effect = list(seq)  # type: ignore[attr-defined]
@@ -685,7 +685,7 @@ def _refine_seq(writer: WriterAI, seq: list[dict[str, Any]]) -> Any:
 
 
 def test_refine_no_tool_calls_then_submit() -> None:
-    """无工具调用轮→提醒；随后 modify 修改；submit 提交."""
+    """Verify a no-tool round is reminded, then modify and submit run."""
     writer, _ = _make_writer()
     with patch("src.agents.writer_ai.execute_modify", return_value={"poem": ["改"]}):
         _refine_seq(
@@ -721,7 +721,7 @@ def test_refine_no_tool_calls_then_submit() -> None:
 
 
 def test_refine_submit_without_modification_allowed() -> None:
-    """未修改直接 submit 现在被允许（不再强制修改后才能提交）."""
+    """Verify submitting without modification is now allowed."""
     writer, _ = _make_writer()
     _refine_seq(
         writer,
@@ -744,14 +744,14 @@ def test_refine_submit_without_modification_allowed() -> None:
 
 
 def test_refine_submit_rejected_when_meter_invalid() -> None:
-    """Submit 时全量格律未通过→拒绝并把错误返回给模型，通过后才提交."""
+    """Verify invalid submit is rejected with errors until meter passes."""
     from src.prosody.meter_validator import ValidationResult
 
     class _SeqValidator:
-        """按序返回预置校验结果的假校验器.
+        """Fake validator returning preset results in order.
 
         Args:
-            results: validate 依次返回的 ValidationResult。
+            results: ValidationResults returned by validate in order.
 
         """
 
@@ -806,17 +806,17 @@ def test_refine_submit_rejected_when_meter_invalid() -> None:
     assert rounds == 2
     submits = [h for h in history if h["tool"] == "submit"]
     assert len(submits) == 2
-    # 第一次 submit 被全量校验拒绝，第二次通过
+    # First submit rejected by full validation; second passes
     assert submits[0]["result"] == {"error": ["第1行不匹配"]}
     assert submits[1]["result"] == "submitted"
-    assert "拒绝提交" in detail
+    assert "rejected" in detail
     assert "第1行不匹配" in detail
 
 
 def test_refine_submit_gate_end_to_end() -> None:
-    """真实五绝模板：不合律 submit 被拒；随后 modify 修正后以全量校验通过收尾."""
+    """Verify real quatrain: invalid submit rejected, then modify fixes it."""
     valid_first_line = "远岸栖云树"
-    # 首句与对句“相对”被破坏（首句第2字改平），全诗不合律
+    # Opposition broken (line 1, syllable 2 made level), so the poem is invalid
     invalid_poem = ["西窗残月冷", "溪流伴月明", "桃红迷柳岸", "古道远山风"]
     valid_poem = [valid_first_line, "溪流伴月明", "桃红迷柳岸", "古道远山风"]
     template = {
@@ -868,16 +868,16 @@ def test_refine_submit_gate_end_to_end() -> None:
     assert rounds == 2
     submits = [h for h in history if h["tool"] == "submit"]
     assert len(submits) == 1
-    # 全量格律未通过时 submit 被拒绝并给出错误信息
+    # Invalid full meter check rejects submit and returns the errors
     assert "error" in submits[0]["result"]
-    assert "拒绝提交" in detail
+    assert "rejected" in detail
     refines = [h for h in history if h["tool"] == "modify"]
     assert len(refines) == 1
     assert "poem" in refines[0]["result"]
 
 
 def test_refine_modify_validation_errors_recorded() -> None:
-    """Modify 修改后全量校验未通过时记录 validation_errors 并继续."""
+    """Verify modify records validation_errors after a failed meter check."""
     invalid_first_line = "西窗残月冷"
     valid_first_line = "远岸栖云树"
     initial_poem = ["远岫依烟岭", "溪流伴月明", "桃红迷柳岸", "古道远山风"]
@@ -933,13 +933,13 @@ def test_refine_modify_validation_errors_recorded() -> None:
     assert poem == [valid_first_line, "溪流伴月明", "桃红迷柳岸", "古道远山风"]
     refines = [h for h in history if h["tool"] == "modify"]
     assert len(refines) == 2
-    # 第一次 modify 改动后全量校验失败 -> 记录 validation_errors
+    # The first modify fails full validation -> validation_errors recorded
     assert "validation_errors" in refines[0]["result"]
-    assert "格律问题" in detail
+    assert "meter issues" in detail
 
 
 def test_refine_search_words_branch() -> None:
-    """search_words 工具分支被处理并写入历史."""
+    """Verify the search_words branch is handled and recorded in history."""
     writer, _ = _make_writer()
     with (
         patch(
@@ -995,7 +995,7 @@ def test_refine_search_words_branch() -> None:
 
 
 def test_refine_modify_error_branch() -> None:
-    """Modify 返回错误时记录失败详情；修正后再次提交通过."""
+    """Verify modify errors are logged; a fixed retry then passes."""
     writer, _ = _make_writer()
     with patch(
         "src.agents.writer_ai.execute_modify",
@@ -1047,11 +1047,11 @@ def test_refine_modify_error_branch() -> None:
         _, _, detail, _, _, _ = writer.refine(
             "主题", ["原"], {"language": "zh", "lines": 1}, msgs
         )
-    assert "失败" in detail
+    assert "failed" in detail
 
 
 def test_refine_modify_title_and_punctuation() -> None:
-    """Modify 的 title / punctuation 分支更新标题与标点."""
+    """Verify modify title/punctuation branches update title and punctuation."""
     writer, _ = _make_writer()
     _refine_seq(
         writer,
@@ -1098,7 +1098,7 @@ def test_refine_modify_title_and_punctuation() -> None:
 
 
 def test_refine_submit_replaces_whole_poem_and_punctuation() -> None:
-    """Submit 的 poem 整首替换与 punctuation 设置."""
+    """Verify submit replaces the whole poem and sets punctuation."""
     writer, _ = _make_writer()
     _refine_seq(
         writer,
@@ -1130,7 +1130,7 @@ def test_refine_submit_replaces_whole_poem_and_punctuation() -> None:
 
 
 def test_refine_submit_punctuation_length_rejected() -> None:
-    """Submit 标点数量与格律行数不符时拒绝提交."""
+    """Verify submit rejects a punctuation count that mismatches lines."""
     writer, _ = _make_writer()
     _refine_seq(
         writer,
@@ -1172,11 +1172,11 @@ def test_refine_submit_punctuation_length_rejected() -> None:
     assert any(
         isinstance(h["result"], dict) and "error" in h["result"] for h in submits
     )
-    assert "标点数量" in detail
+    assert "punctuation marks" in detail
 
 
 def test_refine_submit_punctuation_non_list_rejected() -> None:
-    """Submit 标点非列表时拒绝提交."""
+    """Verify submit rejects non-list punctuation."""
     writer, _ = _make_writer()
     _refine_seq(
         writer,
@@ -1207,11 +1207,11 @@ def test_refine_submit_punctuation_non_list_rejected() -> None:
     assert any(
         isinstance(h["result"], dict) and "error" in h["result"] for h in submits
     )
-    assert "标点必须是字符串列表" in detail
+    assert "Punctuation must be a list of strings" in detail
 
 
 def test_refine_submit_poem_wrong_line_count_rejected() -> None:
-    """Submit 的 poem 行数与格律不符时被拒绝；后续合法整诗替换通过."""
+    """Verify submit rejects a wrong line count, then accepts a valid poem."""
     writer, _ = _make_writer()
     _refine_seq(
         writer,
@@ -1249,13 +1249,13 @@ def test_refine_submit_poem_wrong_line_count_rejected() -> None:
         "主题", ["旧一", "旧二"], {"language": "zh", "lines": 2}, msgs
     )
     submits = [h for h in history if h["tool"] == "submit"]
-    assert any("行数不匹配" in str(h["result"]) for h in submits)
-    assert "拒绝提交" in detail
+    assert any("Line count mismatch" in str(h["result"]) for h in submits)
+    assert "rejected" in detail
     assert poem == ["新一", "新二"]
 
 
 def test_refine_no_progress_guidance() -> None:
-    """连续 3 轮无修改时注入空转引导提示（写入 messages）."""
+    """Verify 3 no-progress rounds inject a guidance message."""
     writer, _ = _make_writer()
     template = {
         "language": "zh",
@@ -1294,14 +1294,14 @@ def test_refine_no_progress_guidance() -> None:
     captured: list[list[dict[str, Any]]] = []
 
     def fake_chat(messages: list[dict[str, Any]], tools: Any = None) -> dict[str, Any]:
-        """捕获消息并按序返回预设响应.
+        """Capture messages and return preset responses in order.
 
         Args:
-            messages: 对话消息列表。
-            tools: 工具定义（忽略）。
+            messages: Conversation message list.
+            tools: Tool definitions (ignored).
 
         Returns:
-            预设的响应字典。
+            Preset response dict.
 
         """
         captured.append(messages)
@@ -1328,7 +1328,7 @@ def test_refine_no_progress_guidance() -> None:
 # Token compression
 # --------------------------------------------------------------------------- #
 def test_check_and_compress_no_op_below_threshold() -> None:
-    """Token 数低于阈值时不压缩."""
+    """Verify no compression below the token threshold."""
     writer, chat = _make_writer()
     chat.count_tokens.return_value = 100
     msgs: list[dict[str, Any]] = [{"role": "user", "content": "test"}]
@@ -1337,7 +1337,7 @@ def test_check_and_compress_no_op_below_threshold() -> None:
 
 
 def test_check_and_compress_triggers_at_threshold() -> None:
-    """Token 数达到阈值时触发压缩."""
+    """Verify compression triggers at the token threshold."""
     from src.agents.writer_ai import COMPRESS_THRESHOLD
 
     writer, chat = _make_writer()
@@ -1354,7 +1354,7 @@ def test_check_and_compress_triggers_at_threshold() -> None:
 # Coverage gaps: _extract_poem_from_messages, generate_draft branches
 # --------------------------------------------------------------------------- #
 def test_extract_poem_from_messages_finds_assistant() -> None:
-    """从 assistant 消息中提取诗行."""
+    """Verify poem lines are extracted from assistant messages."""
     from src.agents.writer_ai import _extract_poem_from_messages
 
     msgs: list[dict[str, Any]] = [
@@ -1366,7 +1366,7 @@ def test_extract_poem_from_messages_finds_assistant() -> None:
 
 
 def test_extract_poem_from_messages_empty() -> None:
-    """无 assistant 消息时返回空列表."""
+    """Verify no assistant message returns an empty list."""
     from src.agents.writer_ai import _extract_poem_from_messages
 
     msgs: list[dict[str, Any]] = [{"role": "user", "content": "hi"}]
@@ -1375,10 +1375,10 @@ def test_extract_poem_from_messages_empty() -> None:
 
 
 def test_generate_draft_submit_empty_content_fallback() -> None:
-    """Submit 时 content 为空，从历史消息提取诗稿."""
+    """Verify an empty submit content falls back to history extraction."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
-        # 第一次: AI 返回空 content + submit tool call
+        # First: AI returns empty content plus a submit tool call
         {
             "content": "",
             "tool_calls": [
@@ -1393,24 +1393,24 @@ def test_generate_draft_submit_empty_content_fallback() -> None:
         "syllable_constraints": None,
     }
     msgs: list[dict[str, Any]] = []
-    # 先手动写入一条 assistant 消息供回退提取
+    # Pre-write one assistant message for the fallback extraction
     msgs.append({"role": "assistant", "content": "一二三四五\n六七八九十"})
     poem, _title, _punct, _ = writer.generate_draft("主题", template, msgs)
     assert len(poem) == 2
 
 
 def test_generate_draft_submit_syllable_fail_then_pass() -> None:
-    """Submit 行数正确但音节错→重试；第二次通过."""
+    """Verify correct lines but wrong syllables retries, then passes."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
-        # 第一次: 行数正确但音节错
+        # First: line count correct but syllables wrong
         {
             "content": "一二三四\n五六七八",
             "tool_calls": [
                 {"id": "1", "name": "submit", "arguments": {"title": "标题"}}
             ],
         },
-        # 第二次: 正确
+        # Second: correct
         {
             "content": "一二三四五\n六七八九十",
             "tool_calls": [
@@ -1430,12 +1430,12 @@ def test_generate_draft_submit_syllable_fail_then_pass() -> None:
 
 
 def test_generate_draft_no_tool_calls_retry() -> None:
-    """AI 不调工具→重试；第二次调 submit 通过."""
+    """Verify no tool call retries, then submit passes."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
-        # 第一次: 无 tool_calls
+        # First: no tool_calls
         {"content": "一二三四五\n六七八九十", "tool_calls": []},
-        # 第二次: submit
+        # Second: submit
         {
             "content": "一二三四五\n六七八九十",
             "tool_calls": [
@@ -1455,12 +1455,12 @@ def test_generate_draft_no_tool_calls_retry() -> None:
 
 
 def test_generate_draft_no_tool_calls_wrong_lines_retry() -> None:
-    """AI 不调工具且行数错→提示重试；第二次通过."""
+    """Verify no tool call plus wrong lines retries, then passes."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
-        # 第一次: 行数错
+        # First: wrong line count
         {"content": "一二三四五", "tool_calls": []},
-        # 第二次: 正确 submit
+        # Second: correct submit
         {
             "content": "一二三四五\n六七八九十",
             "tool_calls": [
@@ -1480,12 +1480,12 @@ def test_generate_draft_no_tool_calls_wrong_lines_retry() -> None:
 
 
 def test_generate_draft_no_tool_calls_syllable_fail_retry() -> None:
-    """AI 不调工具但音节错→提示重试；第二次通过."""
+    """Verify no tool call plus wrong syllables retries, then passes."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
-        # 第一次: 行数对但音节错
+        # First: line count correct but syllables wrong
         {"content": "一二三四\n五六七八", "tool_calls": []},
-        # 第二次: 正确 submit
+        # Second: correct submit
         {
             "content": "一二三四五\n六七八九十",
             "tool_calls": [
@@ -1505,15 +1505,15 @@ def test_generate_draft_no_tool_calls_syllable_fail_retry() -> None:
 
 
 def test_generate_draft_empty_title_retry() -> None:
-    """Submit 时 title 为空→提示重试；第二次通过."""
+    """Verify an empty submit title retries, then passes."""
     writer, chat = _make_writer()
     chat.chat.side_effect = [
-        # 第一次: 空 title
+        # First: empty title
         {
             "content": "一二三四五\n六七八九十",
             "tool_calls": [{"id": "1", "name": "submit", "arguments": {"title": ""}}],
         },
-        # 第二次: 正确
+        # Second: correct
         {
             "content": "一二三四五\n六七八九十",
             "tool_calls": [
@@ -1537,7 +1537,7 @@ def test_generate_draft_empty_title_retry() -> None:
 # format_poem (Chinese templates)
 # --------------------------------------------------------------------------- #
 def test_format_poem_wujue() -> None:
-    """五言绝句格式：一句一行，联内逗号、联末句号."""
+    """Verify five-character quatrain format: one line each, commas/periods."""
     from src.templates.zh import WujueTemplate
 
     t = WujueTemplate()
@@ -1551,7 +1551,7 @@ def test_format_poem_wujue() -> None:
 
 
 def test_format_poem_qijue() -> None:
-    """七言绝句格式：一句一行，联内逗号、联末句号."""
+    """Verify seven-character quatrain format: one line each, commas/periods."""
     from src.templates.zh import QijueTemplate
 
     t = QijueTemplate()
@@ -1561,7 +1561,7 @@ def test_format_poem_qijue() -> None:
 
 
 def test_format_poem_wulv() -> None:
-    """五言律诗格式：一联一行，联间逗号，末联句号."""
+    """Verify five-character regulated verse: one couplet per line."""
     from src.templates.zh import WulvTemplate
 
     t = WulvTemplate()
@@ -1573,7 +1573,7 @@ def test_format_poem_wulv() -> None:
 
 
 def test_format_poem_xiangjianhuan() -> None:
-    """相见欢格式：开头Tab，阙间Tab，默认标点，。。，，."""
+    """Verify Xiangjianhuan format: leading tab, stanza tab, default punctuation."""
     from src.templates.zh import XiangjianhuanTemplate
 
     t = XiangjianhuanTemplate()
@@ -1586,7 +1586,7 @@ def test_format_poem_xiangjianhuan() -> None:
 
 
 def test_format_poem_qilv() -> None:
-    """七言律诗格式：一联一行，联间逗号，末联句号."""
+    """Verify seven-character regulated verse: one couplet per line."""
     from src.templates.zh import QilvTemplate
 
     t = QilvTemplate()
@@ -1598,7 +1598,7 @@ def test_format_poem_qilv() -> None:
 
 
 def test_format_poem_qilv_odd_content() -> None:
-    """七言律诗奇数内容行触发 odd-content 分支."""
+    """Verify seven-character verse odd content lines hit the odd branch."""
     from src.templates.zh import QilvTemplate
 
     t = QilvTemplate()
@@ -1609,7 +1609,7 @@ def test_format_poem_qilv_odd_content() -> None:
 
 
 def test_format_poem_wulv_odd_content() -> None:
-    """五言律诗奇数内容行触发 odd-content 分支."""
+    """Verify five-character verse odd content lines hit the odd branch."""
     from src.templates.zh import WulvTemplate
 
     t = WulvTemplate()
@@ -1620,7 +1620,7 @@ def test_format_poem_wulv_odd_content() -> None:
 
 
 def test_format_poem_base() -> None:
-    """基类 format_poem 默认用换行连接."""
+    """Verify the base format_poem joins lines with newlines."""
     from src.templates.en import ShakespeareSonnetTemplate
 
     t = ShakespeareSonnetTemplate()
@@ -1629,7 +1629,7 @@ def test_format_poem_base() -> None:
 
 
 def test_format_poem_en_haiku() -> None:
-    """英文模板使用基类 format_poem（换行连接）."""
+    """Verify the English template uses the base newline-joining format_poem."""
     from src.templates.en import VillanelleTemplate
 
     t = VillanelleTemplate()
@@ -1638,7 +1638,7 @@ def test_format_poem_en_haiku() -> None:
 
 
 def test_format_poem_fr_haiku() -> None:
-    """法语模板使用基类 format_poem（换行连接）."""
+    """Verify the French template uses the base newline-joining format_poem."""
     from src.templates.fr import RondeauTemplate
 
     t = RondeauTemplate()
@@ -1647,7 +1647,7 @@ def test_format_poem_fr_haiku() -> None:
 
 
 def test_format_poem_it_haiku() -> None:
-    """意大利语模板使用基类 format_poem（换行连接）."""
+    """Verify the Italian template uses the base format_poem newline join."""
     from src.templates.it import TerzaRimaTemplate
 
     t = TerzaRimaTemplate()
@@ -1656,7 +1656,7 @@ def test_format_poem_it_haiku() -> None:
 
 
 def test_format_poem_la_elegy() -> None:
-    """拉丁语模板使用基类 format_poem（换行连接）."""
+    """Verify the Latin template uses the base newline-joining format_poem."""
     from src.templates.la import HexameterTemplate
 
     t = HexameterTemplate()
@@ -1665,7 +1665,7 @@ def test_format_poem_la_elegy() -> None:
 
 
 def test_format_poem_base_with_punctuation() -> None:
-    """基类 format_poem 提供标点时逐行套用."""
+    """Verify the base format_poem applies punctuation line by line."""
     from src.templates.en import ShakespeareSonnetTemplate
 
     t = ShakespeareSonnetTemplate()
@@ -1674,7 +1674,7 @@ def test_format_poem_base_with_punctuation() -> None:
 
 
 def test_format_poem_wulv_with_punctuation() -> None:
-    """五言律诗提供标点时按联拼接."""
+    """Verify five-character regulated verse joins couplets with punctuation."""
     from src.templates.zh import WulvTemplate
 
     t = WulvTemplate()
@@ -1686,7 +1686,7 @@ def test_format_poem_wulv_with_punctuation() -> None:
 
 
 def test_format_poem_wulv_with_punctuation_odd() -> None:
-    """五言律诗提供标点且正文奇数行时触发 odd-content 分支."""
+    """Verify odd content lines hit the odd branch with punctuation supplied."""
     from src.templates.zh import WulvTemplate
 
     t = WulvTemplate()
@@ -1695,7 +1695,7 @@ def test_format_poem_wulv_with_punctuation_odd() -> None:
 
 
 def test_format_poem_qilv_with_punctuation() -> None:
-    """七言律诗提供标点时按联拼接."""
+    """Verify seven-character regulated verse joins couplets with punctuation."""
     from src.templates.zh import QilvTemplate
 
     t = QilvTemplate()
@@ -1706,7 +1706,7 @@ def test_format_poem_qilv_with_punctuation() -> None:
 
 
 def test_format_poem_qilv_with_punctuation_odd() -> None:
-    """七言律诗提供标点且正文奇数行时触发 odd-content 分支."""
+    """Verify odd content lines hit the odd branch with punctuation supplied."""
     from src.templates.zh import QilvTemplate
 
     t = QilvTemplate()
@@ -1715,7 +1715,7 @@ def test_format_poem_qilv_with_punctuation_odd() -> None:
 
 
 def test_format_poem_xiangjianhuan_with_punctuation() -> None:
-    """相见欢提供标点时逐行套用后再按阙拼接."""
+    """Verify Xiangjianhuan applies punctuation per line, then joins stanzas."""
     from src.templates.zh import XiangjianhuanTemplate
 
     t = XiangjianhuanTemplate()
@@ -1727,7 +1727,7 @@ def test_format_poem_xiangjianhuan_with_punctuation() -> None:
 
 
 def test_format_poem_rumengling() -> None:
-    """如梦令格式：开头Tab，单调不分阕，默认标点."""
+    """Verify Rumengling format: leading tab, single stanza, default punctuation."""
     from src.templates.zh import RumenglingTemplate
 
     t = RumenglingTemplate()
@@ -1746,12 +1746,12 @@ def test_format_poem_rumengling() -> None:
     assert "常记溪亭日暮，" in result
     assert "沉醉不知归路。" in result
     assert "争渡，争渡，" in result
-    # 单调：正文内不出现阙间 Tab（仅开头一个 Tab）
+    # Single stanza: no inter-stanza tab in the body (only the leading one)
     assert result.split("\n")[1].count("\t") == 1
 
 
 def test_format_poem_langtaosha() -> None:
-    """浪淘沙格式：开头Tab，上下片阙间Tab，默认标点."""
+    """Verify Langtaosha format: leading tab, stanza tab, default punctuation."""
     from src.templates.zh import LangtaoshaTemplate
 
     t = LangtaoshaTemplate()
@@ -1764,7 +1764,7 @@ def test_format_poem_langtaosha() -> None:
 
 
 def test_format_poem_qingpingyue() -> None:
-    """清平乐格式：开头Tab，上下片阙间Tab，默认标点."""
+    """Verify Qingpingyue format: leading tab, stanza tab, default punctuation."""
     from src.templates.zh import QingpingyueTemplate
 
     t = QingpingyueTemplate()
@@ -1777,7 +1777,7 @@ def test_format_poem_qingpingyue() -> None:
 
 
 def test_format_poem_langtaosha_with_punctuation() -> None:
-    """浪淘沙提供标点时逐行套用."""
+    """Verify Langtaosha applies punctuation line by line."""
     from src.templates.zh import LangtaoshaTemplate
 
     t = LangtaoshaTemplate()

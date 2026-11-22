@@ -49,7 +49,7 @@ body::before {
   padding: 28px 20px 40px;
 }
 
-/* ---- 页头 ---- */
+/* ---- Header ---- */
 
 header {
   display: flex;
@@ -127,7 +127,7 @@ html[lang="en"] .slogan {
   transform: rotate(30deg);
 }
 
-/* ---- LLM 连通性指示灯 ---- */
+/* ---- LLM connectivity indicator ---- */
 
 .header-right {
   display: flex;
@@ -191,7 +191,7 @@ html[lang="en"] .slogan {
   white-space: nowrap;
 }
 
-/* ---- 卡片基础样式 ---- */
+/* ---- Card basics ---- */
 
 .card {
   background: rgba(255, 255, 255, 0.75);
@@ -240,7 +240,7 @@ html[lang="en"] .slogan {
   letter-spacing: 3px;
 }
 
-/* ---- 输入区 ---- */
+/* ---- Input area ---- */
 
 .input-section {
   background: rgba(255, 255, 255, 0.75);
@@ -376,7 +376,7 @@ html[lang="en"] .slogan {
   gap: 12px;
 }
 
-/* ---- 按钮 ---- */
+/* ---- Buttons ---- */
 
 .btn-primary {
   padding: 12px 28px;
@@ -538,7 +538,7 @@ html[lang="en"] .slogan {
   box-shadow: 0 4px 14px rgba(139, 115, 85, 0.3);
 }
 
-/* ---- 进度步骤 ---- */
+/* ---- Progress steps ---- */
 
 .progress-step {
   margin-bottom: 2px;
@@ -681,7 +681,7 @@ html[lang="en"] .slogan {
   cursor: text;
 }
 
-/* ---- 诗稿展示 ---- */
+/* ---- Poem display ---- */
 
 #poem-display {
   text-align: center;
@@ -758,7 +758,7 @@ html[lang="en"] .slogan {
   min-height: 24px;
 }
 
-/* ---- 工具状态 ---- */
+/* ---- Tool status ---- */
 
 .tool-status {
   margin-top: 10px;
@@ -794,7 +794,7 @@ html[lang="en"] .slogan {
   font-size: 11px;
 }
 
-/* ---- 检查内联结果 ---- */
+/* ---- Inline check result ---- */
 
 .checker-inline {
   margin-top: 18px;
@@ -851,7 +851,7 @@ html[lang="en"] .slogan {
   animation: fade-in 0.4s ease-out 0.2s both;
 }
 
-/* ---- 反馈区 ---- */
+/* ---- Feedback area ---- */
 
 .feedback-buttons {
   display: flex;
@@ -877,7 +877,7 @@ html[lang="en"] .slogan {
   }
 }
 
-/* ---- 弹窗 ---- */
+/* ---- Modals ---- */
 
 .modal {
   position: fixed;
@@ -980,7 +980,7 @@ html[lang="en"] .slogan {
   margin-top: 20px;
 }
 
-/* ---- 自定义模板弹窗 ---- */
+/* ---- Custom template modal ---- */
 
 .modal-wide {
   width: 680px;
@@ -1079,7 +1079,7 @@ html[lang="en"] .slogan {
   text-align: center;
 }
 
-/* ---- 诗稿标题行 ---- */
+/* ---- Poem title row ---- */
 
 .section-header-row {
   display: flex;
@@ -1109,7 +1109,7 @@ html[lang="en"] .slogan {
   border-color: rgba(139, 115, 85, 0.4);
 }
 
-/* ---- 历史记录 ---- */
+/* ---- History ---- */
 
 .history-list {
   max-height: 420px;
@@ -1174,7 +1174,7 @@ html[lang="en"] .slogan {
   user-select: text;
 }
 
-/* ---- 导入遮罩层 ---- */
+/* ---- Import overlay ---- */
 
 .import-overlay {
   position: fixed;
@@ -1222,7 +1222,7 @@ html[lang="en"] .slogan {
   }
 }
 
-/* ---- Toast 通知 ---- */
+/* ---- Toast notifications ---- */
 
 #toast-container {
   position: fixed;
@@ -1275,7 +1275,7 @@ html[lang="en"] .slogan {
   background: linear-gradient(135deg, #6a7b8a, #8a9baa);
 }
 
-/* ---- 滚动条 ---- */
+/* ---- Scrollbars ---- */
 
 ::-webkit-scrollbar {
   width: 6px;
@@ -1294,7 +1294,7 @@ html[lang="en"] .slogan {
   background: rgba(139, 115, 85, 0.5);
 }
 
-/* ---- 诗组 ---- */
+/* ---- Poem sequences ---- */
 
 .sequence-plan {
   white-space: pre-wrap;
@@ -1354,7 +1354,8 @@ html[lang="en"] .slogan {
   margin-bottom: 6px;
 }
 
-/* 诗组中的单首标题与单首诗稿共用标题组件；比正文略大、加粗。 */
+/* A sequence poem's title shares the title component with single poems;
+   it is slightly larger than the body and bold. */
 .sequence-poem .poem-title {
   font-size: 24px;
   letter-spacing: 4px;
@@ -1410,7 +1411,7 @@ html[lang="en"] .slogan {
   cursor: pointer;
 }
 
-/* ---- 多重音节约束 ---- */
+/* ---- Multi-syllable constraints ---- */
 
 .syllable-alternatives {
   display: flex;
@@ -1440,7 +1441,7 @@ html[lang="en"] .slogan {
   background: transparent;
 }
 
-/* ---- 模板转化 ---- */
+/* ---- Template conversion ---- */
 
 .tmpl-conversion {
   margin-top: 10px;
@@ -1550,7 +1551,7 @@ html[lang="en"] .slogan {
   font-size: 12px;
 }
 
-/* ---- 押韵 ---- */
+/* ---- Rhyme ---- */
 
 .rhyme-hint {
   font-size: 11px;
@@ -1605,7 +1606,7 @@ html[lang="en"] .slogan {
   cursor: pointer;
 }
 
-/* ---- 模板 AI 面板 ---- */
+/* ---- Template AI panel ---- */
 
 .tmpl-ai-panel {
   border: 1px solid rgba(180, 150, 120, 0.3);
@@ -1749,7 +1750,7 @@ html[lang="en"] .slogan {
   cursor: not-allowed;
 }
 
-/* ---- 模板管理（拖动排序 / 删除） ---- */
+/* ---- Template management (drag to reorder / delete) ---- */
 
 .template-manage-list {
   display: flex;
@@ -1823,7 +1824,7 @@ html[lang="en"] .slogan {
   background: rgba(179, 64, 46, 0.12);
 }
 
-/* ---- 应用内确认弹窗 ---- */
+/* ---- In-app confirm dialog ---- */
 
 .confirm-modal {
   z-index: 300;

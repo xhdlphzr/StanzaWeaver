@@ -1,12 +1,15 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""诗组流水线：规划 → 逐首生成/检查 → 汇总.
+"""Poem-sequence pipeline: plan, generate/check poem by poem, aggregate.
 
-Step 1 由 SequenceArchitect 规划诗组标题与每首诗的格律/创作要求；
-Step 2 按顺序为每首诗开启独立会话，复用单首 PoetryPipeline（描述 → 初稿 →
-炼句 → 检查 AI 终审），并把诗组总目标与前面已完成诗作注入当前诗；
-全部完成后汇总为诗组结果。跨首一致性靠规划与注入，不另做整组符号检查。
+Step 1 has the SequenceArchitect plan the sequence title and each poem's meter
+and creative requirements. Step 2 runs each poem in order in its own session,
+reusing the single-poem PoetryPipeline (description, first draft, line
+refinement, checker AI final review) and injecting the sequence goal and the
+already finished poems into the current poem. The results are aggregated once
+all poems finish. Cross-poem consistency relies on planning and injection; no
+separate symbolic check is performed for the whole sequence.
 """
 
 from collections.abc import Callable
@@ -25,7 +28,7 @@ ProgressCallback = Callable[[dict[str, Any]], None] | None
 
 @dataclass
 class SequencePoemState:
-    """诗组中单首诗的生成状态."""
+    """Generation state of one poem in the sequence."""
 
     title: str
     template_key: str
@@ -44,7 +47,7 @@ class SequencePoemState:
 
 @dataclass
 class SequenceState:
-    """一次诗组生成的完整状态."""
+    """Complete state of one sequence generation."""
 
     topic: str = ""
     title: str = ""
@@ -57,18 +60,19 @@ class SequenceState:
 
 
 class PoemSequencePipeline:
-    """诗组流水线：架构师规划 → 逐首走单首流水线 → 汇总."""
+    """Poem-sequence pipeline: architect planning, per-poem pipeline, aggregation."""
 
     def __init__(
         self,
         writer_config: dict[str, Any] | None = None,
         checker_config: dict[str, Any] | None = None,
     ):
-        """初始化诗组流水线.
+        """Initialize the poem-sequence pipeline.
 
         Args:
-            writer_config: 编写/架构 AI 配置（缺省读全局配置）。
-            checker_config: 检查 AI 配置（缺省读全局配置）。
+            writer_config: Writer/architect AI config (defaults to the global
+                config).
+            checker_config: Checker AI config (defaults to the global config).
 
         """
         config = get_config()
@@ -78,10 +82,10 @@ class PoemSequencePipeline:
         self._on_progress: ProgressCallback = None
 
     def _get_architect(self) -> SequenceArchitect:
-        """获取架构师（惰性初始化）.
+        """Get the architect (initialized lazily).
 
         Returns:
-            SequenceArchitect 实例。
+            SequenceArchitect instance.
 
         """
         if self.architect is None:
@@ -89,10 +93,10 @@ class PoemSequencePipeline:
         return self.architect
 
     def _make_poem_pipeline(self) -> PoetryPipeline:
-        """创建单首流水线（便于测试替换）.
+        """Create a single-poem pipeline (easy to replace in tests).
 
         Returns:
-            PoetryPipeline 实例。
+            PoetryPipeline instance.
 
         """
         return PoetryPipeline(self.writer_config, self.checker_config)
@@ -104,20 +108,21 @@ class PoemSequencePipeline:
         max_rounds: int = 12,
         template_keys: list[str] | None = None,
     ) -> SequenceState:
-        """执行诗组生成.
+        """Run sequence generation.
 
         Args:
-            topic: 诗组总目标。
-            on_progress: 进度回调。
-            max_rounds: 规划最大轮数。
-            template_keys: 用户固定的每首格律 key 列表；提供时不再由架构师
-                新增诗，仅让其设定诗组标题与每首创作要求。
+            topic: Overall sequence goal.
+            on_progress: Progress callback.
+            max_rounds: Maximum planning rounds.
+            template_keys: User-fixed meter keys for each poem; when provided,
+                the architect no longer adds poems and only sets the sequence
+                title and per-poem creative requirements.
 
         Returns:
-            最终诗组状态。
+            Final sequence state.
 
         Raises:
-            ValueError: template_keys 为空或包含未知模板。
+            ValueError: template_keys is empty or contains an unknown template.
 
         """
         self._on_progress = on_progress
@@ -125,14 +130,14 @@ class PoemSequencePipeline:
         seed: list[SequencePoemPlan] | None = None
         if template_keys is not None:
             if not template_keys:
-                raise ValueError("诗组至少需要一首诗")
+                raise ValueError("A poem sequence needs at least one poem")
             seed = []
             for index, key in enumerate(template_keys, 1):
                 try:
                     get_template(key)
                 except KeyError as exc:
-                    raise ValueError(f"未知格律模板 key: {key}") from exc
-                seed.append(SequencePoemPlan(title=f"第{index}首", template_key=key))
+                    raise ValueError(f"Unknown meter template key: {key}") from exc
+                seed.append(SequencePoemPlan(title=f"Poem {index}", template_key=key))
         plan = self._get_architect().plan(
             topic, catalog=catalog, max_rounds=max_rounds, poems=seed
         )
@@ -185,54 +190,60 @@ class PoemSequencePipeline:
         return state
 
     def _poem_instruction(self, state: SequenceState, index: int) -> str:
-        """构造第 index 首诗的生成指令（总目标 + 本首要求 + 前作摘要）.
+        """Build the generation instruction for the poem at ``index``.
+
+        The instruction combines the overall goal, this poem's requirements, and
+        a summary of previous poems.
 
         Args:
-            state: 诗组状态。
-            index: 诗序号（0-based）。
+            state: Sequence state.
+            index: Poem index (0-based).
 
         Returns:
-            作为单首流水线 topic 的指令文本。
+            Instruction text used as the single-poem pipeline topic.
 
         """
         poem = state.poems[index]
         tpl = get_template(poem.template_key)
         parts = [
-            f"【诗组总目标】{state.topic}",
-            f"【诗组标题】{state.title}",
-            f"【本首要求】{poem.prompt}",
-            f"【本首格律】{tpl.name}（{tpl.language}，{tpl.lines} 行）\n{tpl.describe()}",
+            f"[Sequence goal] {state.topic}",
+            f"[Sequence title] {state.title}",
+            f"[This poem's requirements] {poem.prompt}",
+            (
+                f"[This poem's meter] {tpl.name} ({tpl.language}, "
+                f"{tpl.lines} lines)\n{tpl.describe()}"
+            ),
         ]
         previous = state.poems[:index]
         if previous:
             lines: list[str] = []
             for number, prev in enumerate(previous, 1):
-                first_line = prev.draft[0] if prev.draft else "（未完成）"
+                first_line = prev.draft[0] if prev.draft else "(unfinished)"
                 title = prev.final_title or prev.title
-                lines.append(f"第{number}首《{title}》首句：{first_line}")
-            parts.append("【前面已创作】\n" + "\n".join(lines))
-        parts.append("请仅创作本首，不要续写或重复前面的诗作。")
+                lines.append(f'Poem {number} "{title}" first line: {first_line}')
+            parts.append("[Previously written]\n" + "\n".join(lines))
+        parts.append("Write only this poem; do not continue or repeat earlier poems.")
         return "\n\n".join(parts)
 
     def _poem_progress_callback(
         self, state: SequenceState, index: int
     ) -> Callable[[dict[str, Any]], None]:
-        """构造绑定到某首诗的进度回调.
+        """Build a progress callback bound to one poem.
 
         Args:
-            state: 诗组状态。
-            index: 诗序号。
+            state: Sequence state.
+            index: Poem index.
 
         Returns:
-            单参数进度回调。
+            A single-argument progress callback.
 
         """
 
         def on_progress(info: dict[str, Any]) -> None:
-            """把单首进度合并进诗组状态.
+            """Merge single-poem progress into the sequence state.
 
             Args:
-                info: 单首流水线进度字典。
+                info: Single-poem pipeline progress dict.
 
             """
             self._on_poem_progress(state, index, info)
@@ -242,12 +253,12 @@ class PoemSequencePipeline:
     def _on_poem_progress(
         self, state: SequenceState, index: int, info: dict[str, Any]
     ) -> None:
-        """把单首进度合并进诗组状态并推送.
+        """Merge single-poem progress into the sequence state and push it.
 
         Args:
-            state: 诗组状态。
-            index: 诗序号。
-            info: 单首流水线进度字典。
+            state: Sequence state.
+            index: Poem index.
+            info: Single-poem pipeline progress dict.
 
         """
         poem = state.poems[index]
@@ -271,10 +282,10 @@ class PoemSequencePipeline:
         self._report(state)
 
     def _report(self, state: SequenceState) -> None:
-        """推送诗组进度.
+        """Push sequence progress.
 
         Args:
-            state: 诗组状态。
+            state: Sequence state.
 
         """
         if self._on_progress:
@@ -292,13 +303,13 @@ class PoemSequencePipeline:
 
     @staticmethod
     def _poem_dict(poem: SequencePoemState) -> dict[str, Any]:
-        """把单首状态转为可序列化字典.
+        """Convert single-poem state to a serializable dictionary.
 
         Args:
-            poem: 单首状态。
+            poem: Single-poem state.
 
         Returns:
-            字典形式。
+            Dictionary form.
 
         """
         return {

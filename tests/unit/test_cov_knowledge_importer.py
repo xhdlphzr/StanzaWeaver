@@ -201,10 +201,11 @@ def test_import_skip_when_dataset_present() -> None:
 
 
 def test_import_all_runs_to_completion() -> None:
-    """import_all 在数据集已存在时全部走跳过分支（覆盖 508-517 及各 skip return）.
+    """Verify import_all takes every skip branch when datasets exist.
 
-    直接驱动 ``import_all``，确保其在干净环境下也能完整执行（不经 app 后台
-    线程且不受网络影响），从而覆盖 import_all 函数体本身。
+    Cover lines 508-517 and each skip return. Drive ``import_all`` directly
+    so it runs fully in a clean environment (no app background thread, no
+    network), covering the import_all body itself.
     """
     with (
         mock.patch.object(imp, "_check_dataset", return_value=True),
@@ -222,7 +223,7 @@ def _chinese_text() -> str:
     """Build a CC-CEDICT snippet covering every parse branch.
 
     Returns:
-        CC-CEDICT 格式的词典文本。
+        Dictionary text in CC-CEDICT format.
 
     """
     lines = [
@@ -253,7 +254,7 @@ def test_import_chinese_success() -> None:
     ):
         imp._import_chinese()
         assert ins.call_count >= 1
-        # 验证至少有一个批次包含正确的 Word 对象
+        # Verify at least one batch contains the correct Word objects
         first_batch = ins.call_args_list[0][0][0]
         assert len(first_batch) >= 1
         assert first_batch[0].language == "zh"
@@ -278,7 +279,7 @@ def _english_dict() -> dict[str, list[tuple[str, ...]]]:
     """Build CMUdict stub data covering every branch.
 
     Returns:
-        模拟 CMUdict 的字典数据。
+        Stub CMUdict dictionary data.
 
     """
     data: dict[str, list[tuple[str, ...]]] = {
@@ -297,10 +298,10 @@ def _patch_nltk(data: dict[str, list[tuple[str, ...]]]) -> Any:
     """Inject nltk / cmudict stubs; returns a patch context manager.
 
     Args:
-        data: 模拟 CMUdict 的字典数据。
+        data: Stub CMUdict dictionary data.
 
     Returns:
-        mock.patch.dict 上下文管理器。
+        A mock.patch.dict context manager.
 
     """
     nltk_mod = types.ModuleType("nltk")
@@ -332,11 +333,11 @@ def test_import_english_success() -> None:
     ):
         imp._import_english()
         assert ins.call_count >= 1
-        # 验证至少有一个批次包含正确的 Word 对象
+        # Verify at least one batch contains the correct Word objects
         first_batch = ins.call_args_list[0][0][0]
         assert len(first_batch) >= 1
         assert first_batch[0].language == "en"
-        # 验证 set_en_pron 被调用且包含多发音词
+        # Verify set_en_pron is called and includes multi-pronunciation words
         pron_calls = {c[0][0]: c[0][1] for c in set_pron.call_args_list}
         assert "hello" in pron_calls
         set_ds.assert_called_once_with("en", "CMUdict")
@@ -377,10 +378,10 @@ def _fr_syl(w: str) -> list[Syllable]:
     """Stub a controlled French syllable splitter.
 
     Args:
-        w: 待分音节的单词。
+        w: Word to syllabify.
 
     Returns:
-        分音节后的 Syllable 列表。
+        List of Syllables after syllabification.
 
     """
     if w == "we":
@@ -396,7 +397,7 @@ def _french_text() -> str:
     """Build a Lexique TSV snippet covering every branch.
 
     Returns:
-        Lexique382 格式的词典文本。
+        Dictionary text in Lexique382 format.
 
     """
     rows = [
@@ -466,10 +467,10 @@ def _it_syl(w: str) -> list[Syllable]:
     """Stub a controlled Italian syllable splitter.
 
     Args:
-        w: 待分音节的单词。
+        w: Word to syllabify.
 
     Returns:
-        分音节后的 Syllable 列表。
+        List of Syllables after syllabification.
 
     """
     if w in ("bb", "fbad"):
@@ -481,7 +482,7 @@ def _italian_text() -> str:
     """Build a GLAW-IT XML snippet covering every branch.
 
     Returns:
-        GLAW-IT 格式的词典文本。
+        Dictionary text in GLAW-IT format.
 
     """
     parts = [
@@ -554,10 +555,10 @@ def _la_analyze(clean: str) -> list[Syllable]:
     """Stub a controlled Latin analyzer.
 
     Args:
-        clean: 清理后的拉丁文单词。
+        clean: Cleaned Latin word.
 
     Returns:
-        分析后的 Syllable 列表。
+        List of analyzed Syllables.
 
     """
     if clean == "zzz":
@@ -569,7 +570,7 @@ def _latin_text() -> str:
     """Build a Lewis & Short snippet covering every branch.
 
     Returns:
-        Lewis-Short 格式的词典文本。
+        Dictionary text in Lewis-Short format.
 
     """
     lines = [

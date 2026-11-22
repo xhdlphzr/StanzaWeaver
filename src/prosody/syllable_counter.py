@@ -1,11 +1,13 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""多语言统一音节计数与整行分析入口.
+"""Unified multi-language syllable counting and whole-line analysis entry point.
 
-按语言路由到对应分析器，统一以 ``analyze_line_variants`` 为唯一行级口径：
-中文整行交给 pypinyin（上下文消歧多音字），意大利语整行做 sinalefe 合并，
-法语整行做跨词联诵，拉丁语整行做省音与跨词音长，其余语言逐词切分。
+Routes by language to the matching analyzer, always using
+``analyze_line_variants`` as the single line-level convention: Chinese whole
+lines go to pypinyin (context-aware polyphonic disambiguation), Italian lines
+apply sinalefe merging, French lines apply cross-word liaison, Latin lines apply
+elision and cross-word vowel length, and other languages are split word by word.
 """
 
 from ..models.syllable import Syllable
@@ -26,27 +28,27 @@ _ANALYZERS: dict[str, SyllableAnalyzer] = {
 
 
 def register_analyzer(language: str, analyzer: SyllableAnalyzer) -> None:
-    """注册（或覆盖）某语言的分析器.
+    """Register (or override) the analyzer for a language.
 
     Args:
-        language: 语言代码（zh/en/it/fr/la）。
-        analyzer: 分析器实例。
+        language: Language code (zh/en/it/fr/la).
+        analyzer: Analyzer instance.
 
     """
     _ANALYZERS[language] = analyzer
 
 
 def get_analyzer(language: str) -> SyllableAnalyzer:
-    """按语言获取分析器.
+    """Get the analyzer for a language.
 
     Args:
-        language: 语言代码。
+        language: Language code.
 
     Returns:
-        对应分析器实例。
+        The matching analyzer instance.
 
     Raises:
-        ValueError: 未注册该语言。
+        ValueError: If the language is not registered.
 
     """
     if language in _ANALYZERS:
@@ -55,31 +57,34 @@ def get_analyzer(language: str) -> SyllableAnalyzer:
 
 
 def count_syllables(text: str, language: str) -> int:
-    """统计文本音节数（与整行分析同口径）.
+    """Count the syllables in a text (same convention as whole-line analysis).
 
     Args:
-        text: 任意文本。
-        language: 语言代码。
+        text: Arbitrary text.
+        language: Language code.
 
     Returns:
-        音节总数。
+        Total syllable count.
 
     """
     return len(analyze_line(text, language))
 
 
 def analyze_line(line: str, language: str) -> list[Syllable]:
-    """分析一行的音节（取 ``analyze_line_variants`` 的首个非空变体）.
+    """Analyze the syllables of a line (first non-empty variant).
 
-    各语言的行级特性（中文多音字消歧、意大利语 sinalefe、法语联诵、
-    拉丁语省音等）统一由各分析器的 ``analyze_line_variants`` 提供。
+    Delegates to the analyzer's ``analyze_line_variants`` and returns its first
+    non-empty variant. Line-level features (Chinese polyphonic disambiguation,
+    Italian sinalefe, French liaison, Latin elision, etc.) are provided
+    uniformly by each analyzer's ``analyze_line_variants``.
 
     Args:
-        line: 一行诗。
-        language: 语言代码。
+        line: One line of verse.
+        language: Language code.
 
     Returns:
-        整行音节列表；无有效音节时返回空列表。
+        Syllable list for the whole line; empty if there are no valid
+        syllables.
 
     """
     for variant in get_analyzer(language).analyze_line_variants(line):

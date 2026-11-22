@@ -1,18 +1,19 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""modify 工具执行：按类型修改诗稿（行 / 标题 / 标点）.
+"""modify tool execution: modify the draft by type (line / title / punctuation).
 
-- line：整行替换（前置单行格律校验）；
-- title：替换标题；
-- punctuation：替换标点列表（长度须等于格律行数）。
+- line: replace a whole line (validate the new line's meter first);
+- title: replace the title;
+- punctuation: replace the punctuation list (its length must equal the meter
+  line count).
 """
 
 from typing import Any
 
 from ..prosody.meter_validator import MeterValidator
 
-#: 合法的修改类型。
+#: Valid modification types.
 MODIFY_TYPES: tuple[str, ...] = ("line", "title", "punctuation")
 
 
@@ -23,26 +24,30 @@ def execute_modify(
     title: str = "",
     punctuation: list[str] | None = None,
 ) -> dict[str, Any]:
-    """执行一次修改.
+    """Execute one modification.
 
     Args:
-        poem: 当前诗稿（正文行）。
-        template: 模板字典。
-        arguments: 工具参数（modify_type / line / content）。
-        title: 当前标题（title 类型回传旧值）。
-        punctuation: 当前标点（punctuation 类型回传旧值）。
+        poem: Current draft (body lines).
+        template: Template dictionary.
+        arguments: Tool arguments (modify_type / line / content).
+        title: Current title (returned as the old value for the title type).
+        punctuation: Current punctuation (returned as the old value for the
+            punctuation type).
 
     Returns:
-        line 类型返回 {"poem", "changed_line", "old_text", "new_text"}；
-        title 类型返回 {"title", "old_title"}；
-        punctuation 类型返回 {"punctuation", "old_punctuation"}；
-        失败统一返回 {"error": 描述}。
+        For the line type, ``{"poem", "changed_line", "old_text", "new_text"}``;
+        for the title type, ``{"title", "old_title"}``; for the punctuation
+        type, ``{"punctuation", "old_punctuation"}``; failures return
+        ``{"error": description}`` in every case.
 
     """
     modify_type = str(arguments.get("modify_type", "")).strip()
     if modify_type not in MODIFY_TYPES:
         return {
-            "error": f"未知修改类型 {modify_type!r}，应为 line/title/punctuation 之一"
+            "error": (
+                f"Unknown modify type {modify_type!r}; expected line, title or "
+                "punctuation"
+            )
         }
     if modify_type == "line":
         return _modify_line(poem, template, arguments)
@@ -54,28 +59,33 @@ def execute_modify(
 def _modify_line(
     poem: list[str], template: dict[str, Any], arguments: dict[str, Any]
 ) -> dict[str, Any]:
-    """整行替换：校验行号与新行格律后原位替换.
+    """Replace a whole line after validating the line number and its meter.
 
     Args:
-        poem: 当前诗稿。
-        template: 模板字典。
-        arguments: 工具参数（line / content）。
+        poem: Current draft.
+        template: Template dictionary.
+        arguments: Tool arguments (line / content).
 
     Returns:
-        替换结果或 {"error": 描述}。
+        Replacement result, or ``{"error": description}``.
 
     """
     if "line" not in arguments:
-        return {"error": "line 类型需要提供行数参数 line（从0开始）"}
+        return {"error": "The line type requires the line argument (0-based)"}
     try:
         line_idx = int(arguments["line"])
     except TypeError, ValueError:
-        return {"error": "行数参数 line 必须是整数"}
+        return {"error": "The line argument must be an integer"}
     content = arguments.get("content", "")
     if not isinstance(content, str):
-        return {"error": "line 类型的 content 必须是字符串"}
+        return {"error": "content for the line type must be a string"}
     if line_idx < 0 or line_idx >= len(poem):
-        return {"error": f"行号 {line_idx} 越界，共 {len(poem)} 行"}
+        return {
+            "error": (
+                f"Line number {line_idx} is out of range; the draft has "
+                f"{len(poem)} lines"
+            )
+        }
 
     result = MeterValidator().validate_line(content, line_idx, template)
     if not result.passed:
@@ -93,22 +103,22 @@ def _modify_line(
 
 
 def _modify_title(arguments: dict[str, Any], title: str) -> dict[str, Any]:
-    """替换标题（去空白后不得为空）.
+    """Replace the title (it must not be empty after stripping whitespace).
 
     Args:
-        arguments: 工具参数（content）。
-        title: 当前标题。
+        arguments: Tool arguments (content).
+        title: Current title.
 
     Returns:
-        {"title", "old_title"} 或 {"error": 描述}。
+        ``{"title", "old_title"}`` or ``{"error": description}``.
 
     """
     content = arguments.get("content", "")
     if not isinstance(content, str):
-        return {"error": "title 类型的 content 必须是字符串"}
+        return {"error": "content for the title type must be a string"}
     new_title = content.strip()
     if not new_title:
-        return {"error": "标题不能为空"}
+        return {"error": "Title cannot be empty"}
     return {"title": new_title, "old_title": title}
 
 
@@ -117,25 +127,25 @@ def _modify_punctuation(
     arguments: dict[str, Any],
     punctuation: list[str] | None,
 ) -> dict[str, Any]:
-    """替换标点列表（长度须等于格律行数）.
+    """Replace the punctuation list (its length must equal the meter line count).
 
     Args:
-        template: 模板字典（提供格律行数）。
-        arguments: 工具参数（content）。
-        punctuation: 当前标点。
+        template: Template dictionary (provides the meter line count).
+        arguments: Tool arguments (content).
+        punctuation: Current punctuation.
 
     Returns:
-        {"punctuation", "old_punctuation"} 或 {"error": 描述}。
+        ``{"punctuation", "old_punctuation"}`` or ``{"error": description}``.
 
     """
     content = arguments.get("content")
     if not isinstance(content, list) or not all(
         isinstance(item, str) for item in content
     ):
-        return {"error": "punctuation 类型的 content 必须是字符串列表"}
+        return {"error": "content for the punctuation type must be a list of strings"}
     expected = int(template.get("lines", len(content)))
     if len(content) != expected:
-        return {"error": f"标点数量应为 {expected} 个，实际 {len(content)} 个"}
+        return {"error": f"Expected {expected} punctuation items, got {len(content)}"}
     return {
         "punctuation": list(content),
         "old_punctuation": list(punctuation or []),

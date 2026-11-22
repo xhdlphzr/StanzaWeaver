@@ -1,10 +1,11 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""src.knowledge.vocabulary 的 100% 行覆盖补全测试.
+"""Fill line-coverage gaps in src.knowledge.vocabulary.
 
-使用临时文件型 SQLite 数据库（经 ``set_db_path`` 注入），不触碰任何
-真实磁盘库或网络；``rerank`` 通过 patch 替换以避免加载嵌入模型。
+Use a temporary file-backed SQLite database (injected via ``set_db_path``)
+without touching any real on-disk database or network; ``rerank`` is
+patched out to avoid loading the embedding model.
 """
 
 import sqlite3
@@ -34,10 +35,10 @@ from src.models.word import Word
 
 @pytest.fixture
 def vocab_db(tmp_path: Path) -> Iterator[Path]:
-    """创建空词库并返回数据库路径.
+    """Create an empty vocabulary database and return its path.
 
     Returns:
-        临时 SQLite 数据库文件路径。
+        Path to the temporary SQLite database file.
 
     """
     from src.knowledge.vocabulary import init_db
@@ -46,7 +47,7 @@ def vocab_db(tmp_path: Path) -> Iterator[Path]:
     db_file = tmp_path / "vocab.db"
     set_db_path(db_file)
     init_db()
-    # 清空任何可能残留/外部导入的数据，保证测试基于空库（与环境词库无关）
+    # Clear any leftover or externally imported data so tests start empty
     conn = sqlite3.connect(str(db_file))
     conn.execute("DELETE FROM words")
     conn.execute("DELETE FROM en_pron")
@@ -57,7 +58,7 @@ def vocab_db(tmp_path: Path) -> Iterator[Path]:
 
 
 def test_set_db_path_overrides_path(tmp_path: Path) -> None:
-    """验证 set_db_path 写入全局数据库路径（line 31）."""
+    """Verify set_db_path writes the global database path (line 31)."""
     custom = tmp_path / "custom_vocab.db"
     set_db_path(custom)
     from src.knowledge.vocabulary import get_db_path
@@ -66,7 +67,7 @@ def test_set_db_path_overrides_path(tmp_path: Path) -> None:
 
 
 def test_insert_word_delegates_to_insert_words(tmp_path: Path) -> None:
-    """验证 insert_word 委托 insert_words（line 71）."""
+    """Verify insert_word delegates to insert_words (line 71)."""
     from src.knowledge.vocabulary import init_db
 
     set_db_path(tmp_path / "insert_one.db")
@@ -82,7 +83,7 @@ def test_insert_word_delegates_to_insert_words(tmp_path: Path) -> None:
 
 
 def test_insert_words_with_and_without_syllables(vocab_db: Path) -> None:
-    """验证批量插入同时覆盖有/无音节两条分支（lines 80-96）."""
+    """Verify batch insert covers with/without syllable branches (80-96)."""
     with_syl = Word(
         text="CAT",
         language="en",
@@ -95,7 +96,7 @@ def test_insert_words_with_and_without_syllables(vocab_db: Path) -> None:
 
 
 def test_syl_from_json_keeps_dict_attributes() -> None:
-    """验证 _syl_from_json 正常还原属性（lines 108-111 正常分支）."""
+    """Verify _syl_from_json restores dict attributes (lines 108-111)."""
     s = _syl_from_json(
         {
             "onset": "zh",
@@ -109,43 +110,43 @@ def test_syl_from_json_keeps_dict_attributes() -> None:
 
 
 def test_syl_from_json_non_dict_attributes() -> None:
-    """验证 _syl_from_json 当 attributes 非字典时回退（lines 109-111）."""
+    """Verify _syl_from_json falls back for non-dict attributes (109-111)."""
     s = _syl_from_json({"onset": "b", "nucleus": "a", "coda": "t", "attributes": "bad"})
     assert s.attributes == {"tone": "", "stress": "", "length": ""}
 
 
 def test_syl_matches_all_branches() -> None:
-    """逐分支覆盖 _syl_matches（lines 141-151）."""
+    """Cover each _syl_matches branch (lines 141-151)."""
     s = Syllable(
         onset="k",
         nucleus="ae",
         coda="t",
         attributes={"tone": "1", "stress": "heavy", "length": "long"},
     )
-    # 无约束
+    # No constraints
     assert _syl_matches(s)
-    # onset 匹配 / 不匹配
+    # onset match / mismatch
     assert _syl_matches(s, onset="k")
     assert not _syl_matches(s, onset="x")
-    # nucleus 匹配 / 不匹配
+    # nucleus match / mismatch
     assert _syl_matches(s, nucleus="ae")
     assert not _syl_matches(s, nucleus="ow")
-    # coda 匹配 / 不匹配
+    # coda match / mismatch
     assert _syl_matches(s, coda="t")
     assert not _syl_matches(s, coda="ng")
-    # tone 匹配 / 不匹配
+    # tone match / mismatch
     assert _syl_matches(s, tone="1")
     assert not _syl_matches(s, tone="9")
-    # stress 匹配 / 不匹配
+    # stress match / mismatch
     assert _syl_matches(s, stress="heavy")
     assert not _syl_matches(s, stress="light")
-    # length 匹配 / 不匹配
+    # length match / mismatch
     assert _syl_matches(s, length="long")
     assert not _syl_matches(s, length="short")
 
 
 def test_search_no_constraints(vocab_db: Path) -> None:
-    """无约束搜索：覆盖主体循环与音节重建（lines 181-237 部分）."""
+    """Unconstrained search: main loop and syllable rebuild (lines 181-237)."""
     insert_words(
         [
             Word(
@@ -160,13 +161,13 @@ def test_search_no_constraints(vocab_db: Path) -> None:
     results = search_words("en", limit=20)
     texts = {r["text"] for r in results}
     assert texts == {"CAT", "HELLO"}
-    # HELLO 无音节 -> 重建占位音节
+    # HELLO has no syllables -> rebuild placeholder syllables
     hello = next(r for r in results if r["text"] == "HELLO")
     assert hello["syllables"][0]["nucleus"] == "?"
 
 
 def test_search_empty_syllables_json_branch(vocab_db: Path) -> None:
-    """覆盖 syls_json 为空串的 else 分支（line 230）."""
+    """Cover the else branch for an empty syls_json string (line 230)."""
     conn = sqlite3.connect(str(vocab_db))
     conn.execute(
         "INSERT INTO words (text, language, meaning, syllables_json, "
@@ -182,7 +183,7 @@ def test_search_empty_syllables_json_branch(vocab_db: Path) -> None:
 
 
 def test_search_with_syllable_count(vocab_db: Path) -> None:
-    """覆盖 syllable_count 约束分支（lines 185-187）."""
+    """Cover the syllable_count constraint branch (lines 185-187)."""
     insert_words(
         [
             Word(
@@ -207,7 +208,7 @@ def test_search_with_syllable_count(vocab_db: Path) -> None:
 
 
 def test_search_all_constraints_match_and_skip(vocab_db: Path) -> None:
-    """覆盖全部逐位约束构造分支及匹配/跳过（lines 189-246）."""
+    """Cover all positional constraint branches and match/skip (189-246)."""
     insert_words(
         [
             Word(
@@ -262,7 +263,7 @@ def test_search_all_constraints_match_and_skip(vocab_db: Path) -> None:
 
 
 def test_search_limit_break(vocab_db: Path) -> None:
-    """覆盖达到 limit 后中断的循环分支（lines 257-258）."""
+    """Cover the loop break after reaching the limit (lines 257-258)."""
     insert_words(
         [
             Word(
@@ -282,7 +283,7 @@ def test_search_limit_break(vocab_db: Path) -> None:
 
 
 def test_search_with_query_rerank(vocab_db: Path) -> None:
-    """覆盖 query 非空时调用 rerank 的分支（lines 260-264）."""
+    """Cover the branch calling rerank when query is non-empty (260-264)."""
     insert_words(
         [
             Word(
@@ -309,7 +310,7 @@ def test_search_with_query_rerank(vocab_db: Path) -> None:
 
 
 def test_search_query_no_results_skips_rerank(vocab_db: Path) -> None:
-    """覆盖 query 非空但无结果时不调用 rerank（line 260 假分支）."""
+    """Cover the false branch that skips rerank when query yields nothing."""
     with patch.object(embeddings, "rerank") as mock_rerank:
         results = search_words("en", query="animal", limit=10)
     mock_rerank.assert_not_called()
@@ -317,7 +318,7 @@ def test_search_query_no_results_skips_rerank(vocab_db: Path) -> None:
 
 
 def test_word_count_and_has_words(vocab_db: Path) -> None:
-    """覆盖 word_count 两个分支及 has_words（lines 276-284, 296）."""
+    """Cover both word_count branches and has_words (lines 276-284, 296)."""
     insert_words(
         [Word(text="CAT", language="en", syllables=[Syllable(onset="k", nucleus="ae")])]
     )
@@ -329,7 +330,7 @@ def test_word_count_and_has_words(vocab_db: Path) -> None:
 
 
 def test_en_pron_roundtrip_and_missing(vocab_db: Path) -> None:
-    """覆盖 set_en_pron / get_en_pron 全部分支（lines 306-312, 331-332）."""
+    """Cover every set_en_pron / get_en_pron branch (306-312, 331-332)."""
     set_en_pron("cat", [["K", "AE", "T"], ["K", "AH", "T"]])
     data = get_en_pron("cat")
     assert data == [["K", "AE", "T"], ["K", "AH", "T"]]
@@ -337,7 +338,7 @@ def test_en_pron_roundtrip_and_missing(vocab_db: Path) -> None:
 
 
 def test_get_en_pron_db_exception_returns_none() -> None:
-    """覆盖 get_en_pron 数据库异常时返回 None（except 分支）."""
+    """Cover get_en_pron returning None on a database error (except path)."""
     from src.knowledge import vocabulary
 
     def _boom(word: str) -> list[list[str]] | None:
@@ -348,7 +349,7 @@ def test_get_en_pron_db_exception_returns_none() -> None:
 
 
 def test_get_db_path_default(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 _DB_PATH 为 None 时回退到默认路径（line 42）."""
+    """Verify _DB_PATH falls back to the default path when None (line 42)."""
     from src.knowledge import vocabulary
 
     monkeypatch.setattr(vocabulary, "_DB_PATH", None)

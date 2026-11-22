@@ -1,12 +1,20 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""中文格律模板：五言绝句、七言绝句、五言律诗、七言律诗、相见欢、如梦令、浪淘沙、清平乐.
+"""Chinese metrical templates for regulated verse and ci tunes.
 
-实现近体诗/词牌的符号层规则：
-- 平仄骨架：每句 2/4(6) 位相间、联内相对、联间相粘、出句仄脚/对句平脚；
-- 押韵：偶数行平声韵（一韵到底，依《中华通韵》16 韵部），首句可入韵，词牌按谱换韵；
-- 禁忌：三平尾、孤平（三仄尾不计入禁忌）。
+Covers five- and seven-character quatrains and regulated poems, plus the ci
+tunes Xiangjianhuan, Rumengling, Langtaosha, and Qingpingyue.
+
+Implements the symbolic-level rules of regulated verse and ci tunes:
+- tone skeleton: positions 2/4(6) alternate within a line, oppose within a
+  couplet, and adhere across couplets; leading lines end oblique, responding
+  lines end level;
+- rhyme: even lines use level-tone rhyme (single rhyme throughout, per the 16
+  rhyme groups of *Zhonghua Tongyun*); the first line may join the rhyme; ci
+  tunes change rhyme per their patterns;
+- prohibitions: three level-tone tail, isolated level (three oblique-tone tail
+  is not a prohibition).
 """
 
 from typing import Any, ClassVar
@@ -16,13 +24,13 @@ from . import ConstraintTable, PoetryTemplate, _make_syl, register
 
 
 def _tone(t: str) -> dict[str, Any]:
-    """构造仅限声调的约束.
+    """Build a tone-only constraint.
 
     Args:
-        t: "平" 或 "仄"。
+        t: Tone value ("平" or "仄").
 
     Returns:
-        约束字典。
+        Constraint dict.
 
     """
     return _make_syl(attributes={"tone": t})
@@ -30,7 +38,7 @@ def _tone(t: str) -> dict[str, Any]:
 
 _FREE: dict[str, Any] = _make_syl()
 
-#: 已数据化的近体诗结构规则（供跨语言转化携带）。
+#: Data-driven structural rules for regulated verse (carried across conversion).
 _JINTI_COMMON: dict[str, Any] = {
     "kind": "jinti",
     "attribute": "tone",
@@ -52,48 +60,52 @@ _JINTI_QILV: dict[str, Any] = {
 }
 
 
-#: 相见欢默认标点（七句：，。。，，。。）。
+#: Xiangjianhuan default punctuation (7 lines: , . . , , . .).
 _XIANGJIANHUAN_MARKS: list[str] = ["，", "。", "。", "，", "，", "。", "。"]
 
-#: 如梦令默认标点（七句）。
+#: Rumengling default punctuation (7 lines).
 _RUMENGLING_MARKS: list[str] = ["，", "。", "，", "。", "，", "，", "。"]
 
-#: 浪淘沙默认标点（上下片各五句）。
+#: Langtaosha default punctuation (5 lines per stanza).
 _LANGTAOSHA_MARKS: list[str] = ["，", "。", "。", "，", "。"] * 2
 
-#: 清平乐默认标点（上下片各四句）。
+#: Qingpingyue default punctuation (4 lines per stanza).
 _QINGPINGYUE_MARKS: list[str] = ["，", "。", "，", "。", "，", "。", "，", "。"]
 
 
 def _check_sanpingwei(syllables: list[Syllable]) -> list[str]:
-    """检查三平尾（末三字全平）.
+    """Check for a three level-tone tail (last three characters all level).
 
     Args:
-        syllables: 一行音节。
+        syllables: Syllables of one line.
 
     Returns:
-        错误列表。
+        List of errors.
 
     """
     errors: list[str] = []
     if len(syllables) >= 3:
         last3 = [s.attributes.get("tone", "") for s in syllables[-3:]]
         if last3 == ["平", "平", "平"]:
-            errors.append("三平尾: 末三字皆为平声，不合律")
+            errors.append(
+                "Three level-tone tail: the last three characters are all "
+                "level tones, which violates the meter"
+            )
     return errors
 
 
 def _check_guping(syllables: list[Syllable]) -> list[str]:
-    """检查孤平：平脚句（尾字平声）全句仅一个平声字（即韵脚）即为孤平.
+    """Check isolated level: a level-ending line with only one level character.
 
-    孤平为近体诗大忌：平声收尾之句若除去韵脚外再无第二个平声字，则孤平失律。
-    仄脚句（尾字仄声）不检孤平。
+    Isolated level is a major fault in regulated verse: if a level-ending line
+    has no second level character besides the rhyme foot, the line is invalid.
+    Oblique-ending lines are not checked.
 
     Args:
-        syllables: 一行音节。
+        syllables: Syllables of one line.
 
     Returns:
-        错误列表。
+        List of errors.
 
     """
     errors: list[str] = []
@@ -103,19 +115,22 @@ def _check_guping(syllables: list[Syllable]) -> list[str]:
         return errors
     ping_count = sum(1 for s in syllables if s.attributes.get("tone", "") == "平")
     if ping_count == 1:
-        errors.append("孤平: 平脚句全句仅一平声（韵脚），孤平失律")
+        errors.append(
+            "Isolated level: the level-ending line has only one level tone "
+            "(the rhyme foot), which violates the meter"
+        )
     return errors
 
 
 def _check_alternation(syllables: list[Syllable], even_pattern: list[str]) -> list[str]:
-    """二四六分明检查：偶数位必须与给定平仄模式一致.
+    """Check the 2-4-6 rule: even positions must match the given tone pattern.
 
     Args:
-        syllables: 一行音节。
-        even_pattern: 偶数位期望平仄列表。
+        syllables: Syllables of one line.
+        even_pattern: Expected level/oblique tones at even positions.
 
     Returns:
-        错误列表。
+        List of errors.
 
     """
     errors: list[str] = []
@@ -126,13 +141,16 @@ def _check_alternation(syllables: list[Syllable], even_pattern: list[str]) -> li
             actual_tone = syllables[actual_pos].attributes.get("tone", "")
             if actual_tone and actual_tone != expected:
                 errors.append(
-                    f"第{actual_pos + 1}字应为{expected}声（二四六分明），实际为{actual_tone}"
+                    f"Character {actual_pos + 1} should be {expected} tone "
+                    f"(2-4-6 rule) but is {actual_tone}"
                 )
     return errors
 
 
-# 《中华通韵》16 韵部归并（以韵腹+韵尾为键，ü 在 pypinyin 中记为 v）。
-# 关键修正（相对旧十三辙）：齐齿 "i/ü/er" 与 "u" 不同部；舌尖元音 -i 单列 "支" 部。
+# *Zhonghua Tongyun* 16 rhyme-group merge (keyed by nucleus + coda; ü is
+# stored as v in pypinyin).
+# Key correction versus the old 13-rhyme scheme: the "i/ü/er" group differs
+# from "u"; the apical vowel -i forms its own "zhi" group.
 _TONGYUN: dict[str, str] = {
     "a": "麻",
     "ia": "麻",
@@ -177,22 +195,27 @@ _TONGYUN: dict[str, str] = {
     "u": "姑",
 }
 
-# 舌尖元音（知/吃/诗/日…）的声母：其韵母 -i 归入「支」部而非「齐」部。
+# Onsets of apical vowels (zhi/chi/shi/ri...): their final -i belongs to the
+# "zhi" group rather than the "qi" group.
 _APICAL_ONSETS: frozenset[str] = frozenset({"z", "c", "s", "zh", "ch", "sh", "r"})
 
 
 def _rhyme_key(syl: Syllable) -> str:
-    """生成韵脚 key：按《中华通韵》归并韵腹+韵尾.
+    """Build a rhyme key: merge nucleus + coda by *Zhonghua Tongyun*.
 
-    取音节的韵腹+韵尾（已去除声调数字）查韵部表。特别地：当韵母为 "i"
-    且声母属舌尖音 z/c/s/zh/ch/sh/r 时，归「支」部；否则 "i/ü/er" 归「齐」部，
-    "u" 归「姑」部——齐与姑不同部，故 "i" 与 "u" 不押韵。
+    Look up the syllable's nucleus + coda (tone digits already removed) in the
+    rhyme-group table. In particular: when the final is "i" and the onset is an
+    apical z/c/s/zh/ch/sh/r, it belongs to the "zhi" group; otherwise "i/ü/er"
+    belong to "qi" and "u" to "gu" -- "qi" and "gu" are different groups, so
+    "i" and "u" do not rhyme. The key values themselves are the Chinese
+    rhyme-group names listed in ``_TONGYUN``.
 
     Args:
-        syl: 韵脚音节。
+        syl: The rhyme-foot syllable.
 
     Returns:
-        韵部名（如 "庚"、"麻"），未知韵母返回原串或 "?"。
+        Rhyme-group name (one of the ``_TONGYUN`` values); an unknown final
+        returns the raw string or "?".
 
     """
     nucleus = syl.nucleus or ""
@@ -208,17 +231,17 @@ def _rhyme_key(syl: Syllable) -> str:
 def _check_rhyme(
     syllables_list: list[list[Syllable]],
     rhyme_lines: list[int],
-    description: str = "押韵",
+    description: str = "Rhyme",
 ) -> list[str]:
-    """检查指定行韵脚（末音节韵腹+韵尾）是否同韵.
+    """Check that the specified lines rhyme (last syllable nucleus + coda).
 
     Args:
-        syllables_list: 各行音节。
-        rhyme_lines: 参与押韵的行号（0-based）。
-        description: 错误描述前缀。
+        syllables_list: Syllables per line.
+        rhyme_lines: Line numbers participating in the rhyme (0-based).
+        description: Error description prefix.
 
     Returns:
-        错误列表。
+        List of errors.
 
     """
     errors: list[str] = []
@@ -233,7 +256,9 @@ def _check_rhyme(
     for line_idx, rhyme in rhyme_keys[1:]:
         if rhyme and rhyme != base_rhyme:
             errors.append(
-                f"{description}: 第{base_idx + 1}行韵脚为'{base_rhyme}'，第{line_idx + 1}行韵脚为'{rhyme}'，不押韵"
+                f"{description}: line {base_idx + 1} rhymes with "
+                f"'{base_rhyme}', line {line_idx + 1} rhymes with '{rhyme}'; "
+                f"they do not rhyme"
             )
     return errors
 
@@ -241,17 +266,19 @@ def _check_rhyme(
 def _check_jinti_rhyme(
     syllables_list: list[list[Syllable]],
     rhyme_lines: list[int],
-    description: str = "押韵",
+    description: str = "Rhyme",
 ) -> list[str]:
-    """近体诗押韵检查：偶数行必须押平声韵；首句尾字为平声时一并入韵.
+    """Check regulated-verse rhyme: even lines use level rhyme; first joins too.
+
+    The first line joins the rhyme when its last character is a level tone.
 
     Args:
-        syllables_list: 各行音节。
-        rhyme_lines: 偶数行号（0-based）。
-        description: 错误描述前缀。
+        syllables_list: Syllables per line.
+        rhyme_lines: Even line numbers (0-based).
+        description: Error description prefix.
 
     Returns:
-        错误列表。
+        List of errors.
 
     """
     errors: list[str] = []
@@ -261,7 +288,9 @@ def _check_jinti_rhyme(
             last = syllables_list[line_idx][-1]
             if last.attributes.get("tone", "") != "平":
                 errors.append(
-                    f"第{line_idx + 1}行韵脚应为平声字，实际为'{last.attributes.get('tone') or '未知'}'"
+                    f"Line {line_idx + 1} rhyme foot should be a level-tone "
+                    f"character but is "
+                    f"'{last.attributes.get('tone') or 'unknown'}'"
                 )
             keys.append((line_idx, _rhyme_key(last)))
     first = syllables_list[0][-1] if syllables_list and syllables_list[0] else None
@@ -273,7 +302,9 @@ def _check_jinti_rhyme(
     for line_idx, rhyme in keys[1:]:
         if rhyme and rhyme != base_rhyme:
             errors.append(
-                f"{description}: 第{base_idx + 1}行韵脚为'{base_rhyme}'，第{line_idx + 1}行韵脚为'{rhyme}'，不押韵"
+                f"{description}: line {base_idx + 1} rhymes with "
+                f"'{base_rhyme}', line {line_idx + 1} rhymes with '{rhyme}'; "
+                f"they do not rhyme"
             )
     return errors
 
@@ -281,15 +312,16 @@ def _check_jinti_rhyme(
 def _check_jinti_structure(
     syllables_list: list[list[Syllable]],
 ) -> list[str]:
-    """近体诗句式结构检查：每句 2/4(6) 位平仄相间、联内相对、联间相粘.
+    """Check regulated-verse line structure: 2/4(6) alternation, opposition, adhesion.
 
-    出句（第 3 行起奇数行）须仄脚，对句（偶数行）须平脚；tone 未知跳过。
+    Leading lines (odd lines from line 3) must end oblique; responding lines
+    (even lines) must end level; unknown tone values are skipped.
 
     Args:
-        syllables_list: 各行音节。
+        syllables_list: Syllables per line.
 
     Returns:
-        错误列表。
+        List of errors.
 
     """
     errors: list[str] = []
@@ -299,13 +331,13 @@ def _check_jinti_structure(
     positions = [1, 3] if first_len <= 5 else [1, 3, 5]
 
     def line_tones(idx: int) -> list[str]:
-        """取一行的固定位平仄.
+        """Get the tones at fixed positions of a line.
 
         Args:
-            idx: 行号。
+            idx: Line number.
 
         Returns:
-            固定位平仄列表（未知项为空串）。
+            Tones at fixed positions (empty string for unknown items).
 
         """
         syls = syllables_list[idx]
@@ -316,40 +348,53 @@ def _check_jinti_structure(
         out = line_tones(i)
         in_ = line_tones(i + 1)
 
-        # 出句(第3行起奇数行)仄脚；首句例外(可押韵平尾可仄尾)
+        # Leading lines (odd lines from line 3) end oblique; the first line is
+        # exempt (it may rhyme with a level ending or end oblique).
         if i >= 2 and syllables_list[i]:
             last_tone = syllables_list[i][-1].attributes.get("tone", "")
             if last_tone == "平":
-                errors.append(f"第{i + 1}行为出句，尾字应为仄声，实际为平")
-        # 对句(偶数行)平脚
+                errors.append(
+                    f"Line {i + 1} is a leading line; its last character "
+                    f"should be oblique but is level"
+                )
+        # Responding lines (even lines) end level.
         if syllables_list[i + 1]:
             last_tone = syllables_list[i + 1][-1].attributes.get("tone", "")
             if last_tone == "仄":
-                errors.append(f"第{i + 2}行为对句，尾字应为平声，实际为仄")
+                errors.append(
+                    f"Line {i + 2} is a responding line; its last character "
+                    f"should be level but is oblique"
+                )
 
-        # 每句 2/4(6) 位平仄相间
+        # Alternate tones at positions 2/4(6) of every line.
         for j in range(len(positions) - 1):
             for idx, tones in ((i, out), (i + 1, in_)):
                 a = tones[j] if j < len(tones) else ""
                 b = tones[j + 1] if j + 1 < len(tones) else ""
                 if a and b and a == b:
                     errors.append(
-                        f"第{idx + 1}行第{positions[j] + 1}字与第{positions[j + 1] + 1}字平仄应相间，实际均为'{a}'"
+                        f"Line {idx + 1} characters {positions[j] + 1} and "
+                        f"{positions[j + 1] + 1} should alternate in tone "
+                        f"but are both '{a}'"
                     )
 
-        # 联内相对
+        # Opposition within a couplet.
         for j, (a, b) in enumerate(zip(out, in_)):
             if a and b and a == b:
                 errors.append(
-                    f"第{i + 1}行与第{i + 2}行应相对: 第{positions[j] + 1}字平仄应相反，实际均为'{a}'"
+                    f"Lines {i + 1} and {i + 2} should oppose: character "
+                    f"{positions[j] + 1} should have the opposite tone but "
+                    f"both are '{a}'"
                 )
 
-        # 联间相粘
+        # Adhesion across couplets.
         if prev_couplet_in is not None:
             for j, (a, b) in enumerate(zip(prev_couplet_in, out)):
                 if a and b and a != b:
                     errors.append(
-                        f"第{i + 1}行应与第{i}行相粘: 第{positions[j] + 1}字平仄应相同，实际'{a}'与'{b}'"
+                        f"Line {i + 1} should adhere to line {i}: character "
+                        f"{positions[j] + 1} should have the same tone but "
+                        f"is '{a}' and '{b}'"
                     )
 
         prev_couplet_in = in_
@@ -359,15 +404,15 @@ def _check_jinti_structure(
 def _check_lv_alternation(
     syllables: list[Syllable], line_idx: int, constraints: list[list[dict[str, Any]]]
 ) -> list[str]:
-    """律诗二四六分明检查（按约束表偶数位期望）.
+    """Check the regulated-poem 2-4-6 rule against constraint-table even positions.
 
     Args:
-        syllables: 一行音节。
-        line_idx: 行号。
-        constraints: 逐位约束表。
+        syllables: Syllables of one line.
+        line_idx: Line number.
+        constraints: Per-position constraint table.
 
     Returns:
-        错误列表。
+        List of errors.
 
     """
     errors: list[str] = []
@@ -388,17 +433,18 @@ def _check_lv_alternation(
 def _check_jinti_full(
     syllables: list[list[Syllable]], rhyme_lines: list[int], rhyme_desc: str
 ) -> list[str]:
-    """近体诗整诗检查（五/七言绝句与律诗共用）.
+    """Full regulated-verse check (shared by five/seven-character forms).
 
-    逐行三平尾/孤平、句式结构（相间/相对/相粘/首尾脚）、押韵。
+    Checks per-line three-level-tail/isolated-level faults, line structure
+    (alternation/opposition/adhesion/line endings), and rhyme.
 
     Args:
-        syllables: 各行音节。
-        rhyme_lines: 押韵的偶数行号（0-based）。
-        rhyme_desc: 押韵错误描述前缀。
+        syllables: Syllables per line.
+        rhyme_lines: Even line numbers that must rhyme (0-based).
+        rhyme_desc: Error description prefix for rhyme errors.
 
     Returns:
-        错误信息列表（空列表表示通过）。
+        List of error messages (empty means pass).
 
     """
     errors: list[str] = []
@@ -411,7 +457,10 @@ def _check_jinti_full(
 
 
 class WujueTemplate(PoetryTemplate):
-    """五言绝句：4 行 5 字，二四字定平仄，偶句平声韵."""
+    """Five-character quatrain: 4 lines of 5 characters.
+
+    Tones are fixed at positions 2/4; even lines rhyme on a level tone.
+    """
 
     name = "五言绝句"
     language = "zh"
@@ -426,10 +475,10 @@ class WujueTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位固定约束（一三不论）.
+        """No fixed per-position constraints (odd positions are free).
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         return None
@@ -437,27 +486,31 @@ class WujueTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）.
+        """Full check: three-level-tail/isolated-level/structure/rhyme.
+
+        A three-oblique-tone tail is not treated as a fault.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
-        return _check_jinti_full(syllables, [1, 3], "押韵(二四行)")
+        return _check_jinti_full(syllables, [1, 3], "Rhyme (lines 2 and 4)")
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """绝句格式：一句一行，联内逗号、联末句号.
+        """Quatrain layout: one sentence per line.
+
+        Commas separate lines within a couplet; a period closes it.
 
         Args:
-            poem: 诗行列表（首元素为标题）。
-            punctuation: 逐行标点；空/None 使用默认。
+            poem: List of poem lines (first element is the title).
+            punctuation: Per-line punctuation; empty/None uses defaults.
 
         Returns:
-            格式化后的展示文本。
+            Formatted display text.
 
         """
         title = poem[0] if poem else ""
@@ -472,7 +525,10 @@ class WujueTemplate(PoetryTemplate):
 
 
 class QijueTemplate(PoetryTemplate):
-    """七言绝句：4 行 7 字，二四六字定平仄，偶句平声韵."""
+    """Seven-character quatrain: 4 lines of 7 characters.
+
+    Tones are fixed at positions 2/4/6; even lines rhyme on a level tone.
+    """
 
     name = "七言绝句"
     language = "zh"
@@ -487,10 +543,10 @@ class QijueTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位固定约束（一三五不论）.
+        """No fixed per-position constraints (odd positions are free).
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         return None
@@ -498,27 +554,31 @@ class QijueTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）.
+        """Full check: three-level-tail/isolated-level/structure/rhyme.
+
+        A three-oblique-tone tail is not treated as a fault.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
-        return _check_jinti_full(syllables, [1, 3], "押韵(二四行)")
+        return _check_jinti_full(syllables, [1, 3], "Rhyme (lines 2 and 4)")
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """绝句格式：一句一行，联内逗号、联末句号.
+        """Quatrain layout: one sentence per line.
+
+        Commas separate lines within a couplet; a period closes it.
 
         Args:
-            poem: 诗行列表（首元素为标题）。
-            punctuation: 逐行标点；空/None 使用默认。
+            poem: List of poem lines (first element is the title).
+            punctuation: Per-line punctuation; empty/None uses defaults.
 
         Returns:
-            格式化后的展示文本。
+            Formatted display text.
 
         """
         title = poem[0] if poem else ""
@@ -533,7 +593,10 @@ class QijueTemplate(PoetryTemplate):
 
 
 class WulvTemplate(PoetryTemplate):
-    """五言律诗：8 行 5 字，四联，偶句平声韵（对仗由检查 AI 负责）."""
+    """Five-character regulated poem: 8 lines of 5 characters, four couplets.
+
+    Even lines rhyme on a level tone (antithesis is checked by the review AI).
+    """
 
     name = "五言律诗"
     language = "zh"
@@ -544,10 +607,10 @@ class WulvTemplate(PoetryTemplate):
     rule_description = WujueTemplate.rule_description
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位固定约束.
+        """No fixed per-position constraints.
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         return None
@@ -555,27 +618,31 @@ class WulvTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）.
+        """Full check: three-level-tail/isolated-level/structure/rhyme.
+
+        A three-oblique-tone tail is not treated as a fault.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
-        return _check_jinti_full(syllables, [1, 3, 5, 7], "押韵(二四六八行)")
+        return _check_jinti_full(syllables, [1, 3, 5, 7], "Rhyme (lines 2, 4, 6, 8)")
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """律诗格式：一联一行，联间逗号，末联句号.
+        """Regulated-poem layout: one couplet per line.
+
+        Couplets are separated by commas; a period closes the final couplet.
 
         Args:
-            poem: 诗行列表（首元素为标题）。
-            punctuation: 逐行标点；空/None 使用默认。
+            poem: List of poem lines (first element is the title).
+            punctuation: Per-line punctuation; empty/None uses defaults.
 
         Returns:
-            格式化后的展示文本。
+            Formatted display text.
 
         """
         title = poem[0] if poem else ""
@@ -602,7 +669,10 @@ class WulvTemplate(PoetryTemplate):
 
 
 class QilvTemplate(PoetryTemplate):
-    """七言律诗：8 行 7 字，四联，偶句平声韵（对仗由检查 AI 负责）."""
+    """Seven-character regulated poem: 8 lines of 7 characters, four couplets.
+
+    Even lines rhyme on a level tone (antithesis is checked by the review AI).
+    """
 
     name = "七言律诗"
     language = "zh"
@@ -613,10 +683,10 @@ class QilvTemplate(PoetryTemplate):
     rule_description = QijueTemplate.rule_description
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位固定约束.
+        """No fixed per-position constraints.
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         return None
@@ -624,27 +694,31 @@ class QilvTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整规则检查：三平尾/孤平/结构/押韵（三仄尾不计入禁忌）.
+        """Full check: three-level-tail/isolated-level/structure/rhyme.
+
+        A three-oblique-tone tail is not treated as a fault.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
-        return _check_jinti_full(syllables, [1, 3, 5, 7], "押韵(二四六八行)")
+        return _check_jinti_full(syllables, [1, 3, 5, 7], "Rhyme (lines 2, 4, 6, 8)")
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """律诗格式：一联一行，联间逗号，末联句号.
+        """Regulated-poem layout: one couplet per line.
+
+        Couplets are separated by commas; a period closes the final couplet.
 
         Args:
-            poem: 诗行列表（首元素为标题）。
-            punctuation: 逐行标点；空/None 使用默认。
+            poem: List of poem lines (first element is the title).
+            punctuation: Per-line punctuation; empty/None uses defaults.
 
         Returns:
-            格式化后的展示文本。
+            Formatted display text.
 
         """
         title = poem[0] if poem else ""
@@ -671,7 +745,11 @@ class QilvTemplate(PoetryTemplate):
 
 
 class XiangjianhuanTemplate(PoetryTemplate):
-    """相见欢（双调三十六字）：上阕三平韵，下阕先两仄韵换韵再转回平韵."""
+    """Xiangjianhuan (double tune, 36 characters).
+
+    The upper stanza has three level-tone rhymes; the lower stanza first
+    changes to two oblique-tone rhymes, then returns to level-tone rhyme.
+    """
 
     name = "相见欢"
     language = "zh"
@@ -691,10 +769,10 @@ class XiangjianhuanTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """词牌固定平仄谱（"中"=自由）.
+        """Fixed tone pattern of the ci tune (free positions are unconstrained).
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         _f, _p, _z = _FREE, _tone("平"), _tone("仄")
@@ -711,16 +789,19 @@ class XiangjianhuanTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """押韵检查：上阕三平韵、下阕仄韵换韵、平韵转回且须同部.
+        """Rhyme check: three level rhymes in the upper stanza.
 
-        另提示上下阕末句（第 3、7 行）末三字全平宜规避（非铁律）。
+        The lower stanza changes to oblique rhymes and then returns to a level
+        rhyme in the same group. Also warns (not a hard rule) that the last
+        three characters of both stanzas' final lines (lines 3 and 7) should
+        not be all level.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
         errors: list[str] = []
@@ -728,20 +809,27 @@ class XiangjianhuanTemplate(PoetryTemplate):
             if line_idx < len(syllables) and syllables[line_idx]:
                 last3 = [s.attributes.get("tone", "") for s in syllables[line_idx][-3:]]
                 if last3 == ["平", "平", "平"]:
-                    errors.append(f"第{line_idx + 1}行末三字全平，宜规避")
-        errors.extend(_check_rhyme(syllables, [0, 1, 2], "押韵(上阕·平韵)"))
-        errors.extend(_check_rhyme(syllables, [3, 4], "押韵(下阕·仄韵·换韵)"))
-        errors.extend(_check_rhyme(syllables, [5, 6], "押韵(下阕·平韵·换回)"))
+                    errors.append(
+                        f"Line {line_idx + 1} ends with three level tones; avoid this"
+                    )
+        errors.extend(_check_rhyme(syllables, [0, 1, 2], "Rhyme (upper stanza, level)"))
+        errors.extend(
+            _check_rhyme(syllables, [3, 4], "Rhyme (lower stanza, oblique, changed)")
+        )
+        errors.extend(
+            _check_rhyme(syllables, [5, 6], "Rhyme (lower stanza, level, returned)")
+        )
 
-        # 下阕平韵应转回上阕平声韵部；下阕仄韵须与平韵不同部（换韵）
+        # The lower stanza's level rhyme should return to the upper stanza's
+        # level rhyme group; its oblique rhyme must be in a different group.
         def tail(idx: int) -> str:
-            """取指定行的韵脚 key.
+            """Get the rhyme key of the given line.
 
             Args:
-                idx: 行号。
+                idx: Line number.
 
             Returns:
-                韵脚串；无音节时返回空串。
+                Rhyme key string; empty string when there are no syllables.
 
             """
             if idx < len(syllables) and syllables[idx]:
@@ -753,21 +841,29 @@ class XiangjianhuanTemplate(PoetryTemplate):
         lower_ze = tail(3)
         if upper and lower_ping and upper != lower_ping:
             errors.append(
-                f"下阕平韵应转回上阕平声韵部: 上阕'{upper}'，下阕'{lower_ping}'"
+                f"The lower stanza's level rhyme should return to the upper "
+                f"stanza's level rhyme group: upper '{upper}', lower "
+                f"'{lower_ping}'"
             )
         if upper and lower_ze and lower_ze == upper:
-            errors.append(f"下阕仄韵应与平韵不同部（换韵）: 均为'{lower_ze}'")
+            errors.append(
+                f"The lower stanza's oblique rhyme should be in a different "
+                f"group from the level rhyme (rhyme change): both are "
+                f"'{lower_ze}'"
+            )
         return errors
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """相见欢格式：开头Tab，阙间Tab，阕内无换行（CSS wrap）.
+        """Xiangjianhuan layout: leading tab, tab between stanzas, no line breaks.
+
+        Wrapping inside a stanza is handled by CSS.
 
         Args:
-            poem: 诗行列表（首元素为标题）。
-            punctuation: 逐行标点；空/None 使用默认。
+            poem: List of poem lines (first element is the title).
+            punctuation: Per-line punctuation; empty/None uses defaults.
 
         Returns:
-            格式化后的展示文本。
+            Formatted display text.
 
         """
         title = poem[0] if poem else ""
@@ -786,7 +882,11 @@ class XiangjianhuanTemplate(PoetryTemplate):
 
 
 class RumenglingTemplate(PoetryTemplate):
-    """如梦令（单调三十三字）：七句，五仄韵一叠韵，第5、6句须叠句."""
+    """Rumengling (single tune, 33 characters).
+
+    Seven lines with five oblique-tone rhymes and one repeated rhyme; lines 5
+    and 6 must be an identical refrain.
+    """
 
     name = "如梦令"
     language = "zh"
@@ -801,10 +901,10 @@ class RumenglingTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
-        """词牌固定平仄谱（"中"=自由）.
+        """Fixed tone pattern of the ci tune (free positions are unconstrained).
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         _f, _p, _z = _FREE, _tone("平"), _tone("仄")
@@ -821,31 +921,34 @@ class RumenglingTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """押韵与叠句检查：全词仄韵一韵到底，第5、6句须叠句.
+        """Rhyme and refrain check: oblique rhyme throughout; lines 5-6 repeat.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
         errors: list[str] = []
-        errors.extend(_check_rhyme(syllables, [0, 1, 3, 4, 5, 6], "押韵(仄韵)"))
+        errors.extend(_check_rhyme(syllables, [0, 1, 3, 4, 5, 6], "Rhyme (oblique)"))
         if len(poem) > 5 and poem[4].strip() and poem[4].strip() != poem[5].strip():
-            errors.append(f"第5、6句应为叠句（相同），实际'{poem[4]}'与'{poem[5]}'")
+            errors.append(
+                f"Lines 5 and 6 should be an identical refrain; got "
+                f"'{poem[4]}' and '{poem[5]}'"
+            )
         return errors
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """如梦令格式：开头Tab，单调不分阕.
+        """Rumengling layout: leading tab, single tune without stanza breaks.
 
         Args:
-            poem: 诗行列表（首元素为标题）。
-            punctuation: 逐行标点；空/None 使用默认。
+            poem: List of poem lines (first element is the title).
+            punctuation: Per-line punctuation; empty/None uses defaults.
 
         Returns:
-            格式化后的展示文本。
+            Formatted display text.
 
         """
         title = poem[0] if poem else ""
@@ -860,7 +963,11 @@ class RumenglingTemplate(PoetryTemplate):
 
 
 class LangtaoshaTemplate(PoetryTemplate):
-    """浪淘沙（双调五十四字）：上下片各五句四平韵，一韵到底."""
+    """Langtaosha (double tune, 54 characters).
+
+    The upper and lower stanzas each have five lines and four level-tone
+    rhymes, with a single rhyme throughout.
+    """
 
     name = "浪淘沙"
     language = "zh"
@@ -874,10 +981,10 @@ class LangtaoshaTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
-        """词牌固定平仄谱（"中"=自由）.
+        """Fixed tone pattern of the ci tune (free positions are unconstrained).
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         _f, _p, _z = _FREE, _tone("平"), _tone("仄")
@@ -897,27 +1004,31 @@ class LangtaoshaTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """押韵检查：上下片平韵一韵到底（第4、9句不入韵）.
+        """Rhyme check: level rhyme throughout both stanzas (lines 4 and 9 skip).
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
-        return _check_rhyme(syllables, [0, 1, 2, 4, 5, 6, 7, 9], "押韵(平韵·一韵到底)")
+        return _check_rhyme(
+            syllables, [0, 1, 2, 4, 5, 6, 7, 9], "Rhyme (level, throughout)"
+        )
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """浪淘沙格式：开头Tab，阙间Tab，阕内无换行（CSS wrap）.
+        """Langtaosha layout: leading tab, tab between stanzas, no line breaks.
+
+        Wrapping inside a stanza is handled by CSS.
 
         Args:
-            poem: 诗行列表（首元素为标题）。
-            punctuation: 逐行标点；空/None 使用默认。
+            poem: List of poem lines (first element is the title).
+            punctuation: Per-line punctuation; empty/None uses defaults.
 
         Returns:
-            格式化后的展示文本。
+            Formatted display text.
 
         """
         title = poem[0] if poem else ""
@@ -936,7 +1047,12 @@ class LangtaoshaTemplate(PoetryTemplate):
 
 
 class QingpingyueTemplate(PoetryTemplate):
-    """清平乐（双调四十六字）：上片四句仄韵，下片四句平韵，上下换韵."""
+    """Qingpingyue (double tune, 46 characters).
+
+    The upper stanza's four lines all carry oblique-tone rhymes; the lower
+    stanza rhymes level tones on alternate lines (line 7 does not rhyme), with
+    a rhyme change between stanzas.
+    """
 
     name = "清平乐"
     language = "zh"
@@ -953,10 +1069,10 @@ class QingpingyueTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
-        """词牌固定平仄谱（"中"=自由）.
+        """Fixed tone pattern of the ci tune (free positions are unconstrained).
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         _f, _p, _z = _FREE, _tone("平"), _tone("仄")
@@ -974,36 +1090,43 @@ class QingpingyueTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """押韵检查：上片仄韵、下片平韵，且上下片换韵.
+        """Rhyme check: oblique rhyme in the upper stanza, level in the lower.
+
+        The two stanzas must change rhyme.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
         errors: list[str] = []
-        errors.extend(_check_rhyme(syllables, [0, 1, 2, 3], "押韵(上片·仄韵)"))
-        errors.extend(_check_rhyme(syllables, [4, 5, 7], "押韵(下片·平韵)"))
+        errors.extend(_check_rhyme(syllables, [0, 1, 2, 3], "Rhyme (upper, oblique)"))
+        errors.extend(_check_rhyme(syllables, [4, 5, 7], "Rhyme (lower, level)"))
         upper = _rhyme_key(syllables[0][-1]) if syllables and syllables[0] else ""
         lower = (
             _rhyme_key(syllables[4][-1]) if len(syllables) > 4 and syllables[4] else ""
         )
         if upper and lower and upper == lower:
-            errors.append(f"上下片应换韵: 上片'{upper}'与下片'{lower}'同部")
+            errors.append(
+                f"The stanzas should change rhyme: upper '{upper}' and lower "
+                f"'{lower}' are in the same group"
+            )
         return errors
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """清平乐格式：开头Tab，阙间Tab，阕内无换行（CSS wrap）.
+        """Qingpingyue layout: leading tab, tab between stanzas, no line breaks.
+
+        Wrapping inside a stanza is handled by CSS.
 
         Args:
-            poem: 诗行列表（首元素为标题）。
-            punctuation: 逐行标点；空/None 使用默认。
+            poem: List of poem lines (first element is the title).
+            punctuation: Per-line punctuation; empty/None uses defaults.
 
         Returns:
-            格式化后的展示文本。
+            Formatted display text.
 
         """
         title = poem[0] if poem else ""
@@ -1022,7 +1145,7 @@ class QingpingyueTemplate(PoetryTemplate):
 
 
 def register_chinese_templates() -> None:
-    """注册全部中文模板."""
+    """Register all Chinese templates."""
     register("zh_wujue", WujueTemplate())
     register("zh_qijue", QijueTemplate())
     register("zh_wulv", WulvTemplate())

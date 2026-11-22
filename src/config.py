@@ -1,9 +1,9 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""应用配置（LLM 多端点）.
+"""Application configuration (multi-endpoint LLM).
 
-配置文件位于 ~/.stanza_weaver/config.json（权限 0600）。
+The config file lives at ~/.stanza_weaver/config.json (mode 0600).
 """
 
 import json
@@ -33,23 +33,23 @@ LLMEndpoint = dict[str, str]
 
 
 def _default_config_path() -> Path:
-    """默认配置文件路径.
+    """Return the default config file path.
 
     Returns:
-        ~/.stanza_weaver/config.json。
+        ~/.stanza_weaver/config.json.
 
     """
     return Path.home() / ".stanza_weaver" / "config.json"
 
 
 class Config:
-    """JSON 配置文件读写（惰性加载 + 0600 权限）."""
+    """Read and write the JSON config file (lazy loading + 0600 permissions)."""
 
     def __init__(self, config_path: Path | None = None):
-        """初始化配置对象.
+        """Initialize the config object.
 
         Args:
-            config_path: 配置文件路径（缺省用默认路径）。
+            config_path: Config file path (defaults to the default path).
 
         """
         self._path = config_path or _default_config_path()
@@ -57,7 +57,7 @@ class Config:
         self._loaded = False
 
     def _ensure_loaded(self) -> None:
-        """惰性加载配置文件（损坏时按空配置处理）."""
+        """Lazy-load the config file (treat a corrupt file as an empty config)."""
         if self._loaded:
             return
         if self._path.exists():
@@ -69,7 +69,7 @@ class Config:
         self._loaded = True
 
     def save(self) -> None:
-        """写回配置文件（0600 权限）."""
+        """Write the config file back (mode 0600)."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with open(self._path, "w", encoding="utf-8") as f:
             json.dump(self._data, f, indent=2, ensure_ascii=False)
@@ -80,10 +80,10 @@ class Config:
 
     @property
     def writer(self) -> LLMEndpoint:
-        """编写 AI 端点配置（缺省回退默认值）.
+        """Return the writer AI endpoint config (falls back to defaults).
 
         Returns:
-            {"base_url", "api_key", "model"}。
+            {"base_url", "api_key", "model"}.
 
         """
         self._ensure_loaded()
@@ -98,10 +98,10 @@ class Config:
 
     @writer.setter
     def writer(self, value: dict[str, Any]) -> None:
-        """设置编写 AI 端点配置.
+        """Set the writer AI endpoint config.
 
         Args:
-            value: 配置字典。
+            value: Config dictionary.
 
         """
         self._ensure_loaded()
@@ -109,10 +109,10 @@ class Config:
 
     @property
     def checker(self) -> LLMEndpoint:
-        """检查 AI 端点配置（缺省回退默认值）.
+        """Return the checker AI endpoint config (falls back to defaults).
 
         Returns:
-            {"base_url", "api_key", "model"}。
+            {"base_url", "api_key", "model"}.
 
         """
         self._ensure_loaded()
@@ -127,10 +127,10 @@ class Config:
 
     @checker.setter
     def checker(self, value: dict[str, Any]) -> None:
-        """设置检查 AI 端点配置.
+        """Set the checker AI endpoint config.
 
         Args:
-            value: 配置字典。
+            value: Config dictionary.
 
         """
         self._ensure_loaded()
@@ -138,10 +138,10 @@ class Config:
 
     @property
     def editor(self) -> LLMEndpoint:
-        """模板编辑 AI 端点配置（缺省回退默认值）.
+        """Return the template editor AI endpoint config (falls back to defaults).
 
         Returns:
-            {"base_url", "api_key", "model"}。
+            {"base_url", "api_key", "model"}.
 
         """
         self._ensure_loaded()
@@ -156,10 +156,10 @@ class Config:
 
     @editor.setter
     def editor(self, value: dict[str, Any]) -> None:
-        """设置模板编辑 AI 端点配置.
+        """Set the template editor AI endpoint config.
 
         Args:
-            value: 配置字典。
+            value: Config dictionary.
 
         """
         self._ensure_loaded()
@@ -167,10 +167,10 @@ class Config:
 
     @property
     def language(self) -> str:
-        """界面语言（"zh" 或 "en"，缺省 "en"）.
+        """Return the UI language ("zh" or "en", defaults to "en").
 
         Returns:
-            语言代码。
+            Language code.
 
         """
         self._ensure_loaded()
@@ -181,10 +181,10 @@ class Config:
 
     @language.setter
     def language(self, value: str) -> None:
-        """设置界面语言.
+        """Set the UI language.
 
         Args:
-            value: 语言代码（"zh" 或 "en"）。
+            value: Language code ("zh" or "en").
 
         """
         self._ensure_loaded()
@@ -192,20 +192,20 @@ class Config:
 
     @property
     def data(self) -> dict[str, Any]:
-        """原始配置数据.
+        """Return the raw config data.
 
         Returns:
-            配置字典（惰性加载）。
+            Config dictionary (lazily loaded).
 
         """
         self._ensure_loaded()
         return self._data
 
     def update(self, d: dict[str, Any]) -> None:
-        """合并更新配置.
+        """Merge updates into the config.
 
         Args:
-            d: 要合并的配置字典。
+            d: Config dictionary to merge.
 
         """
         self._ensure_loaded()
@@ -216,10 +216,10 @@ _config: Config | None = None
 
 
 def get_config() -> Config:
-    """获取全局配置单例.
+    """Return the global config singleton.
 
     Returns:
-        Config 实例。
+        A Config instance.
 
     """
     global _config
@@ -229,6 +229,6 @@ def get_config() -> Config:
 
 
 def reset_config() -> None:
-    """重置配置单例（测试用）."""
+    """Reset the config singleton (for tests)."""
     global _config
     _config = None

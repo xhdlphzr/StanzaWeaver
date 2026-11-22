@@ -1,11 +1,12 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""词库访问层（SQLite）.
+"""Vocabulary store access layer (SQLite).
 
-- 词条表 words：文本、语言、释义、音节 JSON、音节数；
-- search_words：按语言/音节数/逐位约束查询，支持向量相似度重排；
-- 数据库默认位于 ~/.stanza_weaver/vocabulary.db。
+- Word table ``words``: text, language, meaning, syllable JSON, syllable count.
+- ``search_words``: query by language/syllable count/positional constraints,
+  with optional vector-similarity reranking.
+- The database defaults to ``~/.stanza_weaver/vocabulary.db``.
 """
 
 import json
@@ -22,10 +23,10 @@ _DB_PATH: Path | None = None
 
 
 def set_db_path(path: Path) -> None:
-    """覆盖数据库路径（主要供测试使用）.
+    """Override the database path (mainly for tests).
 
     Args:
-        path: 新的数据库文件路径。
+        path: New database file path.
 
     """
     global _DB_PATH
@@ -33,10 +34,10 @@ def set_db_path(path: Path) -> None:
 
 
 def get_db_path() -> Path:
-    """返回数据库路径（默认 ~/.stanza_weaver/vocabulary.db）.
+    """Return the database path (default ``~/.stanza_weaver/vocabulary.db``).
 
     Returns:
-        数据库文件路径。
+        Database file path.
 
     """
     global _DB_PATH
@@ -46,7 +47,7 @@ def get_db_path() -> Path:
 
 
 def init_db() -> None:
-    """初始化数据库（建表与索引，幂等）."""
+    """Initialize the database (create tables and indexes; idempotent)."""
     db_path = get_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
@@ -56,30 +57,30 @@ def init_db() -> None:
 
 
 def _get_conn() -> sqlite3.Connection:
-    """打开数据库连接.
+    """Open a database connection.
 
     Returns:
-        sqlite3 连接。
+        SQLite connection.
 
     """
     return sqlite3.connect(str(get_db_path()))
 
 
 def insert_word(word: Word) -> None:
-    """插入单个词条（便捷封装，主要供测试使用）.
+    """Insert a single word entry (convenience wrapper, mainly for tests).
 
     Args:
-        word: 词条。
+        word: Word entry.
 
     """
     insert_words([word])
 
 
 def insert_words(words: list[Word]) -> None:
-    """批量插入词条.
+    """Insert word entries in batches.
 
     Args:
-        words: 词条列表。
+        words: List of word entries.
 
     """
     conn = _get_conn()
@@ -102,13 +103,13 @@ def insert_words(words: list[Word]) -> None:
 
 
 def _syl_from_json(d: dict[str, Any]) -> Syllable:
-    """从字典还原音节.
+    """Restore a syllable from a dictionary.
 
     Args:
-        d: 音节字典。
+        d: Syllable dictionary.
 
     Returns:
-        Syllable 实例。
+        Syllable instance.
 
     """
     return Syllable.from_dict(d)
@@ -123,19 +124,19 @@ def _syl_matches(
     stress: str = "",
     length: str = "",
 ) -> bool:
-    """判断音节是否满足约束（空字段不限）.
+    """Check whether a syllable satisfies the constraints (empty = unconstrained).
 
     Args:
-        syl: 音节。
-        onset: onset 约束（空=不限）。
-        nucleus: nucleus 约束（空=不限）。
-        coda: coda 约束（空=不限）。
-        tone: 声调约束（空=不限）。
-        stress: 重音约束（空=不限）。
-        length: 音长约束（空=不限）。
+        syl: Syllable.
+        onset: Onset constraint (empty = unconstrained).
+        nucleus: Nucleus constraint (empty = unconstrained).
+        coda: Coda constraint (empty = unconstrained).
+        tone: Tone constraint (empty = unconstrained).
+        stress: Stress constraint (empty = unconstrained).
+        length: Length constraint (empty = unconstrained).
 
     Returns:
-        满足返回 True。
+        True if satisfied.
 
     """
     if onset and syl.onset != onset:
@@ -163,25 +164,26 @@ def search_words(
     length: str = "",
     limit: int = 20,
 ) -> list[dict[str, Any]]:
-    """按约束搜索候选词.
+    """Search candidate words by constraints.
 
-    约束匹配词内任一音节位（结果标注 matched_syllable）；
-    提供 query 时用向量相似度重排。
+    A constraint matches any syllable position in a word (the result marks
+    ``matched_syllable``); when ``query`` is given, results are reranked by
+    vector similarity.
 
     Args:
-        language: 语言代码。
-        query: 语义查询文本（用于重排，可为空）。
-        syllable_count: 音节数约束。
-        onset: onset 约束（空=不限）。
-        nucleus: nucleus 约束（空=不限）。
-        coda: coda 约束（空=不限）。
-        tone: 声调约束（空=不限）。
-        stress: 重音约束（空=不限）。
-        length: 音长约束（空=不限）。
-        limit: 最大返回数。
+        language: Language code.
+        query: Semantic query text (used for reranking; may be empty).
+        syllable_count: Syllable-count constraint.
+        onset: Onset constraint (empty = unconstrained).
+        nucleus: Nucleus constraint (empty = unconstrained).
+        coda: Coda constraint (empty = unconstrained).
+        tone: Tone constraint (empty = unconstrained).
+        stress: Stress constraint (empty = unconstrained).
+        length: Length constraint (empty = unconstrained).
+        limit: Maximum number of results.
 
     Returns:
-        词条字典列表。
+        List of word dictionaries.
 
     """
     conn = _get_conn()
@@ -268,13 +270,13 @@ def search_words(
 
 
 def word_count(language: str = "") -> int:
-    """统计词条数量（主要供 has_words 与测试使用）.
+    """Count word entries (mainly for ``has_words`` and tests).
 
     Args:
-        language: 语言代码（空=全部）。
+        language: Language code (empty = all).
 
     Returns:
-        词条数。
+        Number of word entries.
 
     """
     conn = _get_conn()
@@ -289,24 +291,26 @@ def word_count(language: str = "") -> int:
 
 
 def has_words(language: str = "") -> bool:
-    """判断词库是否非空（主要供测试使用）.
+    """Check whether the vocabulary is non-empty (mainly for tests).
 
     Args:
-        language: 语言代码（空=全部）。
+        language: Language code (empty = all).
 
     Returns:
-        非空返回 True。
+        True if non-empty.
 
     """
     return word_count(language) > 0
 
 
 def set_en_pron(word: str, prons: list[list[str]]) -> None:
-    """写入英文词的 CMUdict 全部发音（本地缓存，供 EnglishAnalyzer 离线使用）.
+    """Store all CMUdict pronunciations of an English word (local cache).
+
+    The cache lets EnglishAnalyzer work offline.
 
     Args:
-        word: 小写英文词。
-        prons: 音素列表的列表（每个元素是一个发音）。
+        word: Lowercase English word.
+        prons: List of phoneme lists (each element is one pronunciation).
 
     """
     conn = _get_conn()
@@ -319,14 +323,15 @@ def set_en_pron(word: str, prons: list[list[str]]) -> None:
 
 
 def get_en_pron(word: str) -> list[list[str]] | None:
-    """读取英文词的 CMUdict 全部发音（本地缓存）.
+    """Read all cached CMUdict pronunciations of an English word.
 
     Args:
-        word: 小写英文词。
+        word: Lowercase English word.
 
     Returns:
-        音素列表的列表；词不存在于本地缓存或表尚未创建时返回 None
-        （调用方应回退到 CMUdict）。
+        List of phoneme lists; None if the word is not in the local cache or
+        the table has not been created yet (callers should fall back to
+        CMUdict).
 
     """
     try:
@@ -335,7 +340,7 @@ def get_en_pron(word: str) -> list[list[str]] | None:
             "SELECT phones_json FROM en_pron WHERE word = ?", (word,)
         ).fetchone()
         conn.close()
-    except Exception:  # noqa: BLE001 - 数据库未初始化时静默降级
+    except Exception:  # noqa: BLE001 - degrade silently when the database is not ready
         return None
     if row is None:
         return None

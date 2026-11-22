@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""补充单元测试：将 syllable_counter / base / meter_validator 行覆盖拉满."""
+"""Add unit tests that bring syllable_counter, base and meter_validator to 100%."""
 
 from typing import Any
 from unittest import mock
@@ -14,43 +14,43 @@ from src.prosody.syllable_counter import analyze_line
 
 
 class _BaseStub(SyllableAnalyzer):
-    """无 analyze_line_variants 的基类桩（用于 118 分支）."""
+    """Base stub without analyze_line_variants (for the line 118 branch)."""
 
     language = "xx"
 
     def analyze_word(self, word: str) -> list[Syllable]:
-        """返回空音节列表.
+        """Return an empty syllable list.
 
         Args:
-            word: 待分析单词。
+            word: Word to analyze.
 
         Returns:
-            空列表。
+            An empty list.
 
         """
         return []
 
     def count_syllables(self, text: str) -> int:
-        """返回 0.
+        """Return 0.
 
         Args:
-            text: 待计数文本。
+            text: Text to count.
 
         Returns:
-            固定返回 0。
+            Always 0.
 
         """
         return 0
 
 
 def test_analyze_line_zh_all_empty_variants_returns_empty() -> None:
-    """Zh 分析器返回的全是空变体时，_zh_line 应回退到返回 []（覆盖 46）."""
+    """Verify _zh_line returns [] when all Zh variants are empty (line 46)."""
 
     class _ZhEmptyStub(_BaseStub):
-        """analyze_line_variants 只返回空变体列表."""
+        """analyze_line_variants returns only an empty variant list."""
 
         def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-            """返回仅含空变体的列表."""
+            """Return a list containing only an empty variant."""
             return [[]]
 
     stub = _ZhEmptyStub()
@@ -59,39 +59,39 @@ def test_analyze_line_zh_all_empty_variants_returns_empty() -> None:
 
 
 def test_analyze_line_it_routes_to_syllabify_line() -> None:
-    """It 语言应进入 _it_line 分支（覆盖 59）."""
+    """Verify Italian routes to the _it_line branch (line 59)."""
     syls = analyze_line("poeti e", "it")
     assert isinstance(syls, list)
     assert all(isinstance(s, Syllable) for s in syls)
 
 
 def test_analyze_line_en_default_branch() -> None:
-    """不在 _LINE_HANDLERS 的语言走默认逐词分支（覆盖 139-144）."""
+    """Verify unhandled languages use the per-word default (139-144)."""
     syls = analyze_line("hello world", "en")
     assert isinstance(syls, list)
 
 
 def test_base_default_tokenize_line() -> None:
-    """默认 tokenize_line 应按空白切分（覆盖 base 53）."""
+    """Verify the default tokenize_line splits on whitespace (base 53)."""
 
     class _Concrete(SyllableAnalyzer):
-        """仅实现两个抽象方法的极简子类."""
+        """Minimal subclass implementing only the two abstract methods."""
 
         language = "concrete"
 
         def analyze_word(self, word: str) -> list[Syllable]:
-            """返回空列表."""
+            """Return an empty list."""
             return []
 
         def count_syllables(self, text: str) -> int:
-            """返回 0."""
+            """Return 0."""
             return 0
 
     assert _Concrete().tokenize_line("a b  c") == ["a", "b", "c"]
 
 
 def test_validate_analyzer_without_variants_uses_analyze_line() -> None:
-    """无 analyze_line_variants 的分析器走 118 分支."""
+    """Verify an analyzer without analyze_line_variants takes line 118."""
     stub = _BaseStub()
     v = MeterValidator()
     tpl: dict[str, Any] = {
@@ -107,15 +107,15 @@ def test_validate_analyzer_without_variants_uses_analyze_line() -> None:
 
 
 def test_validate_constraints_empty_variants_reports_error() -> None:
-    """某行变体为空时，逐位约束分支应报“无音节”（覆盖 140-141）."""
+    """Verify empty line variants raise the no-syllables error (140-141)."""
 
     class _EnEmptyStub(_BaseStub):
-        """analyze_line_variants 返回空列表."""
+        """analyze_line_variants returns an empty list."""
 
         language = "en"
 
         def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-            """返回空变体列表."""
+            """Return an empty variant list."""
             return []
 
     stub = _EnEmptyStub()
@@ -128,30 +128,30 @@ def test_validate_constraints_empty_variants_reports_error() -> None:
     }
     with mock.patch.dict(sc_module._ANALYZERS, {"en": stub}):
         res = v.validate(["x"], tpl)
-    assert any("无音节" in e for e in res.errors)
+    assert any("no syllables" in e for e in res.errors)
 
 
 def test_validate_full_variants_order_and_empty_line() -> None:
-    """En 排序分支（198）与空变体行分支（235）同测."""
+    """Cover the En ordering branch (198) and empty-variant line (235)."""
 
     class _FullStub(_BaseStub):
-        """analyze_line_variants 对空行返回 []，其余返回单变体."""
+        """analyze_line_variants returns [] for an empty line else one variant."""
 
         language = "en"
 
         def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-            """空行返回空；正常行返回单音节变体."""
+            """Return empty for an empty line, else a single-syllable variant."""
             if line == "empty":
                 return []
             return [[Syllable(onset="", nucleus="x", coda="", attributes={})]]
 
     class _FullTemplate:
-        """只返回错误的模板桩."""
+        """Template stub that always returns errors."""
 
         def validate_full(
             self, poem: list[str], syllables: list[list[Syllable]]
         ) -> list[str]:
-            """始终返回非空错误列表."""
+            """Always return a non-empty error list."""
             return ["err"]
 
     stub = _FullStub()
@@ -168,15 +168,15 @@ def test_validate_full_variants_order_and_empty_line() -> None:
 
 
 def test_validate_line_en_count_branch() -> None:
-    """validate_line 的 en 计数分支（327-329）."""
+    """Cover validate_line's En count branch (lines 327-329)."""
 
     class _EnStub(_BaseStub):
-        """analyze_line_variants 返回非空单变体."""
+        """analyze_line_variants returns one non-empty variant."""
 
         language = "en"
 
         def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-            """返回长度 1 的变体."""
+            """Return a variant of length 1."""
             return [[Syllable(onset="", nucleus="a", coda="", attributes={})]]
 
     stub = _EnStub()
@@ -189,19 +189,19 @@ def test_validate_line_en_count_branch() -> None:
     }
     with mock.patch.dict(sc_module._ANALYZERS, {"en": stub}):
         res = v.validate_line("text", 0, tpl)
-    assert any("音节数不匹配" in e for e in res.errors)
+    assert any("Syllable count mismatch" in e for e in res.errors)
 
 
 def test_validate_line_en_constraint_matches_returns() -> None:
-    """validate_line 的 en 约束分支：变体匹配时直接返回（341-345）."""
+    """Verify the En constraint branch returns on a variant match (341-345)."""
 
     class _EnMatchStub(_BaseStub):
-        """analyze_line_variants 返回满足约束的变体."""
+        """analyze_line_variants returns a variant satisfying the constraint."""
 
         language = "en"
 
         def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-            """返回 onset=z 的变体."""
+            """Return a variant with onset=z."""
             return [[Syllable(onset="z", nucleus="", coda="", attributes={})]]
 
     stub = _EnMatchStub()
@@ -218,15 +218,15 @@ def test_validate_line_en_constraint_matches_returns() -> None:
 
 
 def test_validate_line_en_constraint_mismatch_reports() -> None:
-    """validate_line 的 en 约束分支：无匹配时取 variants[0]（346）."""
+    """Verify the En constraint branch falls back to variants[0] (line 346)."""
 
     class _EnMismatchStub(_BaseStub):
-        """analyze_line_variants 返回不满足约束的变体."""
+        """analyze_line_variants returns a variant that misses the constraint."""
 
         language = "en"
 
         def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-            """返回 onset=a 的变体（约束要求 z）."""
+            """Return a variant with onset=a (the constraint requires z)."""
             return [[Syllable(onset="a", nucleus="", coda="", attributes={})]]
 
     stub = _EnMismatchStub()
@@ -239,47 +239,47 @@ def test_validate_line_en_constraint_mismatch_reports() -> None:
     }
     with mock.patch.dict(sc_module._ANALYZERS, {"en": stub}):
         res = v.validate_line("text", 0, tpl)
-    assert any("第1音节" in e for e in res.errors)
+    assert any("Syllable 1" in e for e in res.errors)
 
 
 def test_describe_constraint_onset_nucleus_coda() -> None:
-    """_describe_constraint 的 onset/nucleus/coda 分支（372/374/376）."""
+    """Cover _describe_constraint's onset/nucleus/coda branches (372-376)."""
     desc = MeterValidator._describe_constraint(
         {"onset": "zh", "nucleus": "a", "coda": "ng"}
     )
-    assert desc == "声母=zh,韵母=a,韵尾=ng"
+    assert desc == "onset=zh,nucleus=a,coda=ng"
 
 
 def test_describe_syllable_with_coda() -> None:
-    """_describe_syllable 的 coda 分支（398）."""
+    """Cover _describe_syllable's coda branch (line 398)."""
     desc = MeterValidator._describe_syllable(
         Syllable(onset="z", nucleus="a", coda="ng", attributes={})
     )
-    assert "韵尾=ng" in desc
+    assert "coda=ng" in desc
 
 
 def test_validate_full_variants_cap_break() -> None:
-    """变体组合数超过 MAX_FULL_COMBOS 时截断（覆盖 239 行）."""
+    """Verify variant combos are capped at MAX_FULL_COMBOS (line 239)."""
 
     class _ManyVariants(_BaseStub):
-        """每行返回 30 个相同变体，3 行共 27000 组合 > 20000."""
+        """Each line has 30 identical variants: 3 lines make 27000 > 20000."""
 
         language = "en"
 
         def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-            """返回 30 个相同变体."""
+            """Return 30 identical variants."""
             return [
                 [Syllable(onset="", nucleus="x", coda="", attributes={})]
                 for _ in range(30)
             ]
 
     class _AlwaysErrorTemplate:
-        """validate_full 恒返回错误的模板桩."""
+        """Template stub whose validate_full always returns errors."""
 
         def validate_full(
             self, poem: list[str], syllables: list[list[Syllable]]
         ) -> list[str]:
-            """始终返回非空错误列表."""
+            """Always return a non-empty error list."""
             return ["err"]
 
     stub = _ManyVariants()

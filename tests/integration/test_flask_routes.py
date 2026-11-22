@@ -1,9 +1,10 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""Flask 路由集成测试（不依赖 OpenAI，仅验证 HTTP 层与本地访问守卫）.
+"""Flask route integration tests (no OpenAI; HTTP layer and local guard only).
 
-借助 Flask 测试客户端发起请求；CSRF 守卫按设计需携带 X-CSRF-Token。
+Requests use the Flask test client; CSRF-protected routes need X-CSRF-Token by
+design.
 """
 
 from collections.abc import Iterator
@@ -17,10 +18,10 @@ import app as app_module
 
 @pytest.fixture()
 def client() -> Iterator[FlaskClient]:
-    """提供 Flask 测试客户端.
+    """Provide a Flask test client.
 
     Yields:
-        配置好 testing 模式的 FlaskClient。
+        A FlaskClient with testing mode enabled.
 
     """
     app_module.app.testing = True
@@ -29,24 +30,24 @@ def client() -> Iterator[FlaskClient]:
 
 
 def _csrf() -> dict[str, str]:
-    """构造 CSRF 请求头.
+    """Build CSRF request headers.
 
     Returns:
-        {"X-CSRF-Token": ...} 字典。
+        A {"X-CSRF-Token": ...} dict.
 
     """
     return {"X-CSRF-Token": app_module._CSRF_TOKEN}
 
 
 def test_index_page(client: FlaskClient) -> None:
-    """验证 index page."""
+    """Verify the index page."""
     resp = client.get("/")
     assert resp.status_code == 200
     assert "StanzaWeaver" in resp.get_data(as_text=True)
 
 
 def test_templates_endpoint(client: FlaskClient) -> None:
-    """验证 templates endpoint."""
+    """Verify the templates endpoint."""
     resp = client.get("/api/templates")
     assert resp.status_code == 200
     data = resp.get_json()
@@ -56,14 +57,14 @@ def test_templates_endpoint(client: FlaskClient) -> None:
 
 
 def test_import_status_endpoint(client: FlaskClient) -> None:
-    """验证 import status endpoint."""
+    """Verify the import status endpoint."""
     resp = client.get("/api/import-status")
     assert resp.status_code == 200
     assert "importing" in resp.get_json()
 
 
 def test_llm_status_endpoint(client: FlaskClient) -> None:
-    """验证 LLM 连通状态 endpoint."""
+    """Verify the LLM status endpoint."""
     resp = client.get("/api/llm-status")
     assert resp.status_code == 200
     data = resp.get_json()
@@ -73,7 +74,7 @@ def test_llm_status_endpoint(client: FlaskClient) -> None:
 
 
 def test_llm_ping_requires_csrf(client: FlaskClient) -> None:
-    """验证手动 ping 需要 CSRF 令牌."""
+    """Verify manual ping requires a CSRF token."""
     assert client.post("/api/llm-ping").status_code == 403
     resp = client.post("/api/llm-ping", headers=_csrf())
     assert resp.status_code == 200
@@ -82,7 +83,7 @@ def test_llm_ping_requires_csrf(client: FlaskClient) -> None:
 
 
 def test_config_requires_csrf(client: FlaskClient) -> None:
-    """验证 config requires csrf."""
+    """Verify config requires CSRF."""
     assert client.get("/api/config").status_code == 403
     resp = client.get("/api/config", headers=_csrf())
     assert resp.status_code == 200
@@ -93,7 +94,7 @@ def test_config_requires_csrf(client: FlaskClient) -> None:
 
 
 def test_i18n_zh(client: FlaskClient) -> None:
-    """验证中文翻译接口."""
+    """Verify the Chinese i18n endpoint."""
     resp = client.get("/api/i18n/zh")
     assert resp.status_code == 200
     data = resp.get_json()
@@ -103,7 +104,7 @@ def test_i18n_zh(client: FlaskClient) -> None:
 
 
 def test_i18n_en(client: FlaskClient) -> None:
-    """验证英文翻译接口."""
+    """Verify the English i18n endpoint."""
     resp = client.get("/api/i18n/en")
     assert resp.status_code == 200
     data = resp.get_json()
@@ -113,7 +114,7 @@ def test_i18n_en(client: FlaskClient) -> None:
 
 
 def test_i18n_unknown_fallback(client: FlaskClient) -> None:
-    """验证未知语言回退到中文."""
+    """Verify unknown languages fall back to Chinese."""
     resp = client.get("/api/i18n/fr")
     assert resp.status_code == 200
     data = resp.get_json()
@@ -121,14 +122,14 @@ def test_i18n_unknown_fallback(client: FlaskClient) -> None:
 
 
 def test_history_get(client: FlaskClient) -> None:
-    """验证 history get."""
+    """Verify the history GET endpoint."""
     resp = client.get("/api/history")
     assert resp.status_code == 200
     assert isinstance(resp.get_json(), list)
 
 
 def test_history_post_requires_csrf(client: FlaskClient) -> None:
-    """验证 history post requires csrf."""
+    """Verify history POST requires CSRF."""
     assert (
         client.post("/api/history", json={"topic": "t", "poem": "p"}).status_code == 403
     )
@@ -142,7 +143,7 @@ def test_history_post_requires_csrf(client: FlaskClient) -> None:
 
 
 def test_templates_meta_endpoint(client: FlaskClient) -> None:
-    """自定义模板 meta 应覆盖五语言并返回约束维度/可选项/辅助函数."""
+    """Template meta covers five languages with dimensions, values, and helpers."""
     resp = client.get("/api/templates/meta")
     assert resp.status_code == 200
     data = resp.get_json()
@@ -157,7 +158,7 @@ def test_templates_meta_endpoint(client: FlaskClient) -> None:
 
 
 def test_custom_template_rejects_unknown_language(client: FlaskClient) -> None:
-    """创建自定义模板时未知语言应返回 400."""
+    """Creating a custom template with an unknown language returns 400."""
     resp = client.post(
         "/api/templates/custom",
         json={
@@ -174,7 +175,7 @@ def test_custom_template_rejects_unknown_language(client: FlaskClient) -> None:
 
 
 def test_build_custom_template_code_all_languages() -> None:
-    """五种语言的模板源码均可编译且使用对应语言模块别名 rules."""
+    """Template source compiles for all five languages using the rules alias."""
     cases: list[tuple[str, str, str]] = [
         ("zh", "tone", "平"),
         ("en", "stress", "light"),

@@ -1,11 +1,12 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""英语格律模板：莎士比亚商籁体、维拉内拉诗、英雄双行体.
+"""English metrical templates: Shakespearean sonnet, villanelle, heroic couplet.
 
-押韵采用严格重音匹配：韵脚必须落在主/次重音音节上，且该音节起的
-全部音素（含重音层级）完全一致，任一发音满足押韵即通过
-（由 EnglishAnalyzer.rhyme_tails 实现）。
+Rhyme uses strict stress matching: the rhyme must fall on a primary/secondary
+stressed syllable, and all phonemes from that syllable on (including the stress
+level) must match exactly; any pronunciation that satisfies the rhyme passes
+(implemented by ``EnglishAnalyzer.rhyme_tails``).
 """
 
 from typing import Any, ClassVar
@@ -22,29 +23,31 @@ _h: dict[str, Any] = _make_syl(attributes={"stress": "heavy"})
 
 
 def _en_last_word(line: str) -> str:
-    """取行末词（去标点、小写）.
+    """Get the last word of a line (punctuation stripped, lowercased).
 
     Args:
-        line: 一行诗。
+        line: One line of poetry.
 
     Returns:
-        行末词；空行返回空串。
+        Last word of the line; empty string for an empty line.
 
     """
     return _last_word(line, "A-Za-z0-9'-")
 
 
 def _en_rhyme_key(line_text: str) -> tuple[str, ...] | None:
-    """严格重音押韵 key：行末词全部发音中"自重读音节起的音素串"集合.
+    """Strict stress rhyme key: phoneme tails from the stressed syllable onward.
 
-    押韵须为严格重音匹配（含重音层级），且任一发音满足押韵即通过，
-    故返回去重后的尾串元组（可哈希，便于集合运算）。
+    Rhyme must be strict stress matching (including the stress level), and any
+    pronunciation that satisfies the rhyme passes, so this returns a tuple of
+    deduplicated tails (hashable for set operations).
 
     Args:
-        line_text: 一行诗。
+        line_text: One line of poetry.
 
     Returns:
-        押韵尾串元组；行末词无重读音节时返回 None（不能作韵脚）。
+        Tuple of rhyme tails; None when the last word has no stressed syllable
+        (it cannot serve as a rhyme).
 
     """
     word = _en_last_word(line_text)
@@ -59,31 +62,33 @@ def _en_rhyme_key(line_text: str) -> tuple[str, ...] | None:
 def _check_stress_count(
     poem: list[str], syllables: list[list[Syllable]], min_stress: int, errors: list[str]
 ) -> None:
-    """检查每行重读音节数下限（次重音亦计入）.
+    """Check the minimum stressed-syllable count of each line (secondary counts).
 
     Args:
-        poem: 诗行列表。
-        syllables: 各行音节。
-        min_stress: 最少重读音节数。
-        errors: 错误列表（就地追加）。
+        poem: List of poem lines.
+        syllables: Syllables per line.
+        min_stress: Minimum number of stressed syllables.
+        errors: Error list (appended in place).
 
     """
     for i, syls in enumerate(syllables):
         stress_count = sum(1 for s in syls if s.attributes.get("stress") == "heavy")
         if stress_count < min_stress:
-            errors.append(f"第{i + 1}行重音音节过少 ({stress_count})")
+            errors.append(
+                f"Line {i + 1} has too few stressed syllables ({stress_count})"
+            )
 
 
 def _check_rhyme_group(
     poem: list[str], indices: list[int], label: str, errors: list[str]
 ) -> None:
-    """检查一组行严格重音押韵一致（组内所有行共享至少一个韵尾）.
+    """Check that a set of lines rhyme strictly by stress (shared tails).
 
     Args:
-        poem: 诗行列表。
-        indices: 参与该韵组的行号（0-based）。
-        label: 韵组名（A/B/AA 等）。
-        errors: 错误列表（就地追加）。
+        poem: List of poem lines.
+        indices: Line numbers participating in this rhyme group (0-based).
+        label: Rhyme group name (A/B/AA, ...).
+        errors: Error list (appended in place).
 
     """
     keys: list[tuple[int, tuple[str, ...]]] = []
@@ -92,7 +97,10 @@ def _check_rhyme_group(
             continue
         k = _en_rhyme_key(poem[idx])
         if k is None:
-            errors.append(f"第{idx + 1}行韵脚未落在主重音或次重音音节上")
+            errors.append(
+                f"Line {idx + 1} rhyme does not fall on a primary or secondary "
+                f"stressed syllable"
+            )
             continue
         keys.append((idx, k))
     if len(keys) >= 2:
@@ -103,14 +111,15 @@ def _check_rhyme_group(
             first_idx, first_key = keys[0]
             last_idx, last_key = keys[-1]
             errors.append(
-                f"押韵{label}不匹配: 第{first_idx + 1}行韵脚{first_key}，"
-                f"第{last_idx + 1}行韵脚{last_key}"
-                f"（要求组内所有行共享一个自重读音节起的音素尾串）"
+                f"Rhyme {label} mismatch: line {first_idx + 1} rhyme "
+                f"{first_key}, line {last_idx + 1} rhyme {last_key} "
+                f"(all lines in the group must share a phoneme tail starting "
+                f"from a stressed syllable)"
             )
 
 
 class ShakespeareSonnetTemplate(PoetryTemplate):
-    """莎士比亚商籁体：14 行抑扬格五音步，韵式 ABAB CDCD EFEF GG."""
+    """Shakespearean sonnet: 14 lines of iambic pentameter, ABAB CDCD EFEF GG."""
 
     name = "莎士比亚商籁体"
     language = "en"
@@ -126,10 +135,10 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
-        """抑扬格逐位约束：奇数位轻、偶数位重.
+        """Iambic per-position constraints: light on odd positions, heavy on even.
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         line = [_l, _h, _l, _h, _l, _h, _l, _h, _l, _h]
@@ -138,14 +147,14 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：重音下限、ABAB CDCD EFEF GG 韵式、组内 A/B 韵不同.
+        """Full check: stress minimum, ABAB CDCD EFEF GG scheme, distinct A/B.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
         errors: list[str] = []
@@ -177,15 +186,16 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
                     for j in range(i + 1, len(present)):
                         if not set(present[i]).isdisjoint(present[j]):
                             errors.append(
-                                f"第{q_idx + 1}段对韵: A/B 韵脚应不同，"
-                                f"当前共享韵尾{set(present[i]) & set(present[j])}"
+                                f"Quatrain {q_idx + 1} rhyme: A/B rhymes should "
+                                f"differ but share the tail "
+                                f"{set(present[i]) & set(present[j])}"
                             )
 
         return errors
 
 
 class VillanelleTemplate(PoetryTemplate):
-    """维拉内拉诗：19 行，韵式 ABA…ABAA，两叠句循环，音节数不限."""
+    """Villanelle: 19 lines, ABA...ABAA scheme, two cycling refrains, free length."""
 
     name = "维拉内拉诗"
     language = "en"
@@ -206,10 +216,10 @@ class VillanelleTemplate(PoetryTemplate):
     _rhyme_b: ClassVar[list[int]] = [1, 4, 7, 10, 13, 16]
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束（只要求每行 ≥4 重读音节）.
+        """No per-position constraints (only require >=4 stressed syllables per line).
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         return None
@@ -217,14 +227,14 @@ class VillanelleTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：重音下限、叠句原文重复、A/B 两韵及互异.
+        """Full check: stress minimum, verbatim refrains, A/B rhymes and distinctness.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
         errors: list[str] = []
@@ -234,12 +244,18 @@ class VillanelleTemplate(PoetryTemplate):
             base_a1 = _norm_refrain(poem[0])
             for ref_idx in self._refrain_a1[1:]:
                 if ref_idx < len(poem) and _norm_refrain(poem[ref_idx]) != base_a1:
-                    errors.append(f"叠句A1不匹配: 第1行与第{ref_idx + 1}行文本不一致")
+                    errors.append(
+                        f"Refrain A1 mismatch: line 1 and line {ref_idx + 1} "
+                        f"texts differ"
+                    )
         if len(poem) > 2:
             base_a2 = _norm_refrain(poem[2])
             for ref_idx in self._refrain_a2[1:]:
                 if ref_idx < len(poem) and _norm_refrain(poem[ref_idx]) != base_a2:
-                    errors.append(f"叠句A2不匹配: 第3行与第{ref_idx + 1}行文本不一致")
+                    errors.append(
+                        f"Refrain A2 mismatch: line 3 and line {ref_idx + 1} "
+                        f"texts differ"
+                    )
 
         _check_rhyme_group(poem, self._rhyme_a, "A", errors)
         _check_rhyme_group(poem, self._rhyme_b, "B", errors)
@@ -247,26 +263,31 @@ class VillanelleTemplate(PoetryTemplate):
         a_key = _en_rhyme_key(poem[0]) if poem else None
         b_key = _en_rhyme_key(poem[1]) if len(poem) > 1 else None
         if a_key and b_key and not set(a_key).isdisjoint(b_key):
-            errors.append(f"A/B韵脚应不同，当前共享韵尾{set(a_key) & set(b_key)}")
+            errors.append(
+                f"A/B rhymes should differ but share the tail {set(a_key) & set(b_key)}"
+            )
 
         return errors
 
 
 def _norm_refrain(line: str) -> str:
-    """叠句归一化：折叠空白并忽略大小写.
+    """Normalize a refrain: collapse whitespace and ignore case.
 
     Args:
-        line: 一行诗。
+        line: One line of poetry.
 
     Returns:
-        归一化后的文本。
+        Normalized text.
 
     """
     return " ".join(line.split()).casefold()
 
 
 class HeroicCoupletTemplate(PoetryTemplate):
-    """英雄双行体：两行抑扬格五音步，AA 严格重音押韵，可连续堆叠."""
+    """Heroic couplet: two lines of iambic pentameter, strict AA stress rhyme.
+
+    Couplets can be stacked continuously.
+    """
 
     name = "英雄双行体"
     language = "en"
@@ -281,10 +302,10 @@ class HeroicCoupletTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
-        """抑扬格逐位约束.
+        """Iambic per-position constraints.
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         line = [_l, _h, _l, _h, _l, _h, _l, _h, _l, _h]
@@ -293,14 +314,14 @@ class HeroicCoupletTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：重音下限 + AA 押韵.
+        """Full check: stress minimum + AA rhyme.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
         errors: list[str] = []
@@ -310,7 +331,7 @@ class HeroicCoupletTemplate(PoetryTemplate):
 
 
 def register_english_templates() -> None:
-    """注册全部英语模板."""
+    """Register all English templates."""
     register("en_sonnet", ShakespeareSonnetTemplate())
     register("en_villanelle", VillanelleTemplate())
     register("en_heroic_couplet", HeroicCoupletTemplate())

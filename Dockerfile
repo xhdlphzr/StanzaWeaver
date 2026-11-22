@@ -1,25 +1,27 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-# StanzaWeaver Docker 镜像
-# 以 Web 服务方式运行（无 GUI）：python app.py 在容器中自动回退到 HTTP 服务。
+# StanzaWeaver Docker image
+# Runs as a web service (no GUI): python app.py falls back to HTTP in a container.
 #
-# 构建:  docker build -t stanzaweaver .
-#   （无法直连 Docker Hub 时，可用国内镜像加速器前缀：
-#     docker build --build-arg BASE_IMAGE=docker.m.daocloud.io/library/python:3.14-slim -t stanzaweaver . ）
-# 运行:  docker run --rm -p 5000:5000 \
+# Build: docker build -t stanzaweaver .
+#   (If Docker Hub is unreachable, prefix with a regional mirror:
+#     docker build --build-arg BASE_IMAGE=docker.m.daocloud.io/library/python:3.14-slim -t stanzaweaver . )
+# Run:   docker run --rm -p 5000:5000 \
 #            -e STANZAWEAVER_HOST=0.0.0.0 \
 #            -v stanzaweaver-data:/home/stanzaweaver/.stanza_weaver \
 #            stanzaweaver
-# 访问:  http://localhost:5000 （安全设计仅接受 localhost/127.0.0.1 的 Host 头）
+# Open:  http://localhost:5000
+#        (the security design accepts only localhost/127.0.0.1 Host headers)
 #
-# 依赖管理使用 uv：仅 COPY pyproject.toml + uv.lock 以利用 Docker 层缓存，
-# dev 依赖（pytest/ruff/mypy/pyinstaller 等）不进镜像，保持镜像精简。
+# Dependencies are managed with uv: only pyproject.toml + uv.lock are COPYed to use
+# Docker layer caching; dev dependencies (pytest/ruff/mypy/pyinstaller, etc.) stay
+# out of the image to keep it slim.
 
 ARG BASE_IMAGE=python:3.14-slim
 FROM ${BASE_IMAGE}
 
-# 复制 uv（与官方 uv 镜像同版本可写死 tag 以便复用层缓存）
+# Copy uv (same version as the official uv image; pin the tag to reuse the layer cache)
 COPY --from=ghcr.io/astral-sh/uv:0.12.10 /uv /uvx /bin/
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -32,23 +34,25 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# 创建非 root 运行用户
+# Create a non-root runtime user
 RUN groupadd -r stanzaweaver \
     && useradd -r -g stanzaweaver -d /home/stanzaweaver -m stanzaweaver
 
-# 先装依赖（利用层缓存；uv 在基础镜像内直接使用系统 Python 3.14）
+# Install dependencies first (uses the layer cache; uv uses the base image's
+# system Python 3.14)
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen
 
-# 复制源码（排除 .dockerignore 中的内容）
+# Copy the source (excludes entries in .dockerignore)
 COPY --chown=stanzaweaver:stanzaweaver . .
 
-# 预创建用户数据目录并授权：命名卷首次挂载 ~/.stanza_weaver 时
-# Docker 会继承镜像中该目录的属主，否则卷归 root 导致非 root 用户无权限写
+# Pre-create the user data directory and chown it: on first mount of the named
+# volume at ~/.stanza_weaver, Docker inherits the image directory's owner;
+# otherwise the volume is root-owned and the non-root user cannot write.
 RUN mkdir -p /home/stanzaweaver/.stanza_weaver/logs \
     && chown -R stanzaweaver:stanzaweaver /home/stanzaweaver
 
-# 健康检查：/api/import-status 返回 JSON 即存活
+# Health check: alive if /api/import-status returns JSON
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/import-status', timeout=5)"
 
@@ -56,5 +60,6 @@ USER stanzaweaver
 
 EXPOSE 5000
 
-# 容器内无 GUI：直接启动 HTTP 服务（绕开 pywebview 窗口分支）
+# No GUI inside the container: start the HTTP service directly
+# (bypass the pywebview window branch)
 CMD ["python", "-u", "-c", "from app import start_server; start_server()"]

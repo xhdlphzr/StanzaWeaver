@@ -1,9 +1,10 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""SocketIO 集成测试：用桩 LLM 驱动 generate 事件，验证进度/定稿推送.
+"""SocketIO integration tests: a stub LLM drives the generate event.
 
-不发起真实网络请求；emit 被替换为录制器，便于断言推送的事件。
+No real network requests: emit is replaced by a recorder so pushed events
+can be asserted.
 """
 
 import time
@@ -17,19 +18,19 @@ from src.agents import checker_ai, writer_ai
 from tests.helpers import make_stub, tool_call
 
 DESC = "SocketIO 测试主题"
-# 五言绝句（合律：二四相间/联内相对/联间相粘/二四行押平声韵）。
+# Regulated five-character quatrain: valid tonal pattern, opposition, and rhyme.
 DRAFT = "远岫依烟岭\n溪流伴月明\n桃红迷柳岸\n古道远山风"
 REVISED_LINE = "远岸栖云树"
 
 
 def _make_emitter(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Any]]:
-    """构造事件收集器，拦截所有 socketio.emit 调用.
+    """Build an event collector that intercepts all socketio.emit calls.
 
     Args:
-        monkeypatch: pytest monkeypatch 实例。
+        monkeypatch: pytest monkeypatch instance.
 
     Returns:
-        收集到的 (event, data) 元组列表。
+        A list of captured (event, data) tuples.
 
     """
     emitted: list[tuple[str, object]] = []
@@ -42,16 +43,16 @@ def _make_emitter(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Any]]:
 
 
 def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
-    """注入桩 LLM 客户端，使 SocketIO 流程完全离线运行.
+    """Inject stub LLM clients so the SocketIO flow runs fully offline.
 
     Args:
-        monkeypatch: pytest monkeypatch 实例。
+        monkeypatch: pytest monkeypatch instance.
 
     """
     writer_stub = make_stub(
         stream=[DESC, DRAFT],
         chat=[
-            # Step 2: generate_draft submit（content 含诗稿）
+            # Step 2: generate_draft submits (content holds the draft poem)
             {
                 "role": "assistant",
                 "content": DRAFT,
@@ -63,7 +64,8 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
                     }
                 ],
             },
-            # Step 3: refine 第一轮 modify（修改后全量校验通过即结束炼句）
+            # Step 3: first refine round modifies; passing full checks ends
+            # refinement.
             tool_call(
                 "modify",
                 {"modify_type": "line", "line": 0, "content": REVISED_LINE},
@@ -76,7 +78,7 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_generate_emits_progress_and_done(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 generate emits progress and done."""
+    """Verify generate emits progress and done events."""
     _patch_llm(monkeypatch)
     emitted = _make_emitter(monkeypatch)
 
@@ -101,10 +103,10 @@ def test_generate_emits_progress_and_done(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_generate_empty_input_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 generate empty input errors."""
+    """Verify generate rejects empty input."""
     emitted = _make_emitter(monkeypatch)
     client = socketio.test_client(app_module.app)
     client.emit("generate", {"topic": "", "template_key": ""})
     errors = [d for e, d in emitted if e == "error"]
     assert errors
-    assert "不能为空" in str(errors[0])
+    assert "must not be empty" in str(errors[0])

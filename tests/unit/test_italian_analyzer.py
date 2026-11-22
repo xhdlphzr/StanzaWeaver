@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""意大利语音节分析器单元测试（符号层）."""
+"""Unit tests for the Italian syllable analyzer (symbol layer)."""
 
 from src.models.syllable import Syllable
 from src.prosody.italian import ItalianAnalyzer
@@ -9,53 +9,53 @@ from src.templates.it import CanzoneTemplate
 
 
 def test_count_amor() -> None:
-    """验证 count amor."""
+    """Verify count_syllables for "amor"."""
     a = ItalianAnalyzer()
-    # a-mor: 2 音节，末音节重读（辅音收尾）
+    # a-mor: 2 syllables, the last one stressed (consonant-final word).
     assert a.count_syllables("amor") == 2
     syls = a.analyze_word("amor")
     assert syls[-1].attributes["stress"] == "heavy"
 
 
 def test_count_citta() -> None:
-    """验证 count citta."""
+    """Verify count_syllables for "città"."""
     a = ItalianAnalyzer()
-    # ci-ttà: 2 音节，末音节重读（词尾重音元音）
+    # ci-ttà: 2 syllables, the last one stressed (accented final vowel).
     assert a.count_syllables("città") == 2
 
 
 def test_no_sinalefe_when_prev_coda() -> None:
-    """验证 no sinalefe when prev coda."""
+    """Verify no sinalefe applies when the previous word has a coda."""
     a = ItalianAnalyzer()
-    # amor 末音节韵尾 r 非空 -> 不与 "e" 并读
+    # "amor" ends with the coda r, so it does not merge with the following "e".
     assert a.count_syllables("amor e") == 3
 
 
 def test_sinalefe_merges_cross_word_vowels() -> None:
-    """验证 sinalefe merges cross word vowels."""
+    """Verify sinalefe merges vowels across words."""
     a = ItalianAnalyzer()
-    # poeti 末元音 i 与 e 并读为一个音节: 3 而非 4
+    # The final i of "poeti" merges with the following e: 3 syllables, not 4.
     assert a.count_syllables("poeti e") == 3
 
 
 def test_sinalefe_hiatus_no_merge() -> None:
-    """验证 sinalefe hiatus no merge."""
+    """Verify sinalefe does not merge across a hiatus."""
     a = ItalianAnalyzer()
-    # virtù 末元音 ù 重读 -> 与 eterna 首元音 e 形成元音分裂，不合并
+    # Stressed final ù of "virtù" and initial e of "eterna" form a hiatus.
     assert a.count_syllables("virtù eterna") == 5
 
 
 def test_sinalefe_unstressed_merges() -> None:
-    """验证 sinalefe unstressed merges."""
+    """Verify sinalefe merges unstressed vowels."""
     a = ItalianAnalyzer()
-    # la 非重读、aria 首元音非重读 -> 合并
+    # "la" is unstressed and the initial vowel of "aria" is unstressed -> merge.
     assert a.count_syllables("la aria") == 3
 
 
 def test_zio_hiatus_two_syllables() -> None:
-    """验证 zio hiatus two syllables."""
+    """Verify the "zio" hiatus yields two syllables."""
     a = ItalianAnalyzer()
-    # zì-o: 重读 ì 与其后 o 为元音分裂，计 2 音节
+    # zì-o: stressed ì and the following o form a hiatus, so 2 syllables.
     assert a.count_syllables("zìo") == 2
     syls = a.analyze_word("zìo")
     assert len(syls) == 2
@@ -63,15 +63,15 @@ def test_zio_hiatus_two_syllables() -> None:
 
 
 def _mk_line(n: int, stress_idx: int, tail: str) -> list[Syllable]:
-    """构造一行指定音节数、重音位置与韵脚的音节列表.
+    """Build a syllable list with the given count, stress index, and rhyme tail.
 
     Args:
-        n: 音节数。
-        stress_idx: 重音所在音节索引。
-        tail: 韵脚文本。
+        n: Number of syllables.
+        stress_idx: Index of the stressed syllable.
+        tail: Rhyme tail text.
 
     Returns:
-        构造好的 Syllable 列表。
+        The constructed Syllable list.
 
     """
     syls: list[Syllable] = []
@@ -92,21 +92,24 @@ def _mk_line(n: int, stress_idx: int, tail: str) -> list[Syllable]:
 
 
 def _mk_canzone() -> list[list[Syllable]]:
-    """构造一首全部合律的歌谣（奇数 11 音节第10重读，偶数/末行 7 音节末重读）.
+    """Build a fully metrical canzone.
+
+    Odd lines have 11 syllables with the 10th stressed; even lines and the
+    last line have 7 syllables with the final one stressed.
 
     Returns:
-        13 行 Syllable 列表。
+        A list of 13 syllable lines.
 
     """
     lines: list[list[Syllable]] = []
     for idx in range(13):
         if idx % 2 == 0:
-            # 奇数行：11 音节，第 10 音节（0-based 9）重读
+            # Odd line: 11 syllables, the 10th (0-based index 9) stressed.
             lines.append(_mk_line(11, 9, "a"))
         else:
-            # 偶数行：7 音节，末音节（0-based 6）重读
+            # Even line: 7 syllables, the final one (0-based index 6) stressed.
             lines.append(_mk_line(7, 6, "b"))
-    # 第 13 行（0-based 12）另用韵脚 c，确保末三行各异
+    # Line 13 (0-based 12) uses rhyme c so the last three lines differ.
     lines[12] = _mk_line(7, 6, "c")
     return lines
 
@@ -115,10 +118,10 @@ def _validate_canzone(lines: list[list[Syllable]]) -> list[str]:
     """Validate canzone.
 
     Args:
-        lines: 歌谣的音节行列表。
+        lines: Syllable lines of the canzone.
 
     Returns:
-        校验错误列表。
+        List of validation errors.
 
     """
     poem = ["x"] * 13
@@ -126,37 +129,37 @@ def _validate_canzone(lines: list[list[Syllable]]) -> list[str]:
 
 
 def test_canzone_valid_stress() -> None:
-    """验证 canzone valid stress."""
-    # 完全合律的歌谣不应产生重音类错误
+    """Verify a fully metrical canzone passes stress validation."""
+    # A fully metrical canzone must not produce any stress errors.
     assert _validate_canzone(_mk_canzone()) == []
 
 
 def test_canzone_odd_line_stress_on_11_fails() -> None:
-    """验证 canzone odd line stress on 11 fails."""
+    """Verify an odd line stressed on syllable 11 fails."""
     lines = _mk_canzone()
-    # 第 1 行（0-based 0）改为第 11 音节重读、第 10 不重读
+    # Make line 1 (0-based 0) stress syllable 11 instead of syllable 10.
     lines[0] = _mk_line(11, 10, "a")
     errs = _validate_canzone(lines)
-    assert any("第1行第10音节" in e for e in errs)
-    assert any("第1行第11音节" in e for e in errs)
+    assert any("Line 1 syllable 10" in e for e in errs)
+    assert any("Line 1 syllable 11" in e for e in errs)
 
 
 def test_canzone_odd_line_missing_tenth_fails() -> None:
-    """验证 canzone odd line missing tenth fails."""
+    """Verify an odd line missing the syllable-10 stress fails."""
     lines = _mk_canzone()
-    # 第 1 行（0-based 0）重音落在第 6 音节，第 10 音节未重读
+    # Line 1 (0-based 0) stresses syllable 6, leaving syllable 10 unstressed.
     lines[0] = _mk_line(11, 5, "a")
     errs = _validate_canzone(lines)
-    assert any("第1行第10音节" in e for e in errs)
+    assert any("Line 1 syllable 10" in e for e in errs)
 
 
 def test_canzone_even_line_final_stressed() -> None:
-    """验证 canzone even line final stressed."""
+    """Verify an even line has its final syllable stressed."""
     lines = _mk_canzone()
-    # 偶数行（第 2 行，0-based 1）末音节已重读 -> 无该项错误
+    # The even line (line 2, 0-based 1) already stresses its last syllable.
     errs = _validate_canzone(lines)
-    assert not any("第2行末音节" in e for e in errs)
-    # 改为末音节非重读 -> 应报错
+    assert not any("Line 2 last syllable" in e for e in errs)
+    # Make the final syllable unstressed -> an error must be reported.
     lines[1] = _mk_line(7, 3, "b")
     errs = _validate_canzone(lines)
-    assert any("第2行末音节" in e for e in errs)
+    assert any("Line 2 last syllable" in e for e in errs)

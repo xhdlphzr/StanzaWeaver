@@ -1,10 +1,11 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""词库数据集导入（CC-CEDICT / CMUdict / Lexique / GLAW-IT / Lewis & Short）.
+"""Vocabulary dataset import (CC-CEDICT / CMUdict / Lexique / GLAW-IT / Lewis & Short).
 
-首次运行自动执行：下载数据集 → 解析为 Word 列表 → 写入 SQLite。
-同一数据集已导入时跳过（meta 表记录版本）。
+Runs automatically on first launch: downloads datasets, parses them into Word
+lists, and writes them to SQLite. A dataset already imported is skipped (the
+meta table records the version).
 """
 
 import re
@@ -17,7 +18,8 @@ from ..models.word import Word
 from ..prosody.chinese import CHINESE_INITIALS, FINAL_TO_PARTS
 from .vocabulary import get_db_path, init_db, insert_words, set_en_pron
 
-# y/w 零声母拼写还原为 pypinyin 风格的韵母（与 prosody/chinese.py 实时分析保持一致）
+# Restore y/w zero-initial spellings to pypinyin-style finals so they stay
+# consistent with the real-time analysis in prosody/chinese.py
 _YW_MAP: dict[str, str] = {
     "yu": "ü",
     "yue": "üe",
@@ -47,16 +49,16 @@ logger: Logger = get_logger(__name__)
 
 
 def _download_text(url: str, timeout: int = 10) -> str | None:
-    """下载文本资源（失败返回 None）.
+    """Download a text resource (return None on failure).
 
-    网络错误（URLError/HTTPError/超时）均为 OSError 子类。
+    Network errors (URLError/HTTPError/timeout) are all OSError subclasses.
 
     Args:
-        url: 资源地址。
-        timeout: 超时秒数。
+        url: Resource URL.
+        timeout: Timeout in seconds.
 
     Returns:
-        文本内容；失败时 None。
+        Text content; None on failure.
 
     """
     try:
@@ -69,27 +71,27 @@ def _download_text(url: str, timeout: int = 10) -> str | None:
 
 
 def _dataset_key(name: str) -> str:
-    """数据集 meta 键.
+    """Return the dataset meta key.
 
     Args:
-        name: 语言代码。
+        name: Language code.
 
     Returns:
-        "dataset_{lang}"。
+        "dataset_{lang}".
 
     """
     return f"dataset_{name}"
 
 
 def _check_dataset(lang: str, expected: str) -> bool:
-    """判断数据集是否已导入.
+    """Check whether a dataset has already been imported.
 
     Args:
-        lang: 语言代码。
-        expected: 期望的数据集名。
+        lang: Language code.
+        expected: Expected dataset name.
 
     Returns:
-        已导入返回 True。
+        True if already imported.
 
     """
     import sqlite3
@@ -108,11 +110,11 @@ def _check_dataset(lang: str, expected: str) -> bool:
 
 
 def _set_dataset(lang: str, name: str) -> None:
-    """记录已导入的数据集版本.
+    """Record the imported dataset version.
 
     Args:
-        lang: 语言代码。
-        name: 数据集名。
+        lang: Language code.
+        name: Dataset name.
 
     """
     import sqlite3
@@ -127,9 +129,12 @@ def _set_dataset(lang: str, name: str) -> None:
 
 
 def _import_chinese() -> None:
-    """导入 CC-CEDICT（中文词条，多音字每个读音独立成条）."""
+    """Import CC-CEDICT (Chinese entries).
+
+    Each reading of a polyphonic character becomes its own record.
+    """
     if _check_dataset("zh", "CC-CEDICT"):
-        logger.info("[zh] 已有数据，跳过")
+        logger.info("[zh] data already present, skipping")
         return
     import gzip
 
@@ -144,7 +149,8 @@ def _import_chinese() -> None:
             raw = gzip.decompress(resp.read())
             text = raw.decode("utf-8", errors="replace")
     except OSError as e:
-        # 网络/解压失败（URLError/HTTPError/BadGzipFile 均为 OSError 子类）
+        # Network/decompression failure (URLError/HTTPError/BadGzipFile are all
+        # OSError subclasses)
         logger.warning("[zh] CC-CEDICT error: %s", e)
         return
     for line in text.splitlines():
@@ -156,7 +162,8 @@ def _import_chinese() -> None:
             continue
         simplified = parts[1]
         rest = parts[2] if len(parts) > 2 else ""
-        # 提取所有拼音括号（主读音 + 异读 + 轻声等），而非仅第一个
+        # Extract every pinyin group (primary reading, variants, neutral tone,
+        # etc.), not just the first
         pinyin_groups = re.findall(r"\[([^\[\]/]+?)\]", rest)
         meaning_match = re.search(r"/(.+?)/", rest)
         if not pinyin_groups:
@@ -195,13 +202,13 @@ def _import_chinese() -> None:
 
 
 def _parse_pinyin(raw_list: list[str]) -> list[Syllable]:
-    """解析拼音音节列表（含声调数字）.
+    """Parse a list of pinyin syllables (with tone digits).
 
     Args:
-        raw_list: 如 ["ni3", "hao3"]。
+        raw_list: e.g. ["ni3", "hao3"].
 
     Returns:
-        音节列表（平仄标在 tone）。
+        Syllable list (the level/oblique label is stored under ``tone``).
 
     """
     tone_map: dict[str, str] = {"1": "平", "2": "平", "3": "仄", "4": "仄", "5": "平"}
@@ -238,10 +245,10 @@ def _parse_pinyin(raw_list: list[str]) -> list[Syllable]:
 
 
 def _sqlite_delete(lang: str) -> None:
-    """删除某语言的词条.
+    """Delete word entries for one language.
 
     Args:
-        lang: 语言代码。
+        lang: Language code.
 
     """
     import sqlite3
@@ -256,9 +263,12 @@ def _sqlite_delete(lang: str) -> None:
 
 
 def _import_english() -> None:
-    """导入 CMUdict（英文，全部发音变体独立成条，次重音记 heavy）."""
+    """Import CMUdict (English; each pronunciation variant becomes its own record).
+
+    Secondary stress is recorded as ``heavy``.
+    """
     if _check_dataset("en", "CMUdict"):
-        logger.info("[en] 已有数据，跳过")
+        logger.info("[en] data already present, skipping")
         return
     try:
         import nltk  # type: ignore[import-untyped]
@@ -306,12 +316,15 @@ def _import_english() -> None:
 
 
 def _import_french() -> None:
-    """导入 Lexique382（法语词形，真实音节结构由 FrenchAnalyzer 推导）."""
+    """Import Lexique382 (French word forms).
+
+    The real syllable structure is derived by FrenchAnalyzer.
+    """
     from ..prosody.french import FrenchAnalyzer
 
     _fr_analyzer = FrenchAnalyzer()
     if _check_dataset("fr", "Lexique382"):
-        logger.info("[fr] 已有数据，跳过")
+        logger.info("[fr] data already present, skipping")
         return
     text = _download_text(
         "http://www.lexique.org/databases/Lexique382/Lexique382.tsv", timeout=15
@@ -381,9 +394,9 @@ _GLAWIT_URL = "http://redac.univ-tlse2.fr/lexicons/glawit/glawit_2017-06-09.xml.
 
 
 def _import_italian() -> None:
-    """导入 GLAW-IT（意大利语词形与释义）."""
+    """Import GLAW-IT (Italian word forms and meanings)."""
     if _check_dataset("it", "GLAW-IT"):
-        logger.info("[it] 已有数据，跳过")
+        logger.info("[it] data already present, skipping")
         return
     import bz2
 
@@ -401,7 +414,7 @@ def _import_italian() -> None:
                 raw = bz2.decompress(raw)
             text = raw.decode("utf-8", errors="replace")
     except OSError as e:
-        # 网络/解压失败（URLError/HTTPError/OSError 子类）
+        # Network/decompression failure (URLError/HTTPError/OSError subclasses)
         logger.warning("[it] GLAW-IT error: %s", e)
         text = None
     if text:
@@ -464,9 +477,12 @@ _LS_URL = "https://raw.githubusercontent.com/telemachus/plaintext-lewis-short/ma
 
 
 def _import_latin() -> None:
-    """导入 Lewis & Short（拉丁语词条，音长按正字法启发式判定）."""
+    """Import Lewis & Short (Latin entries).
+
+    Vowel length is judged by orthographic heuristics.
+    """
     if _check_dataset("la", "Lewis-Short"):
-        logger.info("[la] 已有数据，跳过")
+        logger.info("[la] data already present, skipping")
         return
     from ..prosody.latin import LatinAnalyzer
 
@@ -512,12 +528,12 @@ def _import_latin() -> None:
 
 
 def import_all() -> None:
-    """导入全部语言词库（幂等，已导入的数据集自动跳过）."""
+    """Import every language vocabulary (idempotent; imported datasets are skipped)."""
     init_db()
-    logger.info("[StanzaWeaver] 导入词库...")
+    logger.info("[StanzaWeaver] Importing vocabulary...")
     _import_chinese()
     _import_english()
     _import_french()
     _import_italian()
     _import_latin()
-    logger.info("[StanzaWeaver] 就绪")
+    logger.info("[StanzaWeaver] Ready")

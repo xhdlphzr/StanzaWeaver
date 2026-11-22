@@ -5,12 +5,12 @@
 
 <#
 .SYNOPSIS
-构建 StanzaWeaver Docker 镜像。
+Build the StanzaWeaver Docker image.
 
 .DESCRIPTION
-在项目根目录执行 docker build，自动切换到项目目录。
-无法直连 Docker Hub 时可用 -BaseImage 指定国内镜像加速器前缀；
-如需彻底重建（排除 BuildKit 缓存干扰）用 -NoCache。
+Runs docker build in the project root; switches to the project directory first.
+If Docker Hub is unreachable, use -BaseImage to set a regional mirror prefix;
+use -NoCache for a clean rebuild (avoiding BuildKit cache interference).
 
 .EXAMPLE
 .\scripts\docker-build.ps1
@@ -23,26 +23,27 @@
 #>
 [CmdletBinding()]
 param(
-    # 镜像标签（默认 stanzaweaver:latest）
+    # Image tag (default stanzaweaver:latest)
     [string]$Tag = "stanzaweaver:latest",
-    # 基础镜像（默认官方 python:3.14-slim；国内可传加速器前缀，如 docker.m.daocloud.io/library/python:3.14-slim）
+    # Base image (default official python:3.14-slim; a regional mirror prefix
+    # may be passed, e.g. docker.m.daocloud.io/library/python:3.14-slim)
     [string]$BaseImage = "python:3.14-slim",
-    # 彻底重建（跳过 BuildKit 缓存，耗时较长但确保与当前文件一致）
+    # Clean rebuild (skip BuildKit cache; slower but consistent with current files)
     [switch]$NoCache
 )
 
 $ErrorActionPreference = "Stop"
 
-# 定位项目根目录（脚本位于 <root>/scripts/）
+# Locate the project root (the script lives in <root>/scripts/)
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
 
 if (-not (Test-Path -LiteralPath "Dockerfile")) {
-    throw "在项目根目录未找到 Dockerfile，请确认脚本位于 <项目根>/scripts/ 下"
+    throw "Dockerfile not found in the project root; make sure the script is under <project root>/scripts/"
 }
 
-$cacheNote = if ($NoCache) { "，无缓存模式" } else { "" }
-Write-Host "[build] 构建 $Tag (基础镜像: $BaseImage)$cacheNote" -ForegroundColor Cyan
+$cacheNote = if ($NoCache) { ", no-cache mode" } else { "" }
+Write-Host "[build] Building $Tag (base image: $BaseImage)$cacheNote" -ForegroundColor Cyan
 
 $buildArgs = @("-t", $Tag)
 if ($NoCache) {
@@ -55,7 +56,7 @@ $buildArgs += "."
 
 docker build @buildArgs
 if ($LASTEXITCODE -ne 0) {
-    throw "docker build 失败 (exit code $LASTEXITCODE)"
+    throw "docker build failed (exit code $LASTEXITCODE)"
 }
 
-Write-Host "[build] 完成: $Tag" -ForegroundColor Green
+Write-Host "[build] Done: $Tag" -ForegroundColor Green

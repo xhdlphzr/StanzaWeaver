@@ -1,14 +1,18 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""英语音节分析器（基于 CMUdict）.
+"""English syllable analyzer (based on CMUdict).
 
-- CMUdict 音素串 → 音节切分，采用英语常规划音规则分配跨音节辅音。
-- 主重音(1)与次重音(2)均视为重读（诗歌格律中次重音同样承担重音位置）。
-- 多音词保留全部发音（read/present/record 等按词性、意义有不同读音），
-  校验时任一发音变体满足格律即通过。
-- rhyme_tail 生成严格重音押韵 key：最后一个重读元音起到词尾的音素串
-  （含重音层级），用于商籁体/双行体等的押韵校验。
+- CMUdict phoneme strings -> syllable division, assigning intervocalic
+  consonants with standard English syllabification rules.
+- Primary (1) and secondary (2) stress both count as stressed (secondary stress
+  also occupies a stress position in poetic meter).
+- Polyphonic words keep every pronunciation (read/present/record etc. differ by
+  part of speech and meaning); validation passes if any pronunciation variant
+  satisfies the meter.
+- rhyme_tail builds a strict stress-rhyme key: the phoneme sequence from the
+  last stressed vowel to the end of the word (including stress level), used for
+  sonnet/couplet rhyme validation.
 """
 
 import re
@@ -43,8 +47,10 @@ _VOWEL_PHONEMES = {
     "UX",
 }
 
-# 主重音(1)与次重音(2)均为重读（诗歌格律中次重音同样承担重音位置）；
-# 轻音(0)标记为非重音(light)，与模板中 _l 约束一致，确保抑扬格的弱位被强制为非重读
+# Primary (1) and secondary (2) stress are both stressed (secondary stress also
+# occupies a stress position in poetic meter); unstressed (0) is marked
+# "light" to match the _l constraint in templates, so that weak positions in
+# iambic meter are forced to be unstressed.
 _STRESS_MAP: dict[str, str] = {"0": "light", "1": "heavy", "2": "heavy"}
 
 _ARPABET_TO_PHONEMES: dict[str, list[list[str]]] = {}
@@ -53,9 +59,9 @@ _cmudict_lock = threading.Lock()
 
 
 def _load_cmudict() -> None:
-    """惰性加载 CMUdict 到内存（线程安全，仅加载一次）.
+    """Lazily load CMUdict into memory (thread-safe, loaded once).
 
-    保留每个词的全部发音变体。
+    Keeps every pronunciation variant of each word.
     """
     global _cmudict_loaded
     if _cmudict_loaded:
@@ -75,21 +81,23 @@ def _load_cmudict() -> None:
 
 
 class EnglishAnalyzer(SyllableAnalyzer):
-    """英语音节分析器：音节切分 + 重音标注 + 多音变体 + 押韵尾串."""
+    """English syllable analyzer: division, stress, variants, and rhyme tails."""
 
     language = "en"
 
     def _get_pronunciations(self, word: str) -> list[list[str]]:
-        """查询词的全部音素发音.
+        """Look up all phoneme pronunciations of a word.
 
-        优先从本地 SQLite 词库（en_pron 表）读取，离线场景亦可工作；
-        未命中时回退到 CMUdict（首次使用会联网下载并缓存到内存）。
+        Reads first from the local SQLite lexicon (the en_pron table), which
+        also works offline; on a miss falls back to CMUdict (downloaded on
+        first use and cached in memory).
 
         Args:
-            word: 英文单词。
+            word: English word.
 
         Returns:
-            音素列表的列表（每个元素是一个发音）；未知词返回空列表。
+            List of phoneme lists (each element is one pronunciation); an
+            unknown word returns an empty list.
 
         """
         lowered = word.lower()
@@ -102,32 +110,38 @@ class EnglishAnalyzer(SyllableAnalyzer):
         return _ARPABET_TO_PHONEMES.get(lowered, [])
 
     def rhyme_tail(self, word: str) -> str | None:
-        """最后一个重读元音（主/次重音）起到词尾的音素串（含重音层级）.
+        """Return the rhyme tail from the last stressed vowel to the word end.
 
-        押韵须为严格重音匹配：韵脚必须落在主/次重音音节，且该音节起的
-        全部音素（含重音数字）完全一致。
+        The tail includes stress levels. Rhyming requires a strict stress
+        match: the rhyme foot must fall on a primary/secondary stressed
+        syllable, and all phonemes from that syllable onward (including stress
+        digits) must match exactly.
 
         Args:
-            word: 英文单词。
+            word: English word.
 
         Returns:
-            押韵尾串（如 "AY1 T"）；无重读音节时返回 None（不能作韵脚）。
+            Rhyme tail string (e.g. "AY1 T"); None when there is no stressed
+            syllable (cannot serve as a rhyme foot).
 
         """
         tails = self.rhyme_tails(word)
         return tails[0] if tails else None
 
     def rhyme_tails(self, word: str) -> list[str]:
-        """返回该词全部发音中所有可用于押韵的尾串（含重音层级）.
+        """Return every usable rhyme tail of the word across all pronunciations.
 
-        每个发音取最后一个主/次重读音节起到词尾的音素序列；同一词的
-        多个发音会全部返回（去重），用于押韵校验时"任一发音押韵即通过"。
+        Each pronunciation contributes the phoneme sequence from its last
+        primary/secondary stressed syllable to the word end; multiple
+        pronunciations of the same word are all returned (deduplicated), so
+        rhyme validation passes when any pronunciation rhymes.
 
         Args:
-            word: 英文单词。
+            word: English word.
 
         Returns:
-            押韵尾串列表（可能包含多个）；无重读音节时返回空列表。
+            List of rhyme tails (may contain several); empty when there is no
+            stressed syllable.
 
         """
         prons = self._get_pronunciations(word)
@@ -151,13 +165,14 @@ class EnglishAnalyzer(SyllableAnalyzer):
         return result
 
     def analyze_variants(self, word: str) -> list[list[Syllable]]:
-        """返回该词全部发音的音节切分结果.
+        """Return the syllable division for every pronunciation of the word.
 
         Args:
-            word: 英文单词。
+            word: English word.
 
         Returns:
-            每种发音对应一个音节列表；未知词退回启发式切分。
+            One syllable list per pronunciation; unknown words fall back to a
+            heuristic division.
 
         """
         prons = self._get_pronunciations(word)
@@ -166,25 +181,27 @@ class EnglishAnalyzer(SyllableAnalyzer):
         return [self._parse_phones(p) for p in prons]
 
     def analyze_word(self, word: str) -> list[Syllable]:
-        """分析单词（取第一个发音，即 CMUdict 中最常见读音）.
+        """Analyze a word (the first pronunciation is the most common).
 
         Args:
-            word: 英文单词。
+            word: English word.
 
         Returns:
-            音节列表。
+            List of syllables.
 
         """
         return self.analyze_variants(word)[0]
 
     def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-        """整行的候选音节切分：逐词取全部发音变体组合（上限 64 种）.
+        """Return candidate syllable divisions for a whole line (capped at 64).
+
+        Combines the pronunciation variants of each word.
 
         Args:
-            line: 一行诗（可为多词）。
+            line: One line of verse (may contain multiple words).
 
         Returns:
-            候选切分列表（至少含一个元素）。
+            Candidate division list (at least one element).
 
         """
         words = [w for w in re.split(r"[^a-zA-Z0-9'-]+", line.lower()) if w]
@@ -203,18 +220,24 @@ class EnglishAnalyzer(SyllableAnalyzer):
         return combos or [[]]
 
     def _parse_phones(self, phones: list[str]) -> list[Syllable]:
-        """CMUdict 音素串 → 音节切分.
+        """Convert a CMUdict phoneme string into a syllable division.
 
-        跨音节辅音归属规则（英语常规划音）：
-        - 两个元音之间的单个辅音：前一元音为主重音、后一元音非主重音时
-          收前音节（hap-py, bet-ter, bi-ol-o-gy）；否则归后一音节（a-bout, re-spond）。
-        - 两个及以上的辅音簇：首辅音收前音节，其余归后一音节（ex-tra, Mon-day）。
+        Intervocalic consonant assignment rules (standard English
+        syllabification):
+        - Single consonant between two vowels: joins the preceding syllable
+          when the preceding vowel is primary-stressed and the following one is
+          not (hap-py, bet-ter, bi-ol-o-gy); otherwise it joins the following
+          syllable (a-bout, re-spond).
+        - Clusters of two or more consonants: the first consonant joins the
+          preceding syllable and the rest join the following one (ex-tra,
+          Mon-day).
 
         Args:
-            phones: CMUdict 音素列表（含重音数字，如 ["B", "AE1", "T"]）。
+            phones: CMUdict phoneme list (with stress digits, e.g. ["B", "AE1",
+                "T"]).
 
         Returns:
-            音节列表。
+            List of syllables.
 
         """
         vpos = [
@@ -262,13 +285,13 @@ class EnglishAnalyzer(SyllableAnalyzer):
         return syllables
 
     def _fallback_analyze(self, word: str) -> list[Syllable]:
-        """未知词启发式切分：按元音字母组数估音节数.
+        """Estimate syllables for an unknown word by counting vowel groups.
 
         Args:
-            word: 不在 CMUdict 中的词。
+            word: A word not in CMUdict.
 
         Returns:
-            每个元音组一个占位音节（nucleus="?"，无重音）。
+            One placeholder syllable per vowel group (nucleus="?", no stress).
 
         """
         vowel_groups = re.findall(r"[aeiouy]+", word.lower())

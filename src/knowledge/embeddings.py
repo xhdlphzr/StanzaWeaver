@@ -1,13 +1,15 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""词条向量重排.
+"""Entry vector reranking.
 
-用 sentence-transformers 多语言模型对候选词按语义相似度排序；
-模型未就绪或离线时静默降级为原顺序。
+Rank candidate words by semantic similarity with a multilingual
+sentence-transformers model; degrade silently to the original order when the
+model is unavailable or offline.
 
-不依赖 numpy：``encode(normalize_embeddings=True)`` 已输出归一化向量，
-相似度用纯 Python 点积计算即可（也避免引入重数值依赖）。
+No numpy dependency: ``encode(normalize_embeddings=True)`` already returns
+normalized vectors, so pure-Python dot products are enough (and avoid pulling in
+heavy numeric dependencies).
 """
 
 from typing import Any
@@ -17,10 +19,10 @@ _MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 
 
 def _get_model() -> Any:
-    """惰性加载嵌入模型（仅首次调用时加载）.
+    """Load the embedding model lazily (only on the first call).
 
     Returns:
-        SentenceTransformer 实例（或任意具备 encode 的对象）。
+        SentenceTransformer instance (or any object exposing ``encode``).
 
     """
     global _MODEL
@@ -32,13 +34,15 @@ def _get_model() -> Any:
 
 
 def _to_float_list(vec: Any) -> list[float]:
-    """把 encode 返回的向量（numpy 数组或可迭代序列）转为 float 列表.
+    """Convert a vector to a list of floats.
+
+    Accepts the numpy array or iterable returned by ``encode``.
 
     Args:
-        vec: 单条向量。
+        vec: A single vector.
 
     Returns:
-        float 列表。
+        A list of floats.
 
     """
     return [float(x) for x in vec]
@@ -47,15 +51,15 @@ def _to_float_list(vec: Any) -> list[float]:
 def rerank(
     query: str, candidates: list[dict[str, Any]], top_k: int = 20
 ) -> list[dict[str, Any]]:
-    """按语义相似度重排候选词.
+    """Rerank candidate words by semantic similarity.
 
     Args:
-        query: 查询文本。
-        candidates: 候选词字典列表。
-        top_k: 返回数量。
+        query: Query text.
+        candidates: List of candidate word dictionaries.
+        top_k: Number of results to return.
 
     Returns:
-        重排后的列表（失败时保持原顺序）。
+        Reranked list (keeps the original order on failure).
 
     """
     if not query or not candidates:
@@ -69,6 +73,6 @@ def rerank(
             vec = _to_float_list(row)
             c["_score"] = sum(a * b for a, b in zip(query_vec, vec))
         candidates.sort(key=lambda c: float(c.get("_score", 0)), reverse=True)
-    except Exception:  # noqa: S110, BLE001 - 模型加载/编码失败时静默降级为原顺序
+    except Exception:  # noqa: S110, BLE001 - keep the original order on failure
         pass
     return candidates[:top_k]

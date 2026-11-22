@@ -1,10 +1,10 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""法语格律模板：回旋诗、三韵叠句诗、叙事歌.
+"""French metrical templates: rondeau, triolet, ballade.
 
-押韵采用 FrenchAnalyzer.rhyme_key：取词末发音元音核（鼻化归并），
-并丢弃词尾静音辅音（s/t/x/p 等）。
+Rhyme uses ``FrenchAnalyzer.rhyme_key``: the final pronounced vowel nucleus
+(nasalized merged), dropping silent final consonants (s/t/x/p, ...).
 """
 
 from typing import ClassVar
@@ -17,13 +17,13 @@ _FR = FrenchAnalyzer()
 
 
 def _fr_last_word(line: str) -> str:
-    """取行末词（去标点、小写）.
+    """Get the last word of a line (punctuation stripped, lowercased).
 
     Args:
-        line: 一行诗。
+        line: One line of poetry.
 
     Returns:
-        行末词；空行返回空串。
+        Last word of the line; empty string for an empty line.
 
     """
     return _last_word(line, "a-zA-Zàâäéèêëîïôöùûüÿœ'-")
@@ -32,13 +32,13 @@ def _fr_last_word(line: str) -> str:
 def _check_rhyme_group(
     poem: list[str], indices: list[int], label: str, errors: list[str]
 ) -> None:
-    """检查一组行末词法语韵脚一致.
+    """Check that the last words of a set of lines rhyme in French.
 
     Args:
-        poem: 诗行列表。
-        indices: 参与该韵组的行号（0-based）。
-        label: 韵组名。
-        errors: 错误列表（就地追加）。
+        poem: List of poem lines.
+        indices: Line numbers participating in this rhyme group (0-based).
+        label: Rhyme group name.
+        errors: Error list (appended in place).
 
     """
     keys: list[tuple[int, str]] = []
@@ -54,21 +54,22 @@ def _check_rhyme_group(
         for idx, k in keys[1:]:
             if k != base:
                 errors.append(
-                    f"押韵{label}不匹配: 第{keys[0][0] + 1}行韵脚为'{base}'，第{idx + 1}行韵脚为'{k}'"
+                    f"Rhyme {label} mismatch: line {keys[0][0] + 1} rhymes "
+                    f"with '{base}', line {idx + 1} rhymes with '{k}'"
                 )
 
 
 class RondeauTemplate(PoetryTemplate):
-    """回旋诗：15 行三节，韵式 AABBA AAB AABBA，叠句在第 9、15 行."""
+    """Rondeau: 15 lines in three stanzas, AABBA AAB AABBA, refrains on 9 and 15."""
 
     name = "回旋诗"
     language = "fr"
     lines = 15
     special_rules = ("叠句须原样重复",)
     rhyme_scheme = "AABBAAABAAABBAA"
-    # 每行允许 8 或 10 音节（经典回旋诗可统一为 10 音节）
+    # Each line allows 8 or 10 syllables (classic rondeaux use 10 throughout).
     syllables_per_line: ClassVar[list[int | tuple[int, int]]] = [(8, 10)] * 15
-    _refrain_lines: ClassVar[list[int]] = [8, 14]  # 0-based: 叠句出现在第 9、15 行
+    _refrain_lines: ClassVar[list[int]] = [8, 14]  # 0-based: refrains on lines 9, 15
     rule_description = (
         "格律规则：15行，分三节（5+4+6）；韵式 AABBA AAB AABBA（仅用A、B两韵）；"
         "每行8音节（可放宽至10，但全诗统一）；"
@@ -76,10 +77,10 @@ class RondeauTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束.
+        """No per-position constraints.
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         return None
@@ -87,14 +88,14 @@ class RondeauTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：AABBA AAB AABBA 韵式 + 叠句开头 4 词一致.
+        """Full check: AABBA AAB AABBA scheme + first 4 refrain words match.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
         errors: list[str] = []
@@ -111,13 +112,14 @@ class RondeauTemplate(PoetryTemplate):
                 last_words = " ".join(poem[ref_idx].split()[-4:])
                 if first_words and last_words and first_words != last_words:
                     errors.append(
-                        f"叠句不匹配: 第1行开头'{first_words}'与第{ref_idx + 1}行末尾'{last_words}'不一致"
+                        f"Refrain mismatch: line 1 begins with '{first_words}' "
+                        f"but line {ref_idx + 1} ends with '{last_words}'"
                     )
         return errors
 
 
 class TrioletTemplate(PoetryTemplate):
-    """三韵叠句诗：8 行，韵式 ABaAabAB，第 1/4/7 行与 2/8 行为叠句."""
+    """Triolet: 8 lines, ABaAabAB scheme, lines 1/4/7 and 2/8 are refrains."""
 
     name = "三韵叠句诗"
     language = "fr"
@@ -132,10 +134,10 @@ class TrioletTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束.
+        """No per-position constraints.
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         return None
@@ -143,24 +145,24 @@ class TrioletTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：叠句原文重复（1=4=7、2=8）+ ABaAabAB 韵式.
+        """Full check: verbatim refrains (1=4=7, 2=8) + ABaAabAB scheme.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
         errors: list[str] = []
         if len(poem) >= 8:
             if poem[0].strip() != poem[3].strip():
-                errors.append("叠句不匹配: 第1行与第4行文本不一致")
+                errors.append("Refrain mismatch: line 1 and line 4 texts differ")
             if poem[0].strip() != poem[6].strip():
-                errors.append("叠句不匹配: 第1行与第7行文本不一致")
+                errors.append("Refrain mismatch: line 1 and line 7 texts differ")
             if poem[1].strip() != poem[7].strip():
-                errors.append("叠句不匹配: 第2行与第8行文本不一致")
+                errors.append("Refrain mismatch: line 2 and line 8 texts differ")
         rhyme_groups = [
             ([0, 2, 3, 4, 6], "A"),
             ([1, 5, 7], "B"),
@@ -171,7 +173,7 @@ class TrioletTemplate(PoetryTemplate):
 
 
 class BalladeTemplate(PoetryTemplate):
-    """叙事歌：28 行（3 节 8 行 + 4 行跋），ababbcbc 韵式，末行叠句."""
+    """Ballade: 28 lines (3 stanzas of 8 + 4-line envoi), ababbcbc, final refrain."""
 
     name = "叙事歌"
     language = "fr"
@@ -188,10 +190,10 @@ class BalladeTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无逐位约束（音节数在 validate_full 中统一判定）.
+        """No per-position constraints (syllable counts are checked in validate_full).
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         return None
@@ -199,14 +201,14 @@ class BalladeTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：全诗音节统一（8 或 10）、ababbcbc 韵式、叠句一致.
+        """Full check: uniform syllables (8 or 10), ababbcbc scheme, refrains.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
         errors: list[str] = []
@@ -214,12 +216,18 @@ class BalladeTemplate(PoetryTemplate):
         if counts:
             base = counts[0]
             if base not in (8, 10):
-                errors.append(f"叙事歌每行应为8或10音节，当前首行为{base}音节")
+                errors.append(
+                    f"Each ballade line should have 8 or 10 syllables; "
+                    f"the first line has {base}"
+                )
             for i, c in enumerate(counts):
                 if c != base:
-                    errors.append(f"第{i + 1}行音节数不一致: 期望{base}，实际{c}")
+                    errors.append(
+                        f"Line {i + 1} syllable count differs: expected {base}, got {c}"
+                    )
 
-        # 每节 8 行 ababbcbc；末节 4 行 bcbc（0-based 行号见列表）
+        # Each stanza has 8 lines of ababbcbc; the envoi has 4 lines of bcbc
+        # (0-based line numbers listed below).
         rhyme_a = [0, 2, 8, 10, 16, 18]
         rhyme_b = [1, 3, 4, 6, 9, 11, 12, 14, 17, 19, 20, 22, 24, 26]
         rhyme_c = [5, 7, 13, 15, 21, 23, 25, 27]
@@ -230,16 +238,16 @@ class BalladeTemplate(PoetryTemplate):
         if len(poem) > 27:
             base_refrain = poem[7]
             if poem[15].strip() != base_refrain.strip():
-                errors.append("叠句不匹配: 第8行与第16行文本不一致")
+                errors.append("Refrain mismatch: line 8 and line 16 texts differ")
             if poem[23].strip() != base_refrain.strip():
-                errors.append("叠句不匹配: 第8行与第24行文本不一致")
+                errors.append("Refrain mismatch: line 8 and line 24 texts differ")
             if poem[27].strip() != base_refrain.strip():
-                errors.append("叠句不匹配: 第8行与第28行文本不一致")
+                errors.append("Refrain mismatch: line 8 and line 28 texts differ")
         return errors
 
 
 def register_french_templates() -> None:
-    """注册全部法语模板."""
+    """Register all French templates."""
     register("fr_rondeau", RondeauTemplate())
     register("fr_triolet", TrioletTemplate())
     register("fr_ballade", BalladeTemplate())

@@ -1,3 +1,3 @@
-"""StanzaWeaver：多语言格律诗歌生成项目的顶层包."""
+"""StanzaWeaver: top-level package for the multilingual metered poetry generator."""
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT

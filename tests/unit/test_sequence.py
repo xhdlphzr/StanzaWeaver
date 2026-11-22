@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""诗组规划 / 架构师 / 诗组流水线单元测试（离线，桩 LLM）."""
+"""Unit tests for poem-sequence planning / architect / pipeline (offline, stubbed LLM)."""
 
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
@@ -41,15 +41,15 @@ VALID = {"zh_wujue", "zh_rumengling"}
 
 
 def _tool(name: str, cid: str, **arguments: Any) -> dict[str, Any]:
-    """构造一个工具调用响应.
+    """Build one tool-call response.
 
     Args:
-        name: 工具名。
-        cid: 调用 id。
-        **arguments: 工具参数。
+        name: Tool name.
+        cid: Call id.
+        **arguments: Tool arguments.
 
     Returns:
-        ChatResult 形状的字典。
+        A dict shaped like ChatResult.
 
     """
     return {
@@ -60,23 +60,23 @@ def _tool(name: str, cid: str, **arguments: Any) -> dict[str, Any]:
 
 
 def _no_tools() -> dict[str, Any]:
-    """构造无工具调用的响应.
+    """Build a response with no tool calls.
 
     Returns:
-        ChatResult 形状的字典。
+        A dict shaped like ChatResult.
 
     """
     return {"role": "assistant", "content": "", "tool_calls": []}
 
 
 def _make_architect(responses: list[dict[str, Any]]) -> SequenceArchitect:
-    """构造带预置响应的架构师.
+    """Build an architect with preset responses.
 
     Args:
-        responses: chat 依次返回的响应。
+        responses: Responses returned by chat in order.
 
     Returns:
-        SequenceArchitect 实例（client 已被替换为 MagicMock）。
+        A SequenceArchitect instance (client already replaced by MagicMock).
 
     """
     with patch("src.agents.architect_ai.LLMClient"):
@@ -87,10 +87,10 @@ def _make_architect(responses: list[dict[str, Any]]) -> SequenceArchitect:
 
 
 # --------------------------------------------------------------------------- #
-# 规划工具
+# Planning tools
 # --------------------------------------------------------------------------- #
 def test_planning_tools_state_and_render() -> None:
-    """规划工具：标题 / 加诗 / 设要求 / 缺失检测 / 计划渲染."""
+    """Planning tools: title / add poem / set brief / missing detection / render."""
     state = PlanState()
     assert "error" in execute_set_sequence_title(state, {"title": " "})
     assert execute_set_sequence_title(state, {"title": "四季"})["status"] == "ok"
@@ -125,21 +125,21 @@ def test_planning_tools_state_and_render() -> None:
 
     text = render_plan(state, {"zh_wujue": "五言绝句"})
     assert "四季" in text
-    assert "《春》[五言绝句]" in text
+    assert '"春" [五言绝句]' in text
     assert "写春" in text
-    assert "（未设置创作要求）" in text
+    assert "(no creative requirements set)" in text
 
 
 def test_render_plan_empty_title() -> None:
-    """render_plan 在无标题时回退为“未命名”."""
-    assert "未命名" in render_plan(PlanState())
+    """render_plan falls back to "Untitled" when there is no title."""
+    assert '"Untitled"' in render_plan(PlanState())
 
 
 # --------------------------------------------------------------------------- #
-# 架构师规划循环
+# Architect planning loop
 # --------------------------------------------------------------------------- #
 def test_architect_plan_completes() -> None:
-    """架构师：一轮工具补齐标题/诗题/要求后，停止调用即完成."""
+    """Architect: tools fill title/poems/briefs in one round; stopping completes."""
     architect = _make_architect(
         [
             {
@@ -175,7 +175,7 @@ def test_architect_plan_completes() -> None:
 
 
 def test_architect_plan_feedback_then_complete() -> None:
-    """架构师：缺要求时回灌提醒，补齐后完成."""
+    """Architect: feeds back a reminder for missing briefs; completes after filling."""
     architect = _make_architect(
         [
             _tool("set_sequence_title", "1", title="四季"),
@@ -187,11 +187,11 @@ def test_architect_plan_feedback_then_complete() -> None:
     )
     plan = architect.plan("四季组诗", catalog=CATALOG)
     assert plan.completed is True
-    assert "提醒" in plan.log
+    assert "reminder" in plan.log
 
 
 def test_architect_plan_unknown_tool_and_max_rounds() -> None:
-    """未知工具记错误；达到最大轮数仍未完整则返回未完成."""
+    """Unknown tools are recorded as errors; still incomplete at max rounds."""
     architect = _make_architect(
         [
             _tool("bogus", "1"),
@@ -200,11 +200,11 @@ def test_architect_plan_unknown_tool_and_max_rounds() -> None:
     )
     plan = architect.plan("x", catalog=CATALOG, max_rounds=2)
     assert plan.completed is False
-    assert "未知规划工具" in plan.log
+    assert "Unknown planning tool" in plan.log
 
 
 def test_architect_plan_missing_title_and_poems() -> None:
-    """无标题 / 无诗时回灌对应提醒；默认 catalog 分支也被覆盖."""
+    """Feed back reminders for a missing title / no poems; default catalog covered."""
     architect = _make_architect([_no_tools(), _no_tools()])
     plan = architect.plan("x", max_rounds=2)
     assert plan.completed is False
@@ -219,10 +219,10 @@ def test_architect_plan_missing_title_and_poems() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# 诗组流水线
+# Sequence pipeline
 # --------------------------------------------------------------------------- #
 class _FakeArchitect:
-    """返回预置 PlanResult 的假架构师."""
+    """Fake architect returning a preset PlanResult."""
 
     def __init__(self, result: PlanResult) -> None:
         self.result = result
@@ -240,7 +240,7 @@ class _FakeArchitect:
 
 
 class _FakePoemPipeline:
-    """记录 topic 并返回固定单首结果的假流水线."""
+    """Fake pipeline that records topics and returns a fixed single-poem result."""
 
     def __init__(self, checker_pass: bool = True) -> None:
         self.checker_pass = checker_pass
@@ -279,14 +279,14 @@ class _FakePoemPipeline:
 def _sequence_pipeline(
     result: PlanResult, checker_pass: bool = True
 ) -> tuple[Any, Any]:
-    """构造注入了假架构师/假单首流水线的诗组流水线.
+    """Build a sequence pipeline with a fake architect and fake poem pipeline.
 
     Args:
-        result: 架构师返回的规划结果。
-        checker_pass: 假单首流水线的终审结果。
+        result: The plan result returned by the fake architect.
+        checker_pass: Final-check result of the fake single-poem pipeline.
 
     Returns:
-        (诗组流水线, 假单首流水线)。
+        (sequence pipeline, fake single-poem pipeline).
 
     """
     pipeline = PoemSequencePipeline(
@@ -300,7 +300,7 @@ def _sequence_pipeline(
 
 
 def test_sequence_pipeline_composes_all_poems() -> None:
-    """诗组流水线：逐首生成、注入前作、汇总 ok."""
+    """Sequence pipeline: compose poem by poem, inject previous works, report ok."""
     plan = PlanResult(
         True,
         "四季",
@@ -318,16 +318,16 @@ def test_sequence_pipeline_composes_all_poems() -> None:
     assert state.ok is True
     assert len(state.poems) == 2
     assert state.poems[0].formatted_poem == "句一，句二。"
-    assert "【诗组总目标】四季组诗" in fake.topics[0]
-    assert "【本首要求】写春" in fake.topics[0]
-    assert "【前面已创作】" not in fake.topics[0]
-    assert "【前面已创作】" in fake.topics[1]
-    assert "第1首《题》首句：句一" in fake.topics[1]
+    assert "[Sequence goal] 四季组诗" in fake.topics[0]
+    assert "[This poem's requirements] 写春" in fake.topics[0]
+    assert "[Previously written]" not in fake.topics[0]
+    assert "[Previously written]" in fake.topics[1]
+    assert 'Poem 1 "题" first line: 句一' in fake.topics[1]
     assert any("plan_text" in e for e in events)
 
 
 def test_sequence_pipeline_checker_failure() -> None:
-    """任一首终审不过时诗组 ok 为 False."""
+    """Sequence ok is False when any single poem fails final review."""
     plan = PlanResult(True, "题", [SequencePoemPlan("春", "zh_wujue", "写春")], "")
     pipeline, _ = _sequence_pipeline(plan, checker_pass=False)
     state = pipeline.run("x")
@@ -336,7 +336,7 @@ def test_sequence_pipeline_checker_failure() -> None:
 
 
 def test_sequence_pipeline_incomplete_plan() -> None:
-    """规划未完成或没有诗时直接返回未完成."""
+    """Return incomplete directly when the plan is incomplete or has no poems."""
     pipeline, fake = _sequence_pipeline(PlanResult(False, "", [], ""))
     state = pipeline.run("x")
     assert state.completed is False
@@ -349,7 +349,7 @@ def test_sequence_pipeline_incomplete_plan() -> None:
 
 
 def test_sequence_poem_instruction_previous_without_draft() -> None:
-    """前作尚无草稿时用“（未完成）”占位."""
+    """Use the "(unfinished)" placeholder when a previous poem has no draft."""
     pipeline, _ = _sequence_pipeline(PlanResult(True, "题", [], ""))
     state = SequenceState(
         topic="总目标",
@@ -360,13 +360,13 @@ def test_sequence_poem_instruction_previous_without_draft() -> None:
         ],
     )
     text = pipeline._poem_instruction(state, 1)
-    assert "（未完成）" in text
+    assert "(unfinished)" in text
 
 
 def test_sequence_pipeline_lazy_helpers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """默认架构师与单首流水线工厂可被惰性构造."""
+    """The default architect and poem-pipeline factories can be built lazily."""
     import src.pipeline.sequence as sequence_module
 
     created: dict[str, Any] = {}
@@ -394,7 +394,7 @@ def test_sequence_pipeline_lazy_helpers(
 
 
 def test_architect_fixed_mode_only_prompts() -> None:
-    """固定诗数/格律时：不暴露 add_poem，只要求设标题与逐首提示词."""
+    """Fixed poem count/meter: hide add_poem; only title and briefs are needed."""
     architect = _make_architect(
         [
             {
@@ -439,7 +439,7 @@ def test_architect_fixed_mode_only_prompts() -> None:
 
 
 def test_architect_fixed_mode_rejects_add_poem() -> None:
-    """固定模式下即使模型调用 add_poem 也会被拒绝."""
+    """In fixed mode even a model call to add_poem is rejected."""
     architect = _make_architect(
         [
             _tool("set_sequence_title", "1", title="题"),
@@ -453,11 +453,11 @@ def test_architect_fixed_mode_rejects_add_poem() -> None:
         max_rounds=2,
     )
     assert plan.completed is False
-    assert "诗数已固定" in plan.log
+    assert "poem count is fixed" in plan.log.lower()
 
 
 def test_sequence_pipeline_seeds_templates() -> None:
-    """提供 template_keys 时预先固定诗单并交给架构师."""
+    """The poem list is fixed up front and passed to the architect when seeded."""
     plan = PlanResult(
         True,
         "四季",
@@ -475,12 +475,12 @@ def test_sequence_pipeline_seeds_templates() -> None:
     assert state.poems[1].centered is False
     architect = cast(Any, pipeline.architect)
     assert architect.seed is not None
-    assert [p.title for p in architect.seed] == ["第1首", "第2首"]
+    assert [p.title for p in architect.seed] == ["Poem 1", "Poem 2"]
     assert [p.template_key for p in architect.seed] == ["zh_wujue", "zh_rumengling"]
 
 
 def test_sequence_pipeline_invalid_template_keys() -> None:
-    """空/未知格律 key 直接报错."""
+    """An empty or unknown meter key raises immediately."""
     pipeline, _ = _sequence_pipeline(PlanResult(True, "题", [], ""))
     with pytest.raises(ValueError):
         pipeline.run("x", template_keys=[])
@@ -489,7 +489,7 @@ def test_sequence_pipeline_invalid_template_keys() -> None:
 
 
 def test_centered_flag_shi_vs_ci() -> None:
-    """诗居中、词不居中，并随 to_dict 下发以驱动前端对齐."""
+    """Shi are centered and ci are not; the flag drives frontend alignment via to_dict."""
     from src.templates.zh import (
         LangtaoshaTemplate,
         QingpingyueTemplate,

@@ -1,10 +1,11 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""数据化结构规则（src.templates.structural）的单元测试.
+"""Unit tests for the data-driven structural rules.
 
-覆盖规则数据校验、近体诗各类结构错误分支，并与内置绝句/律诗模板的
-原有代码校验结果做一致性对照（保证“数据化携带”不改变判定口径）。
+Cover rule-data validation and the regulated-verse error branches, and check
+parity with the built-in quatrain/regulated-verse template validation so
+data-driven carrying does not change the verdict.
 """
 
 from typing import Any
@@ -31,7 +32,7 @@ WUJUE_RULES: dict[str, Any] = {
 
 
 def _syl(tone: str, nucleus: str = "a", coda: str = "") -> Syllable:
-    """构造带平仄与韵母的音节."""
+    """Build a syllable with tone and nucleus."""
     return Syllable(
         onset="",
         nucleus=nucleus,
@@ -41,41 +42,41 @@ def _syl(tone: str, nucleus: str = "a", coda: str = "") -> Syllable:
 
 
 def _line(tones: str, nuclei: str | None = None) -> list[Syllable]:
-    """按平仄串构造一行音节（韵母可指定）."""
+    """Build one line of syllables from a tone string (nucleus optional)."""
     nucleus_list = list(nuclei) if nuclei else ["a"] * len(tones)
     return [_syl(tone, nucleus_list[i]) for i, tone in enumerate(tones)]
 
 
 def _line_last(tones: str, last_nucleus: str) -> list[Syllable]:
-    """构造一行音节并指定末音节韵母（用于押韵判定）."""
+    """Build a line and set the last syllable's nucleus (for rhyme checks)."""
     line = _line(tones)
     line[-1] = _syl(tones[-1], last_nucleus)
     return line
 
 
 def _poem(*tone_lines: str) -> tuple[list[str], list[list[Syllable]]]:
-    """构造诗行文本与音节（文本用于占位，押韵 key 由音节决定）."""
+    """Build poem texts and syllables (texts are placeholders for rhyme keys)."""
     poem = [f"line{i}" for i in range(len(tone_lines))]
     return poem, [_line(tones) for tones in tone_lines]
 
 
 # --------------------------------------------------------------------------- #
-# 规则数据校验
+# Rule data validation
 # --------------------------------------------------------------------------- #
 def test_normalize_structural_rules_none() -> None:
-    """None 表示没有结构规则."""
+    """None means there are no structural rules."""
     assert st.normalize_structural_rules(None) == (None, None)
 
 
 def test_normalize_structural_rules_errors() -> None:
-    """非法规则数据返回错误."""
+    """Invalid rule data returns an error."""
     assert st.normalize_structural_rules("bad")[1] is not None
     _, unknown_kind_error = st.normalize_structural_rules({"kind": "x"})
     assert unknown_kind_error is not None
-    assert "未知的结构规则类型" in unknown_kind_error
+    assert "Unknown structural rule kind" in unknown_kind_error
     assert (
         st.normalize_structural_rules({"kind": "jinti"})[1]
-        == "结构规则缺少 attribute/level_value/oblique_value"
+        == "Structural rules are missing attribute/level_value/oblique_value"
     )
     assert (
         st.normalize_structural_rules(
@@ -87,7 +88,7 @@ def test_normalize_structural_rules_errors() -> None:
                 "rhyme_lines": [1],
             }
         )[1]
-        == "结构规则缺少 positions/rhyme_lines"
+        == "Structural rules are missing positions/rhyme_lines"
     )
     assert (
         st.normalize_structural_rules(
@@ -105,7 +106,7 @@ def test_normalize_structural_rules_errors() -> None:
 
 
 def test_normalize_structural_rules_success() -> None:
-    """合法规则被规整（保守布尔值/列表复制）."""
+    """Valid rules are normalized (booleans coerced, lists copied)."""
     raw = {
         "kind": "jinti",
         "attribute": "tone",
@@ -126,21 +127,21 @@ def test_normalize_structural_rules_success() -> None:
 
 
 def test_as_int_list_invalid_item() -> None:
-    """整数列表含非法元素时返回 None."""
+    """An int list with an invalid item returns None."""
     assert st._as_int_list(["a"]) is None
     assert st._as_int_list("x") is None
 
 
 # --------------------------------------------------------------------------- #
-# 近体诗规则各分支
+# Regulated-verse rule branches
 # --------------------------------------------------------------------------- #
 def test_check_short_poem_returns_empty() -> None:
-    """行数不足直接返回."""
+    """Too few lines returns immediately."""
     assert st.check_jinti_rules("zh", ["a"], [_line("平")], WUJUE_RULES) == []
 
 
 def test_check_skips_empty_lines_and_short_first_line() -> None:
-    """空行跳过；首行短于固定位时过滤相应固定位."""
+    """Empty lines are skipped; fixed positions beyond line 1 are filtered."""
     rules = dict(WUJUE_RULES)
     poem = ["a", "b", "c", "d"]
     syllables = [[], _line("平"), [_syl("平")], _line("平")]
@@ -149,12 +150,12 @@ def test_check_skips_empty_lines_and_short_first_line() -> None:
 
 
 def test_last_value_empty_line() -> None:
-    """空行末音节属性返回空串."""
+    """An empty line's last-syllable attribute is an empty string."""
     assert st._last_value([], "tone") == ""
 
 
 def test_check_skips_empty_rhyme_line() -> None:
-    """韵脚行为空时跳过该行押韵检查."""
+    """Skip the rhyme check for a rhyme line with no syllables."""
     poem = ["a", "b", "c", "d"]
     syllables = [
         _line("仄仄平平仄"),
@@ -167,46 +168,48 @@ def test_check_skips_empty_rhyme_line() -> None:
 
 
 def test_check_sanpingwei_and_guping() -> None:
-    """三平尾与孤平均能检出."""
-    # 第1行末三字全平 → 三平尾；第2行平脚且仅一平 → 孤平
+    """Both three-level tails and isolated levels are detected."""
+    # Line 1 ends in three level tones -> three-level tail.
+    # Line 2 has a level foot with only one level tone -> isolated level.
     poem, syllables = _poem("仄平平平", "仄仄仄平", "平平平平", "仄仄仄平")
     errors = st.check_jinti_rules("zh", poem, syllables, WUJUE_RULES)
-    assert any("三平尾" in e for e in errors)
-    assert any("孤平" in e for e in errors)
+    assert any("three level-tone tail" in e for e in errors)
+    assert any("isolated level" in e for e in errors)
 
 
 def test_check_structure_and_rhyme_errors() -> None:
-    """出句平脚/对句仄脚/相间/相对/相粘/韵脚非平/押韵不匹配均可检出."""
-    # 出句(第3行)平脚、对句(第4行)仄脚
+    """Detect leading/responding feet, alternation, opposition, adhesion, rhyme."""
+    # Line 3 (leading) has a level foot; line 4 (responding) has an oblique foot
     poem1, syl1 = _poem("仄仄平平仄", "平平仄仄平", "平平仄仄平", "仄仄平平仄")
     errors1 = st.check_jinti_rules("zh", poem1, syl1, WUJUE_RULES)
-    assert any("出句" in e for e in errors1)
-    assert any("对句" in e for e in errors1)
+    assert any("leading line" in e for e in errors1)
+    assert any("responding line" in e for e in errors1)
 
-    # 固定位相间被破坏：第1行第2、4位均为平
+    # Fixed-position alternation broken: line 1 positions 2 and 4 are both level
     poem2, syl2 = _poem("平平平平仄", "平平仄仄平", "平平平仄仄", "仄仄仄平平")
     errors2 = st.check_jinti_rules("zh", poem2, syl2, WUJUE_RULES)
-    assert any("相间" in e for e in errors2)
+    assert any("should alternate" in e for e in errors2)
 
-    # 联内相对被破坏：第1、2行第2位均为平
+    # In-couplet opposition broken: lines 1 and 2 both have level at position 2
     poem3, syl3 = _poem("平平平仄仄", "平平仄仄平", "仄仄平平仄", "仄仄仄平平")
     errors3 = st.check_jinti_rules("zh", poem3, syl3, WUJUE_RULES)
-    assert any("相对" in e for e in errors3)
+    assert any("should oppose" in e for e in errors3)
 
-    # 联间相粘被破坏：第2行第2位平，第3行第2位仄
+    # Cross-couplet adhesion broken: line 2 position 2 is level,
+    # line 3 position 2 is oblique.
     poem4, syl4 = _poem("仄仄平平仄", "平平仄仄平", "仄仄平平仄", "仄仄仄平平")
     errors4 = st.check_jinti_rules("zh", poem4, syl4, WUJUE_RULES)
-    assert any("相粘" in e for e in errors4)
+    assert any("should adhere" in e for e in errors4)
 
 
 def test_check_rhyme_tone_and_mismatch() -> None:
-    """韵脚非平声报错；首句入韵时与偶数句不押韵报错."""
-    # 第2行韵脚为仄
+    """Non-level rhyme feet error; a rhymed first line must match even lines."""
+    # Line 2's rhyme foot is oblique
     poem1, syl1 = _poem("仄仄平平仄", "平平仄仄仄", "平平平仄仄", "仄仄仄平平")
     errors1 = st.check_jinti_rules("zh", poem1, syl1, WUJUE_RULES)
-    assert any("韵脚应为'平'" in e for e in errors1)
+    assert any("rhyme should be '平'" in e for e in errors1)
 
-    # 首句平脚（入韵）但与第2、4行韵母不同
+    # First line rhymes but its nucleus differs from lines 2 and 4
     poem2 = ["a", "b", "c", "d"]
     syllables2 = [
         _line_last("平平仄仄平", "an"),
@@ -215,9 +218,9 @@ def test_check_rhyme_tone_and_mismatch() -> None:
         _line_last("仄仄仄平平", "en"),
     ]
     errors2 = st.check_jinti_rules("zh", poem2, syllables2, WUJUE_RULES)
-    assert any("押韵不匹配" in e for e in errors2)
+    assert any("Rhyme mismatch" in e for e in errors2)
 
-    # 首句平脚且押韵一致 → 通过押韵部分
+    # First line has a level foot and rhymes -> rhyme check passes
     syllables3 = [
         _line_last("平平仄仄平", "an"),
         _line_last("平平仄仄平", "an"),
@@ -230,11 +233,11 @@ def test_check_rhyme_tone_and_mismatch() -> None:
         syllables3,
         {**WUJUE_RULES, "forbid_sanpingwei": False, "forbid_guping": False},
     )
-    assert not any("押韵" in e for e in errors3)
+    assert not any("Rhyme mismatch" in e for e in errors3)
 
 
 def test_check_unknown_values_are_skipped() -> None:
-    """属性值未知时跳过相间/相对/相粘判断."""
+    """Unknown attribute values skip alternation/opposition/adhesion checks."""
     poem = ["a", "b", "c", "d"]
     syllables = [[_syl("")] for _ in range(4)]
     errors = st.check_jinti_rules(
@@ -243,13 +246,14 @@ def test_check_unknown_values_are_skipped() -> None:
         syllables,
         {**WUJUE_RULES, "forbid_sanpingwei": True, "forbid_guping": True},
     )
-    # 空属性不产生三平尾/孤平/结构错误，但韵脚无法满足“平”声仍会报错。
+    # Empty attributes cause no tail, isolated-level or structure errors,
+    # but the rhyme check still fails because no level tone is present.
     assert errors
-    assert all("韵脚" in e for e in errors)
+    assert all("rhyme should be" in e for e in errors)
 
 
 # --------------------------------------------------------------------------- #
-# 与内置模板判定一致性
+# Parity with the built-in templates
 # --------------------------------------------------------------------------- #
 POEMS: list[list[str]] = [
     ["远岫依烟岭", "溪流伴月明", "桃红迷柳岸", "古道远山风"],
@@ -263,7 +267,7 @@ POEMS: list[list[str]] = [
 
 @pytest.mark.parametrize("key", ["zh_wujue", "zh_qijue"])
 def test_parity_with_builtin_short_forms(key: str) -> None:
-    """数据化规则与内置绝句模板判定一致."""
+    """Data-driven rules match the built-in quatrain templates."""
     register_chinese_templates()
     template = get(key)
     analyzer = get_analyzer("zh")
@@ -281,7 +285,7 @@ def test_parity_with_builtin_short_forms(key: str) -> None:
 
 @pytest.mark.parametrize("key", ["zh_wulv", "zh_qilv"])
 def test_parity_with_builtin_regular_forms(key: str) -> None:
-    """数据化规则与内置律诗模板的韵脚/三平尾/孤平判定一致（样例集合）."""
+    """Data-driven rules match built-in regulated verse on rhyme/tail checks."""
     register_chinese_templates()
     template = get(key)
     rules = st.normalize_structural_rules(template.structural_rules)[0]
@@ -305,7 +309,7 @@ def test_parity_with_builtin_regular_forms(key: str) -> None:
 
 
 def test_structural_rules_registered_for_jinti_templates() -> None:
-    """绝句/律诗模板均声明了数据化结构规则与标准位次."""
+    """Quatrain and regulated-verse templates declare structural rules."""
     register_chinese_templates()
     for key, lines, positions in [
         ("zh_wujue", 4, [1, 3]),
@@ -321,7 +325,7 @@ def test_structural_rules_registered_for_jinti_templates() -> None:
 
 
 def test_special_rules_are_strings() -> None:
-    """内置模板的 special_rules 均为字符串元组（前端可展示）."""
+    """Built-in templates expose special_rules as tuples of strings."""
     for template in _registry.values():
         assert isinstance(template.special_rules, tuple)
         assert all(isinstance(rule, str) for rule in template.special_rules)

@@ -1,10 +1,10 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""集成测试公共工具：桩 LLM 客户端（不实际访问 OpenAI）.
+"""Shared integration-test helpers: a stub LLM client (no real OpenAI).
 
-桩客户端按预置脚本返回 ChatResult，使 Pipeline / Flask / SocketIO 的集成
-测试完全离线、可重复、无需网络。
+The stub client replays scripted responses as ChatResult, so integration tests
+for Pipeline / Flask / SocketIO stay fully offline, repeatable, and network-free.
 """
 
 from typing import Any
@@ -13,14 +13,14 @@ from src.agents.base import ChatResult, LLMClient
 
 
 def tool_call(name: str, arguments: dict[str, Any] | None = None) -> ChatResult:
-    """构造一个带工具调用的助手消息（ChatResult）.
+    """Build an assistant message with tool calls (ChatResult).
 
     Args:
-        name: 工具名（如 "modify" / "submit"）。
-        arguments: 工具参数。
+        name: Tool name (e.g. "modify" / "submit").
+        arguments: Tool arguments.
 
     Returns:
-        {"role", "content", "tool_calls": [{"id", "name", "arguments"}]}。
+        {"role", "content", "tool_calls": [{"id", "name", "arguments"}]}.
 
     """
     return {
@@ -37,10 +37,10 @@ def tool_call(name: str, arguments: dict[str, Any] | None = None) -> ChatResult:
 
 
 class StubLLMClient(LLMClient):
-    """离线桩 LLM 客户端：按队列返回预置脚本，绝不发起网络请求.
+    """Offline stub LLM client: replays scripted responses, never hits the network.
 
-    通过构造参数传入 ``stream_responses``（chat_stream 依次返回的文本）与
-    ``chat_responses``（chat 依次返回的 ChatResult）。
+    Pass ``stream_responses`` (texts returned by chat_stream in order) and
+    ``chat_responses`` (ChatResults returned by chat in order) via the constructor.
     """
 
     def __init__(
@@ -51,14 +51,14 @@ class StubLLMClient(LLMClient):
         stream: list[str] | None = None,
         chat: list[ChatResult] | None = None,
     ):
-        """仅记录连接参数，不创建真实 OpenAI 客户端.
+        """Record connection parameters only; no real OpenAI client is created.
 
         Args:
-            base_url: API 基础地址。
-            api_key: API 密钥。
-            model: 模型名称。
-            stream: chat_stream 依次返回的文本列表。
-            chat: chat 依次返回的 ChatResult 列表。
+            base_url: API base URL.
+            api_key: API key.
+            model: Model name.
+            stream: Texts that chat_stream returns in order.
+            chat: ChatResults that chat returns in order.
 
         """
         self.base_url = base_url
@@ -70,14 +70,14 @@ class StubLLMClient(LLMClient):
         self._chat_iter = iter(self.chat_responses)
 
     def chat(self, messages: list[dict[str, Any]], tools: Any = None) -> ChatResult:
-        """按序返回预置的 ChatResult；耗尽后返回空文本.
+        """Return scripted ChatResults in order; return empty text when exhausted.
 
         Args:
-            messages: 对话消息列表。
-            tools: 工具定义（桩客户端忽略）。
+            messages: Conversation messages.
+            tools: Tool definitions (ignored by the stub).
 
         Returns:
-            预置的 ChatResult。
+            A scripted ChatResult.
 
         """
         try:
@@ -88,14 +88,14 @@ class StubLLMClient(LLMClient):
     def chat_stream(
         self, messages: list[dict[str, Any]], on_chunk: Any = None
     ) -> ChatResult:
-        """按序返回预置文本（触发 on_chunk 回调）.
+        """Return scripted text in order, invoking the on_chunk callback.
 
         Args:
-            messages: 对话消息列表。
-            on_chunk: 收到文本块时的回调函数。
+            messages: Conversation messages.
+            on_chunk: Callback invoked with each text chunk.
 
         Returns:
-            包含累积文本的 ChatResult。
+            A ChatResult containing the accumulated text.
 
         """
         try:
@@ -107,13 +107,13 @@ class StubLLMClient(LLMClient):
         return {"role": "assistant", "content": text, "tool_calls": []}
 
     def count_tokens(self, messages: list[dict[str, Any]]) -> int:
-        """返回低 token 数以避免压缩触发（桩实现）.
+        """Return a low token count so compression never triggers (stub).
 
         Args:
-            messages: 消息列表（未使用）。
+            messages: Message list (unused).
 
         Returns:
-            固定返回 0（不触发压缩）。
+            Always 0, so compression never triggers.
 
         """
         return 0
@@ -123,29 +123,29 @@ def make_stub(
     stream: list[str] | None = None,
     chat: list[ChatResult] | None = None,
 ) -> type[StubLLMClient]:
-    """生成预置脚本的桩客户端类.
+    """Build a stub client class from scripted responses.
 
     Args:
-        stream: chat_stream 依次返回的文本列表。
-        chat: chat 依次返回的 ChatResult 列表。
+        stream: Texts that chat_stream returns in order.
+        chat: ChatResults that chat returns in order.
 
     Returns:
-        可直接替换 WriterAI/CheckerAI 中 LLMClient 引用的子类。
+        A subclass that can replace the LLMClient used by WriterAI/CheckerAI.
 
     """
     script_stream = list(stream or [])
     script_chat = list(chat or [])
 
     class _Stub(StubLLMClient):
-        """预置脚本的桩客户端（由 make_stub 动态生成）."""
+        """Scripted stub client (created dynamically by make_stub)."""
 
         def __init__(self, base_url: str, api_key: str, model: str) -> None:
-            """调用父类 __init__ 并注入预置脚本.
+            """Call the parent __init__ and inject the scripted responses.
 
             Args:
-                base_url: 服务地址。
-                api_key: API 密钥。
-                model: 模型名称。
+                base_url: Service URL.
+                api_key: API key.
+                model: Model name.
 
             """
             super().__init__(

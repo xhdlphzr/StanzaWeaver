@@ -1,16 +1,18 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""统一的模板转化接口（跨语言转化）.
+"""Unified template conversion interface (cross-language conversion).
 
-一个模板对外暴露的完整规格包括：行数、每行音节数、逐位约束（可多份）、
-押韵韵式、自定义校验代码。跨语言转化时，除“逐位约束的属性值需要按映射
-换成目标语言的属性值”之外，其余部分（行数、音节数、韵式、自定义代码）
-原样复制。
+The full spec a template exposes includes: line count, syllables per line,
+per-position constraints (possibly several alternatives), rhyme scheme, and
+custom validation code. During cross-language conversion, everything except the
+constraint attribute values (which are remapped to the target language's values)
+is copied verbatim: line count, syllable counts, rhyme scheme, custom code.
 
-本模块是唯一的转化实现：前端“应用转换”、模板编辑 AI 的 set_from_template
-工具以及后续任何调用方都通过 :func:`convert_template` 得到同一份结果，避免
-多处重复实现转化逻辑。
+This module is the single conversion implementation: the frontend's "apply
+conversion", the template-editing AI's ``set_from_template`` tool, and any later
+caller all go through :func:`convert_template` for the same result, avoiding
+duplicated conversion logic.
 """
 
 from typing import Any
@@ -20,7 +22,8 @@ from . import get as get_template
 from .rhyme import normalize_rhyme_scheme
 from .structural import normalize_structural_rules
 
-#: 约束属性值的中文别名（AI/用户可能用中文描述轻重/长短）。
+#: Chinese aliases for constraint attribute values (AI/users may describe
+#: heavy/light or long/short in Chinese).
 _VALUE_ALIASES: dict[str, str] = {
     "重": "heavy",
     "轻": "light",
@@ -30,36 +33,37 @@ _VALUE_ALIASES: dict[str, str] = {
     "仄": "仄",
 }
 
-#: 自定义模板行数上限。
+#: Maximum line count of a custom template.
 _MAX_LINES = 30
 
-#: 自定义模板每个音节的取值范围。
+#: Allowed syllable count range per line of a custom template.
 _MIN_SYLLABLES = 1
 _MAX_SYLLABLES = 100
 
 
 def constraint_scheme(language: str) -> tuple[str, tuple[str, ...]]:
-    """返回某语言的逐位约束方案.
+    """Return the per-position constraint scheme of a language.
 
     Args:
-        language: 语言代码。
+        language: Language code.
 
     Returns:
-        (属性维度键, 可选值元组)；未知语言按无属性处理。
+        (Attribute dimension key, allowed values tuple); unknown languages are
+        treated as having no attribute.
 
     """
     return custom_template_schemes().get(language, ("", ()))
 
 
 def normalize_constraint_value(language: str, value: Any) -> str | None:
-    """把约束值归一化为该语言的规范值.
+    """Normalize a constraint value to the canonical value of its language.
 
     Args:
-        language: 语言代码。
-        value: 原始值（可为中文别名）。
+        language: Language code.
+        value: Raw value (may be a Chinese alias).
 
     Returns:
-        规范值或空串；非法值返回 None。
+        Canonical value or empty string; None for invalid values.
 
     """
     attribute, values = constraint_scheme(language)
@@ -73,15 +77,16 @@ def normalize_constraint_value(language: str, value: Any) -> str | None:
 
 
 def convert_syllable_count(value: Any) -> int:
-    """把模板的音节数（定值或区间）转为固定整数（区间取中点）.
+    """Convert a template syllable count (fixed or range) to a fixed integer.
 
-    自定义模板的每行音节数只支持固定整数，故区间（如 8-10）取四舍五入中点。
+    Custom templates only support a fixed syllable count per line, so a range
+    (such as 8-10) is reduced to its rounded midpoint.
 
     Args:
-        value: int 或 (min, max) 区间。
+        value: int or a (min, max) range.
 
     Returns:
-        正整数；无法解析时返回 7。
+        Positive integer; 7 when it cannot be parsed.
 
     """
     if isinstance(value, (tuple, list)) and len(value) == 2:
@@ -96,14 +101,14 @@ def convert_syllable_count(value: Any) -> int:
 
 
 def _normalize_syllables(source_dict: dict[str, Any], lines: int) -> list[int]:
-    """读取并规整源模板的每行音节数.
+    """Read and normalize the syllables-per-line list of the source template.
 
     Args:
-        source_dict: 源模板 to_dict() 结果。
-        lines: 行数。
+        source_dict: Source template ``to_dict()`` result.
+        lines: Line count.
 
     Returns:
-        长度为 lines 的每行音节数列表。
+        List of syllable counts with length ``lines``.
 
     """
     raw = list(source_dict.get("syllables_per_line", []) or [])
@@ -119,15 +124,16 @@ def _normalize_syllables(source_dict: dict[str, Any], lines: int) -> list[int]:
 def _source_tables(
     source_dict: dict[str, Any], lines: int, syllables: list[int]
 ) -> list[list[list[dict[str, Any]]]]:
-    """读取源模板的逐位约束并规整为“多份约束表”结构.
+    """Read the source template's per-position constraints into "multiple tables".
 
     Args:
-        source_dict: 源模板 to_dict() 结果。
-        lines: 行数。
-        syllables: 每行音节数。
+        source_dict: Source template ``to_dict()`` result.
+        lines: Line count.
+        syllables: Syllables per line.
 
     Returns:
-        每份约束一个“行 -> 单元格”表；无约束时返回一份空表。
+        One "line -> cell" table per constraint set; one empty table when there
+        are no constraints.
 
     """
     raw_alternatives = source_dict.get("syllable_constraint_alternatives")
@@ -155,31 +161,32 @@ def _source_tables(
 def _normalize_mapping(
     mapping: Any, source_language: str, target_language: str
 ) -> tuple[dict[str, str], str | None]:
-    """校验并归一化“源属性值 → 目标属性值”映射.
+    """Validate and normalize the "source value -> target value" mapping.
 
     Args:
-        mapping: 原始映射（可为 None/非法类型）。
-        source_language: 源语言代码。
-        target_language: 目标语言代码。
+        mapping: Raw mapping (may be None or of an invalid type).
+        source_language: Source language code.
+        target_language: Target language code.
 
     Returns:
-        (归一化映射, 错误信息)；合法时错误信息为 None。
-        多对一是允许的（不同源值可映射到同一目标值），但一个源值只能有
-        一个目标值（映射本身是函数）。
+        (Normalized mapping, error message); error is None when valid.
+        Many-to-one is allowed (different source values may map to the same
+        target value), but one source value can only have one target value
+        (the mapping is itself a function).
 
     """
     result: dict[str, str] = {}
     if mapping is None:
         return result, None
     if not isinstance(mapping, dict):
-        return {}, "mapping 必须是对象"
+        return {}, "mapping must be an object"
     for source, target in mapping.items():
         source_value = normalize_constraint_value(source_language, source)
         target_value = normalize_constraint_value(target_language, target)
         if source_value is None:
-            return {}, f"源属性值 {source!r} 不合法"
+            return {}, f"Invalid source attribute value {source!r}"
         if target_value is None:
-            return {}, f"目标属性值 {target!r} 不合法"
+            return {}, f"Invalid target attribute value {target!r}"
         if source_value:
             result[source_value] = target_value
     return result, None
@@ -192,17 +199,18 @@ def _convert_cell(
     target_values: tuple[str, ...],
     mapping: dict[str, str],
 ) -> dict[str, Any]:
-    """把源语言的一个约束单元格转为目标语言约束单元格.
+    """Convert one constraint cell of the source language to the target language.
 
     Args:
-        cell: 源单元格（{onset, nucleus, coda, attributes}）。
-        source_attribute: 源语言属性维度键（"" 表示无属性）。
-        target_attribute: 目标语言属性维度键（"" 表示无属性）。
-        target_values: 目标语言允许的属性值。
-        mapping: 归一化后的属性值映射。
+        cell: Source cell ({onset, nucleus, coda, attributes}).
+        source_attribute: Source attribute dimension key ("" means no attribute).
+        target_attribute: Target attribute dimension key ("" means no attribute).
+        target_values: Allowed attribute values of the target language.
+        mapping: Normalized attribute-value mapping.
 
     Returns:
-        目标语言的约束单元格；声母/韵母/韵尾不跨语言携带，一律清空。
+        Constraint cell in the target language; onset/nucleus/coda are not
+        carried across languages and are always cleared.
 
     """
     attributes = cell.get("attributes", {})
@@ -230,28 +238,33 @@ def _convert_structural_rules(
     target_language: str,
     mapping: dict[str, str],
 ) -> tuple[dict[str, Any] | None, str | None]:
-    """把源模板的数据化结构规则转换为目标语言版本.
+    """Convert the source template's data-driven structural rules to the target.
 
-    只替换 attribute/level_value/oblique_value（映射后的目标语言属性与值），
-    其余字段（固定位、押韵行、三平尾/孤平开关）原样复制。
+    Only attribute/level_value/oblique_value are replaced (with the mapped
+    target-language attribute and values); all other fields (fixed positions,
+    rhyme lines, three-level-tail/isolated-level switches) are copied verbatim.
 
     Args:
-        source_dict: 源模板 to_dict() 结果。
-        target_language: 目标语言代码。
-        mapping: 归一化后的属性值映射。
+        source_dict: Source template ``to_dict()`` result.
+        target_language: Target language code.
+        mapping: Normalized attribute-value mapping.
 
     Returns:
-        (规整后的结构规则或 None, 未能携带时的原因)；两者可同时为 None。
+        (Normalized structural rules or None, reason when not carried); both
+        may be None at the same time.
 
     """
     rules, error = normalize_structural_rules(source_dict.get("structural_rules"))
     if error:
-        return None, f"源模板结构规则无效（{error}）"
+        return None, f"Source template structural rules are invalid ({error})"
     if rules is None:
         return None, None
     target_attribute, target_values = constraint_scheme(target_language)
     if not target_attribute:
-        return None, "近体诗结构规则未携带（目标语言没有可对应的音节属性）"
+        return None, (
+            "Regulated-verse structural rules not carried: "
+            "the target language has no matching syllable attribute"
+        )
     level = mapping.get(str(rules["level_value"]), "")
     oblique = mapping.get(str(rules["oblique_value"]), "")
     if (
@@ -260,9 +273,15 @@ def _convert_structural_rules(
         or level not in target_values
         or oblique not in target_values
     ):
-        return None, "近体诗结构规则未携带（映射未覆盖平/仄对应的目标属性值）"
+        return None, (
+            "Regulated-verse structural rules not carried: "
+            "the mapping does not cover the target values for level/oblique"
+        )
     if level == oblique:
-        return None, "近体诗结构规则未携带（映射把平/仄映到同一目标值，无法判定）"
+        return None, (
+            "Regulated-verse structural rules not carried: "
+            "the mapping sends level and oblique to the same target value"
+        )
     converted = dict(rules)
     converted["attribute"] = target_attribute
     converted["level_value"] = level
@@ -279,17 +298,17 @@ def _carried_rule_codes(
     structural_rules: dict[str, Any] | None,
     rule_note: str,
 ) -> list[str]:
-    """生成“已随转化携带的规则”代码列表（供前端/AI 展示）.
+    """Build the list of rule codes carried by the conversion (for UI/AI display).
 
     Args:
-        alternatives: 转化后的约束表。
-        rhyme_scheme: 转化后的韵式。
-        code: 复制的自定义代码。
-        structural_rules: 转化后的结构规则。
-        rule_note: 复制的模板规则描述。
+        alternatives: Converted constraint tables.
+        rhyme_scheme: Converted rhyme scheme.
+        code: Copied custom code.
+        structural_rules: Converted structural rules.
+        rule_note: Copied template rule description.
 
     Returns:
-        规则代码列表（constraints/rhyme/custom_code/jinti）。
+        Rule code list (constraints/rhyme/custom_code/jinti).
 
     """
     carried = ["constraints"]
@@ -311,29 +330,31 @@ def convert_template(
     target_language: str,
     mapping: Any = None,
 ) -> tuple[dict[str, Any], str | None]:
-    """把一个模板的完整规格转化为目标语言的新模板规格.
+    """Convert a template's full spec into a new template spec in a target language.
 
-    行数、每行音节数、约束种类数、押韵韵式与自定义代码原样复制；逐位约束
-    的属性值按 mapping 从源语言属性值转换为目标语言属性值（这是转化中
-    唯一需要改写的内容）。
+    Line count, syllables per line, constraint kind count, rhyme scheme, and
+    custom code are copied verbatim; the constraint attribute values are
+    converted from the source language's values to the target language's values
+    according to ``mapping`` (the only content the conversion must rewrite).
 
     Args:
-        base_key: 源模板 key。
-        target_language: 目标语言代码（zh/en/fr/it/la）。
-        mapping: 源属性值 → 目标属性值的映射。
+        base_key: Source template key.
+        target_language: Target language code (zh/en/fr/it/la).
+        mapping: Mapping from source attribute values to target attribute values.
 
     Returns:
-        (转化后的模板规格, 错误信息)；成功时规格含 status="ok"、lines、
-        syllables_per_line、constraints、alternatives、rhyme_scheme、
-        rhyme_distinct、code、source_name、source_language、mapped 等字段。
+        (Converted template spec, error message); on success the spec contains
+        status="ok", lines, syllables_per_line, constraints, alternatives,
+        rhyme_scheme, rhyme_distinct, code, source_name, source_language, and
+        mapped.
 
     """
     if target_language not in custom_template_schemes():
-        return {}, "不支持的目标语言"
+        return {}, "Unsupported target language"
     try:
         source = get_template(base_key)
     except KeyError:
-        return {}, f"未知模板 key: {base_key!r}"
+        return {}, f"Unknown template key: {base_key!r}"
     source_dict = source.to_dict()
     source_language = str(source_dict.get("language", ""))
     source_attribute, _source_values = constraint_scheme(source_language)
@@ -373,7 +394,8 @@ def convert_template(
     raw_scheme = str(source_dict.get("rhyme_scheme", "") or "")
     rhyme_scheme, scheme_error = normalize_rhyme_scheme(raw_scheme, lines)
     if scheme_error:
-        # 源模板声明的韵式与行数不匹配时无法携带，按“无韵式”处理。
+        # A source rhyme scheme that does not match the line count cannot be
+        # carried, so it is treated as "no rhyme scheme".
         rhyme_scheme = ""
     rhyme_distinct = bool(source_dict.get("rhyme_distinct", False))
     if not rhyme_scheme:
@@ -383,8 +405,9 @@ def convert_template(
         source_dict, target_language, normalized_mapping
     )
     custom_code = str(source_dict.get("custom_code", "") or "")
-    # 转化后直接复用源模板的规则描述：优先用户自填的 rule_note，
-    # 否则复用内置模板/自动生成的 rule_description；用户可在界面上继续修改。
+    # Reuse the source template's rule description after conversion: prefer the
+    # user-provided rule_note, otherwise the built-in/auto-generated
+    # rule_description; the user can keep editing it in the UI.
     rule_note = str(source_dict.get("rule_note", "") or "").strip()
     if not rule_note:
         rule_note = str(source_dict.get("rule_description", "") or "").strip()
@@ -420,14 +443,15 @@ def convert_template(
 def constraint_tables_to_values(
     tables: list[list[list[dict[str, Any]]]], language: str
 ) -> list[list[list[str]]]:
-    """把约束字典表转换为“规范值字符串表”（供前端/AI 草稿使用）.
+    """Convert constraint dict tables to "canonical value string tables" for UI/AI drafts.
 
     Args:
-        tables: 多份约束表（行 -> 单元格 -> {attributes}）。
-        language: 语言代码。
+        tables: Multiple constraint tables (line -> cell -> {attributes}).
+        language: Language code.
 
     Returns:
-        多份值表：约束种类 -> 行 -> 每音节规范值（"" 表示自由）。
+        Multiple value tables: constraint kind -> line -> canonical value per
+        syllable ("" means free).
 
     """
     attribute, _values = constraint_scheme(language)

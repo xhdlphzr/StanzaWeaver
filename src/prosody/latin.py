@@ -1,12 +1,14 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""拉丁语音节分析器.
+"""Latin syllable analyzer.
 
-- 支持长音符号（āēīōūȳ）与短音符号（ăĕĭŏŭ）标注。
-- 音长判定：词典/符号标注优先；无标注时双元音（ae/oe/au/eu/ei/ui）为长音，
-  元音后跟两个及以上辅音（含跨词）为长音，其余为短音。
-- qu/gu/su 后接元音时 u 为辅音性（quō、lingua、suāvis），不构成音节。
+- Supports macrons (āēīōūȳ) and breve marks (ăĕĭŏŭ).
+- Length determination: dictionary/symbol marks take precedence; without a
+  mark, a diphthong (ae/oe/au/eu/ei/ui) is long, and a vowel followed by two or
+  more consonants (including across words) is long; everything else is short.
+- u after qu/gu/su followed by a vowel is consonantal (quō, lingua, suāvis) and
+  does not form a syllable.
 """
 
 import re
@@ -55,24 +57,27 @@ _DIPHTHONGS: set[str] = {
     "EU",
     "EI",
 }
-# 拉丁语塞音（muta）：与流音(l/r)相邻构成 muta cum liquida，仅算一个辅音位。
-# 注意：f 是擦音而非塞音，不计入；故 "fl"/"fr" 不算 muta cum liquida。
+# Latin stops (muta): next to a liquid (l/r) they form muta cum liquida, which
+# counts as only one consonant slot.
+# Note: f is a fricative, not a stop, so "fl"/"fr" are not muta cum liquida.
 _STOPS: set[str] = set("bcdgkpqt")
 
-# 仅用于判定词尾/词首是否为元音（去组合音标后）。
+# Used only to test whether a word-final/word-initial letter is a vowel (after
+# stripping combining marks).
 _VOWEL_BASE: set[str] = set("aeiouy")
 
 
 def _strip_macron(text: str) -> str:
-    """去除组合音标（macron/短音符号），仅保留 ASCII 小写字母.
+    """Strip combining marks (macron/breve), keeping only ASCII lowercase.
 
-    用于把 "āe" 等带长音符号的双元音归一为 "ae" 后再查表。
+    Used to normalize diphthongs with macrons such as "āe" to "ae" before a
+    table lookup.
 
     Args:
-        text: 可能含组合音标的字符串。
+        text: String that may contain combining marks.
 
     Returns:
-        去组合音标后的纯 ASCII 小写形式。
+        Pure ASCII lowercase form with combining marks removed.
 
     """
     return "".join(
@@ -81,24 +86,30 @@ def _strip_macron(text: str) -> str:
 
 
 class LatinAnalyzer(SyllableAnalyzer):
-    """拉丁语音节分析器：音节切分 + 音长判定（符号/双元音/辅音位置）."""
+    """Latin syllable analyzer: division + length (marks/diphthongs/consonants)."""
 
     language = "la"
 
     def analyze_word(self, word: str) -> list[Syllable]:
-        """分析单词的音节与音长.
+        """Analyze the syllables and vowel lengths of a word.
 
-        音节 = (onset 辅音) + 元音核(可含双元音) + (coda 辅音)。
-        - 辅音性 u（qu/gu/su 后接元音）整簇作为当前音节的 onset，不构成独立音节。
-        - muta cum liquida（塞音 + 流音簇）附于当前音节（计入 onset），不向后拆分；
-          其余后置辅音归当前音节 coda（除末辅音外；音长由 coda 有效辅音位决定）。
-        - 音长：长音符号/双元音为长；coda 有效辅音位 ≥ 2 亦为长（x 计 2 位）。
+        Syllable = (onset consonants) + vowel nucleus (may be a diphthong) +
+        (coda consonants).
+        - Consonantal u (qu/gu/su followed by a vowel) forms the whole cluster
+          as the onset of the current syllable and does not create a separate
+          syllable.
+        - muta cum liquida (stop + liquid clusters) attaches to the current
+          syllable (counted in the onset) and is not split backwards; other
+          following consonants become the coda of the current syllable (except
+          the last consonant; length is determined by the effective coda slots).
+        - Length: a macron/diphthong is long; an effective coda of >= 2
+          consonant slots is also long (x counts as 2).
 
         Args:
-            word: 拉丁语单词（可含长短音符号）。
+            word: Latin word (may contain length marks).
 
         Returns:
-            音节列表（长度标在 attributes["length"]）。
+            Syllable list (length in attributes["length"]).
 
         """
         word = word.strip(".,;:!?\"'()[]{}")
@@ -111,7 +122,10 @@ class LatinAnalyzer(SyllableAnalyzer):
         length_val = ""
 
         def _close() -> None:
-            """关闭当前挂起音节并追加到音节列表，随后重置本地的 onset/nucleus/coda/length."""
+            """Close the pending syllable and append it to the list.
+
+            Resets the local onset/nucleus/coda/length afterwards.
+            """
             syllables.append(
                 Syllable(
                     onset=onset,
@@ -131,7 +145,8 @@ class LatinAnalyzer(SyllableAnalyzer):
         while i < n:
             ch = word[i]
             lower = ch.lower()
-            # 辅音性 u: qu / gu / su 后接元音时整簇附于 trailing，作为下一音节 onset。
+            # Consonantal u: after qu / gu / su followed by a vowel, the cluster
+            # goes to trailing as the next syllable's onset.
             if lower == "q" or (
                 lower in "gs"
                 and i + 1 < n
@@ -174,11 +189,11 @@ class LatinAnalyzer(SyllableAnalyzer):
                 else:
                     nucleus = vowel_base.lower()
 
-                # 累积的前导辅音成为当前音节 onset
+                # The accumulated leading consonants become the current onset.
                 onset = "".join(trailing)
                 trailing = []
 
-                # 收集后续辅音，遇元音或辅音性 u 停止
+                # Collect following consonants; stop at a vowel or consonantal u.
                 j = i + 1
                 cons: list[str] = []
                 while (
@@ -225,17 +240,19 @@ class LatinAnalyzer(SyllableAnalyzer):
         )
 
     def analyze_line(self, text: str) -> list[Syllable]:
-        """整行分析（含跨词音长与拉丁省音 elision）.
+        """Analyze a whole line (cross-word length and Latin elision included).
 
-        跨词音长：前词末元音后接后词首 ≥2 辅音则为长音。
-        省音：前词以元音（或 m）结尾、后词以元音（或 h）开头时，
-        前词末音节被吞掉，音节总数减一。
+        Cross-word length: if the final vowel of a word is followed by >= 2
+        consonants at the start of the next word, it is long.
+        Elision: when the preceding word ends in a vowel (or m) and the next
+        word starts with a vowel (or h), the preceding word's final syllable is
+        swallowed, reducing the syllable count by one.
 
         Args:
-            text: 一行拉丁语文本。
+            text: One line of Latin text.
 
         Returns:
-            音节列表。
+            Syllable list.
 
         """
         words = [w for w in re.split(r"[^A-Za-zāēīōūȳăĕĭŏŭ'-]+", text) if w]
@@ -254,7 +271,8 @@ class LatinAnalyzer(SyllableAnalyzer):
                     if nstart_char in _VOWEL_BASE or nxt_word.startswith("h"):
                         elided = True
             if elided:
-                # 省音：前词末元音（或 m）被后词首元音/h 吞掉，减少一个音节。
+                # Elision: the preceding word's final vowel (or m) is swallowed
+                # by the next word's initial vowel/h, removing one syllable.
                 syls = syls[:-1]
             elif wi + 1 < m:
                 lead = self._leading_consonant_count(words[wi + 1])
@@ -265,15 +283,17 @@ class LatinAnalyzer(SyllableAnalyzer):
 
     @staticmethod
     def _leading_consonant_count(w: str) -> int:
-        """统计词首辅音序列的「有效辅音位」数（含 x 计2、qu/gu/su 的 u 为辅音性、.
+        """Count the effective consonant slots in a word-initial consonant run.
 
-        muta cum liquida 仅算1）。
+        x counts as 2, u in qu/gu/su is consonantal, and muta cum liquida counts
+        as only 1.
 
         Args:
-            w: 拉丁语单词。
+            w: Latin word.
 
         Returns:
-            有效辅音位数；无前导辅音返回 0。
+            Number of effective consonant slots; 0 when there is no leading
+            consonant.
 
         """
         w = w.strip(".,;:!?\"'()[]{}").lower()
@@ -296,13 +316,16 @@ class LatinAnalyzer(SyllableAnalyzer):
         return eff
 
     def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-        """整行切分变体（拉丁语标准切分下 muta cum liquida 并入一节拍，故仅返回标准切分）.
+        """Return whole-line division variants (standard division only).
+
+        In standard Latin scansion muta cum liquida merges into one beat, so
+        only the standard division is returned.
 
         Args:
-            line: 一行拉丁语诗。
+            line: One line of Latin verse.
 
         Returns:
-            仅含标准切分的变体列表。
+            Variant list containing only the standard division.
 
         """
         return [self.analyze_line(line)]

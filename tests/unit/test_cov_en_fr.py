@@ -1,15 +1,16 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""英语/法语音节分析器补充单测（覆盖缺失分支，目标 100% 行覆盖）.
+"""Coverage tests for the English and French syllable analyzers.
 
-本文件不修改任何既有测试，仅新增针对 `src/prosody/english.py` 与
-`src/prosody/french.py` 中未覆盖分支的单元测试：
+This file changes no existing test; it only adds unit tests for uncovered
+branches in `src/prosody/english.py` and `src/prosody/french.py`:
 
-- 英语：CMUdict 惰性加载体、本地词库回退、64 组合上限、无元音音素串、
-  相邻元音跳过、双辅音归并、未知词无元音回退。
-- 法语：空词、鼻化后部归并、问号核韵脚、单词语节数、空音节跳过、
-  联诵、整行变体。
+- English: lazy CMUdict loader, local vocabulary fallback, 64-combo cap,
+  vowel-less phoneme strings, adjacent-vowel skipping, consonant-cluster
+  merging, unknown word with no vowel fallback.
+- French: empty word, nasal back-vowel merge, placeholder-nucleus rhyme,
+  word syllable count, empty syllable skipping, liaison, line variants.
 """
 
 from unittest import mock
@@ -23,21 +24,22 @@ from src.prosody.french import FrenchAnalyzer
 
 
 def test_load_cmudict_body_executes() -> None:
-    """验证 `_load_cmudict` 加载体在本次会话中真实执行（覆盖 63-64, 66-67, 70, 72, 74）.
+    """Verify the `_load_cmudict` body really runs in this session.
 
-    直接将 mock 注入 ``nltk.corpus.__dict__``，避免任何对 ``nltk.corpus.cmudict``
-    直接注入 ``sys.modules["nltk.corpus"]`` 的 ``cmudict`` 属性（``nltk.corpus``
-    作为 LazyModule 代理与 import 实际解析的 ``sys.modules`` 实体并非同一对象，
-    必须改动后者才能拦截函数内的 ``from nltk.corpus import cmudict``）；内部强制
-    ``nltk.data.find`` 抛 LookupError 以触发 except 下载分支（覆盖 68-69）。
-    测试结束后还原全局状态。
+    Cover lines 63-64, 66-67, 70, 72, 74. Inject the mock directly into
+    ``nltk.corpus.__dict__`` instead of ``sys.modules["nltk.corpus"]``'s
+    ``cmudict`` attribute: ``nltk.corpus`` is a LazyModule proxy and is not
+    the ``sys.modules`` entity resolved by import, so only the latter
+    intercepts the inner ``from nltk.corpus import cmudict``. Force
+    ``nltk.data.find`` to raise LookupError to hit the except download
+    branch (lines 68-69), then restore global state afterwards.
     """
     import importlib
     import sys
 
     importlib.import_module(
         "nltk.corpus"
-    )  # 确保 sys.modules 中存在真实模块，避免在干净环境下注入落空
+    )  # Ensure a real module exists in sys.modules so injection cannot miss
 
     gl = english_module._load_cmudict.__globals__
     saved_loaded = gl["_cmudict_loaded"]
@@ -65,16 +67,17 @@ def test_load_cmudict_body_executes() -> None:
             real_corpus.__dict__.pop("cmudict", None)
         else:
             real_corpus.__dict__["cmudict"] = saved_cmu
-        # 还原全局状态，保证既有用例不受影响
+        # Restore global state so existing tests are unaffected
         gl["_cmudict_loaded"] = saved_loaded
         gl["_ARPABET_TO_PHONEMES"] = saved_cache
 
 
 def test_load_cmudict_inner_guard_return() -> None:
-    """验证双检锁内层守卫：外层检查已过、持锁后已加载即返回（覆盖 65）.
+    """Verify the double-checked lock's inner guard returns early (line 65).
 
-    通过替换 `_cmudict_lock` 的 `__enter__`，使其在持锁瞬间将
-    `_cmudict_loaded` 置 True，从而命中内层 `if _cmudict_loaded: return`。
+    Replace `_cmudict_lock`'s `__enter__` so it sets `_cmudict_loaded` to
+    True at the moment the lock is taken, hitting the inner
+    `if _cmudict_loaded: return`.
     """
     saved_loaded = english_module._cmudict_loaded
     saved_lock = english_module._cmudict_lock
@@ -83,7 +86,7 @@ def test_load_cmudict_inner_guard_return() -> None:
     fake_lock = mock.MagicMock()
 
     def _lock_enter(self: object) -> mock.MagicMock:
-        """Mock 锁的 __enter__：进入时标记 cmudict 已加载并返回锁对象."""
+        """Mark cmudict as loaded on lock entry and return the lock object."""
         english_module._cmudict_loaded = True
         return fake_lock
 
@@ -93,15 +96,15 @@ def test_load_cmudict_inner_guard_return() -> None:
 
     english_module._load_cmudict()
 
-    # 内层守卫提前返回，加载体未实际执行
+    # The inner guard returns early, so the loader body never runs
     assert english_module._cmudict_loaded is True
-    # 还原全局状态，保证既有用例不受影响
+    # Restore global state so existing tests are unaffected
     english_module._cmudict_loaded = saved_loaded
     english_module._cmudict_lock = saved_lock
 
 
 def test_get_pronunciations_returns_db_prons() -> None:
-    """验证本地词库命中时直接返回（覆盖 99）."""
+    """Verify a local vocabulary hit returns directly (line 99)."""
     analyzer = EnglishAnalyzer()
     prons: list[list[str]] = [["B", "AH1", "R"]]
     with mock.patch.object(vocabulary, "get_en_pron", return_value=prons):
@@ -110,9 +113,10 @@ def test_get_pronunciations_returns_db_prons() -> None:
 
 
 def test_analyze_line_variants_combo_cap() -> None:
-    """验证多音变体组合上限 64（覆盖 193、195 两个 break）.
+    """Verify the 64-combo cap on polyphonic variants (lines 193, 195).
 
-    每个词返回 4 个发音，4 个词相乘远超 64，触发内层与外层 break。
+    Each word has 4 pronunciations; 4 words multiply far past 64, so both
+    the inner and outer break triggers.
     """
     analyzer = EnglishAnalyzer()
     four_prons: list[list[str]] = [
@@ -128,25 +132,25 @@ def test_analyze_line_variants_combo_cap() -> None:
 
 
 def test_parse_phones_no_vowels() -> None:
-    """验证无元音音素串返回空列表（覆盖 217）."""
+    """Verify a vowel-less phoneme string returns an empty list (line 217)."""
     analyzer = EnglishAnalyzer()
     assert analyzer._parse_phones(["B", "T"]) == []
 
 
 def test_parse_phones_adjacent_vowels_skip() -> None:
-    """验证相邻元音（无辅音间隔）跳过空 onset（覆盖 230）."""
+    """Verify adjacent vowels with no consonant skip the empty onset (230)."""
     analyzer = EnglishAnalyzer()
     syls = analyzer._parse_phones(["AE1", "IY0"])
-    # 两核相邻，中间无辅音，应切分为两个音节
+    # Two adjacent nuclei with no consonant between become two syllables
     assert len(syls) == 2
     assert syls[0].nucleus == "AE"
     assert syls[1].nucleus == "IY"
 
 
 def test_parse_phones_two_consonant_cluster() -> None:
-    """验证两辅音簇首辅音收前音节（覆盖 238-240）."""
+    """Verify a two-consonant cluster splits with the first as coda."""
     analyzer = EnglishAnalyzer()
-    # B AE1 K T IH0：核间 KT 为双辅音，K 收前、T 归后
+    # B AE1 K T IH0: the KT cluster between nuclei has K as coda, T as onset
     syls = analyzer._parse_phones(["B", "AE1", "K", "T", "IH0"])
     assert len(syls) == 2
     assert syls[0].coda == "K"
@@ -154,7 +158,7 @@ def test_parse_phones_two_consonant_cluster() -> None:
 
 
 def test_fallback_analyze_no_vowels() -> None:
-    """验证无元音组未知词回退为单音节（覆盖 269）."""
+    """Verify a vowel-less unknown word falls back to one syllable (269)."""
     analyzer = EnglishAnalyzer()
     syls = analyzer._fallback_analyze("nth")
     assert len(syls) == 1
@@ -162,7 +166,7 @@ def test_fallback_analyze_no_vowels() -> None:
 
 
 def test_french_syllabify_empty_word() -> None:
-    """验证清洗后为空串的词返回问号占位音节（覆盖 174）."""
+    """Verify a word cleaned to an empty string gets a "?" placeholder (174)."""
     analyzer = FrenchAnalyzer()
     syls = analyzer._syllabify_word("'")
     assert len(syls) == 1
@@ -170,43 +174,43 @@ def test_french_syllabify_empty_word() -> None:
 
 
 def test_french_rhyme_key_nasal_back() -> None:
-    """验证鼻化后部元音归并为 'on'（覆盖 216）."""
+    """Verify the nasal back vowel merges to 'on' (line 216)."""
     analyzer = FrenchAnalyzer()
     assert analyzer.rhyme_key("bon") == "on"
 
 
 def test_french_rhyme_key_placeholder_nucleus() -> None:
-    """验证问号核词返回空韵脚串（覆盖 233）."""
+    """Verify a placeholder-nucleus word returns an empty rhyme key (233)."""
     analyzer = FrenchAnalyzer()
     assert analyzer.rhyme_key("'") == ""
 
 
 def test_french_count_syllables_in_word() -> None:
-    """验证单词语节数辅助方法（覆盖 245）."""
+    """Verify the per-word syllable count helper (line 245)."""
     analyzer = FrenchAnalyzer()
     assert analyzer.count_syllables_in_word("bon") == 1
 
 
 def test_french_syllabify_line_skips_empty_syls() -> None:
-    """验证整行切分时跳过无元音的空词（覆盖 276）."""
+    """Verify line syllabification skips vowel-less empty words (line 276)."""
     analyzer = FrenchAnalyzer()
-    # "bc" 无元音 -> 空音节列表，应被跳过；"bon" 贡献 1 音节
+    # "bc" has no vowel -> empty list, skipped; "bon" contributes 1 syllable
     syls = analyzer.syllabify_line("bc bon")
     assert len(syls) == 1
     assert syls[0].nucleus == "on"
 
 
 def test_french_syllabify_line_liaison() -> None:
-    """验证跨词联诵：前词尾辅音并入后词首 onset（覆盖 285-286）."""
+    """Verify cross-word liaison moves the coda into the next onset (285-286)."""
     analyzer = FrenchAnalyzer()
-    # chat(尾辅音 t) + ami(首元音) -> 联诵，ami 首音节 onset 变为 "t"
+    # chat (coda t) + ami (initial vowel) -> liaison gives ami onset "t"
     syls = analyzer.syllabify_line("chat ami")
     assert syls[0].coda == ""
     assert syls[1].onset == "t"
 
 
 def test_french_analyze_line_variants() -> None:
-    """验证整行变体仅返回标准切分（覆盖 310）."""
+    """Verify line variants return only the standard syllabification (310)."""
     analyzer = FrenchAnalyzer()
     variants = analyzer.analyze_line_variants("bon")
     assert len(variants) == 1
@@ -214,7 +218,7 @@ def test_french_analyze_line_variants() -> None:
 
 
 def test_french_silent_u_after_qu() -> None:
-    """Qu 后的 u 静音：que/qui/quand 均算 1 音节（覆盖 _is_silent_u qu 分支）."""
+    """Verify u after qu is silent, so que/qui/quand count as one syllable."""
     analyzer = FrenchAnalyzer()
     assert analyzer.count_syllables_in_word("quel") == 1
     assert analyzer.count_syllables_in_word("que") == 1
@@ -225,17 +229,17 @@ def test_french_silent_u_after_qu() -> None:
 
 
 def test_french_silent_u_after_gu_front_vowel() -> None:
-    """Gu 后接 e/i/y 时 u 静音，其余情况 u 计为元音（覆盖 _is_silent_u gu 分支）."""
+    """Verify u after gu is silent before e/i/y but a vowel otherwise (gu)."""
     analyzer = FrenchAnalyzer()
-    # guerre：gu 的 u 静音，词尾 e muet 亦省略 -> 1 音节
+    # guerre: the u after gu is silent and final e muet drops -> 1 syllable
     assert analyzer.count_syllables_in_word("guerre") == 1
     assert analyzer.count_syllables_in_word("guide") == 1
-    # 词尾 gu：u 发音（aigu = /e.gy/，2 音节）
+    # Final gu: u is pronounced (aigu = /e.gy/, 2 syllables)
     assert analyzer.count_syllables_in_word("aigu") == 2
 
 
 def test_french_internal_apostrophe_words_not_mangled() -> None:
-    """内嵌撇号固定词不被误剥前缀：aujourd'hui 等不再被算成 1 音节."""
+    """Verify words with an internal apostrophe are not stripped to 1 syllable."""
     analyzer = FrenchAnalyzer()
     assert analyzer.count_syllables_in_word("aujourd'hui") == 3
     assert analyzer.count_syllables_in_word("quelqu'un") == 2
@@ -243,7 +247,7 @@ def test_french_internal_apostrophe_words_not_mangled() -> None:
 
 
 def test_french_elision_proclitics_counts() -> None:
-    """省音小品词整词切分计数与法语诵读一致."""
+    """Verify elided proclitic words count syllables as French reading does."""
     analyzer = FrenchAnalyzer()
     assert analyzer.count_syllables_in_word("l'amour") == 2
     assert analyzer.count_syllables_in_word("l'eau") == 1
