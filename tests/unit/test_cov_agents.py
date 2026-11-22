@@ -331,13 +331,13 @@ def test_build_checker_system_parallelism() -> None:
     text = _build_checker_system(
         ["a", "b"], {"name": "五言律诗", "language": "zh", "lines": 8}
     )
-    assert "对仗" in text
+    assert "Antithesis check" in text
 
 
 def test_build_checker_system_no_parallelism() -> None:
     """Verify non-Chinese or under-8-line templates omit the antithesis note."""
     text = _build_checker_system(["a"], {"language": "en", "lines": 4})
-    assert "对仗" not in text
+    assert "Antithesis check" not in text
 
 
 def test_build_checker_system_includes_user_prompt_and_rule() -> None:
@@ -348,15 +348,15 @@ def test_build_checker_system_includes_user_prompt_and_rule() -> None:
         user_prompt="写一首思乡的七言绝句",
         user_feedback="再婉约一些",
     )
-    assert "用户原始要求" in text
+    assert "User's original request" in text
     assert "写一首思乡的七言绝句" in text
-    assert "模板规则描述" in text
+    assert "Template rule description" in text
     assert "必须使用对仗句" in text
-    assert "用户修改反馈" in text
+    assert "User revision feedback" in text
     assert "再婉约一些" in text
-    assert "用户要求符合" in text
+    assert "Compliance with user requirements" in text
     # The writer AI's distilled topic description is no longer used
-    assert "【主题描述】" not in text
+    assert "Theme description" not in text
 
 
 def test_build_checker_system_rule_description_fallback() -> None:
@@ -365,13 +365,13 @@ def test_build_checker_system_rule_description_fallback() -> None:
         ["a"],
         {"language": "zh", "lines": 4, "rule_description": "格律说明"},
     )
-    assert "模板规则描述" in text
+    assert "Template rule description" in text
     assert "格律说明" in text
-    assert "\n【用户原始要求（创作提示词）】\n" not in text
-    assert "\n【用户修改反馈（本轮必须落实）】\n" not in text
+    assert "\n[User's original request (writing prompt)]\n" not in text
+    assert "\n[User revision feedback (must be applied this round)]\n" not in text
 
     no_rule = _build_checker_system(["a"], {"language": "zh", "lines": 4})
-    assert "\n【模板规则描述】\n" not in no_rule
+    assert "\n[Template rule description]\n" not in no_rule
 
 
 # --------------------------------------------------------------------------- #
@@ -1321,7 +1321,7 @@ def test_refine_no_progress_guidance() -> None:
         )
     assert rounds >= 1
     joined = "\n".join(str(m.get("content", "")) for msgs in captured for m in msgs)
-    assert "连续多轮" in joined
+    assert "several rounds without successfully" in joined
 
 
 # --------------------------------------------------------------------------- #
