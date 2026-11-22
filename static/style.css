@@ -1822,3 +1822,44 @@ html[lang="en"] .slogan {
 .template-manage-delete:hover {
   background: rgba(179, 64, 46, 0.12);
 }
+
+/* ---- 应用内确认弹窗 ---- */
+
+.confirm-modal {
+  z-index: 300;
+}
+
+.modal-confirm {
+  width: 440px;
+}
+
+.confirm-message {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #5a3e2b;
+  white-space: pre-wrap;
+}
+
+.btn-danger {
+  padding: 11px 22px;
+  background: #b3402e;
+  color: #fdfaf5;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  box-shadow: 0 2px 8px rgba(179, 64, 46, 0.25);
+  transition: all 0.3s;
+}
+
+.btn-danger:hover {
+  background: #c04a37;
+  box-shadow: 0 4px 16px rgba(179, 64, 46, 0.32);
+  transform: translateY(-1px);
+}
+
+.btn-danger:active {
+  transform: translateY(0) scale(0.97);
+}
