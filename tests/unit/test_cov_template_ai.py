@@ -1,10 +1,11 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""模板编辑 AI 相关新增模块的单元测试.
+"""Unit tests for the newly added template-editing AI modules.
 
-覆盖：配置 editor 端点、模板描述的多约束支持、MeterValidator 多约束分支、
-通用押韵模块、模板工具、模板编辑 AI 代理。
+Coverage: the editor config endpoint, multi-constraint template descriptions,
+MeterValidator multi-constraint branches, the generic rhyme module, template
+tools, and the template-editing AI agent.
 """
 
 from pathlib import Path
@@ -29,7 +30,7 @@ from tests.helpers import StubLLMClient, make_stub, tool_call
 
 
 def _syl() -> dict[str, Any]:
-    """构造空约束单元格."""
+    """Build an empty constraint cell."""
     return {
         "onset": "",
         "nucleus": "",
@@ -39,14 +40,14 @@ def _syl() -> dict[str, Any]:
 
 
 def _zh(tone: str) -> dict[str, Any]:
-    """构造中文平仄约束单元格."""
+    """Build a Chinese tone constraint cell."""
     cell = _syl()
     cell["attributes"]["tone"] = tone
     return cell
 
 
 def _empty_syl() -> Syllable:
-    """构造空音节."""
+    """Build an empty syllable."""
     return Syllable(
         onset="",
         nucleus="",
@@ -56,10 +57,10 @@ def _empty_syl() -> Syllable:
 
 
 # --------------------------------------------------------------------------- #
-# 配置 editor 端点
+# Editor config endpoint
 # --------------------------------------------------------------------------- #
 def test_config_editor_defaults_and_setter(tmp_path: Path) -> None:
-    """Editor 缺省回退默认值，setter 写入配置数据."""
+    """Editor falls back to defaults; the setter writes config data."""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     assert cfg.editor["model"] == config_module.DEFAULT_EDITOR["model"]
     cfg.editor = {"base_url": "u", "api_key": "k", "model": "m"}
@@ -68,7 +69,7 @@ def test_config_editor_defaults_and_setter(tmp_path: Path) -> None:
 
 
 def test_config_editor_non_dict_falls_back(tmp_path: Path) -> None:
-    """Editor 字段非 dict 时回退默认值."""
+    """A non-dict editor field falls back to defaults."""
     cfg = config_module.Config(config_path=tmp_path / "c.json")
     cfg._data = {"editor": [1, 2]}
     cfg._loaded = True
@@ -76,10 +77,10 @@ def test_config_editor_non_dict_falls_back(tmp_path: Path) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# 模板描述：多约束与基类方法
+# Template descriptions: alternatives and base methods
 # --------------------------------------------------------------------------- #
 class _AltTemplate(PoetryTemplate):
-    """用于测试多约束序列化/描述的模板."""
+    """Template used to test alternative serialization/description."""
 
     name = "多约束"
     language = "zh"
@@ -87,11 +88,11 @@ class _AltTemplate(PoetryTemplate):
     syllables_per_line: ClassVar[list[int]] = [2, 2]
 
     def get_syllable_constraints(self) -> list[list[dict[str, Any]]]:
-        """返回第一份约束."""
+        """Return the first constraint table."""
         return [[_zh("平"), _syl()], [_zh("仄"), _syl()]]
 
     def get_syllable_constraint_alternatives(self) -> list[list[list[dict[str, Any]]]]:
-        """返回两份约束."""
+        """Return two constraint tables."""
         return [
             self.get_syllable_constraints(),
             [[_zh("仄"), _syl()], [_syl(), _syl()]],
@@ -99,7 +100,7 @@ class _AltTemplate(PoetryTemplate):
 
 
 class _BareAlt(PoetryTemplate):
-    """未覆写多约束方法的模板."""
+    """Template that does not override the alternatives method."""
 
     name = "bare"
     language = "zh"
@@ -108,12 +109,12 @@ class _BareAlt(PoetryTemplate):
 
 
 def test_base_alternatives_default_none() -> None:
-    """基类默认无多约束."""
+    """The base class has no alternatives by default."""
     assert _BareAlt().get_syllable_constraint_alternatives() is None
 
 
 def test_describe_dict_with_alternatives() -> None:
-    """describe_template_from_dict 支持多份约束（含空表容错）."""
+    """describe_template_from_dict supports alternatives (tolerates empty)."""
     desc = describe_template_from_dict(
         {
             "lines": 2,
@@ -124,14 +125,14 @@ def test_describe_dict_with_alternatives() -> None:
             ],
         }
     )
-    assert "2 种音节约束" in desc
-    assert "约束种类 1" in desc
-    assert "约束种类 2" in desc
+    assert "syllable constraint variants" in desc
+    assert "Constraint variant 1" in desc
+    assert "Constraint variant 2" in desc
     assert "tone=平" in desc
 
 
 def test_describe_dict_single_table() -> None:
-    """无多约束时沿用单表描述."""
+    """Falls back to the single-table description without alternatives."""
     desc = describe_template_from_dict(
         {
             "lines": 1,
@@ -140,31 +141,31 @@ def test_describe_dict_single_table() -> None:
         }
     )
     assert "tone=仄" in desc
-    assert "约束种类" not in desc
+    assert "Constraint variant" not in desc
 
 
 def test_alt_template_to_dict_and_describe() -> None:
-    """多约束模板 to_dict/describe 包含 alternatives."""
+    """An alternative template's to_dict/describe include alternatives."""
     tpl = _AltTemplate()
     data = tpl.to_dict()
     assert data["syllable_constraints"] is not None
     assert len(data["syllable_constraint_alternatives"]) == 2
-    assert "2 种音节约束" in tpl.describe()
+    assert "syllable constraint variants" in tpl.describe()
 
 
 def test_describe_constraint_table_skips_non_dict_cells() -> None:
-    """_describe_constraint_table 容错非 dict 单元格."""
+    """_describe_constraint_table tolerates non-dict cells."""
     desc = _describe_constraint_table([1], [[_syl(), _syl()]])
-    assert "第1行" in desc
+    assert "Line 1" in desc
 
 
 # --------------------------------------------------------------------------- #
-# MeterValidator：多约束（或关系）
+# MeterValidator: alternatives (OR semantics)
 # --------------------------------------------------------------------------- #
 def _alt_template_dict(
     alternatives: list[list[list[dict[str, Any]]]],
 ) -> dict[str, Any]:
-    """构造带多约束的模板字典."""
+    """Build a template dict with alternatives."""
     return {
         "name": "多约束测试",
         "language": "zh",
@@ -176,7 +177,7 @@ def _alt_template_dict(
 
 
 def test_validator_alternatives_second_matches() -> None:
-    """第一份约束不满足、第二份满足时通过."""
+    """Passes when the first table fails and the second succeeds."""
     alternatives = [
         [[_zh("仄"), _syl()], [_zh("平"), _syl()]],
         [[_zh("平"), _syl()], [_zh("仄"), _syl()]],
@@ -188,7 +189,7 @@ def test_validator_alternatives_second_matches() -> None:
 
 
 def test_validator_alternatives_none_match_reports_best() -> None:
-    """所有约束都不满足时返回错误最少的一份错误."""
+    """Returns the errors of the table with the fewest errors when none match."""
     alternatives = [
         [[_zh("仄"), _syl()], [_zh("平"), _syl()]],
         [[_zh("仄"), _zh("仄")], [_zh("平"), _syl()]],
@@ -201,20 +202,20 @@ def test_validator_alternatives_none_match_reports_best() -> None:
 
 
 def test_validator_alternatives_empty_variants() -> None:
-    """某行无音节时多约束检查报告无音节."""
+    """Alternative checks report a line that has no syllables."""
     alternatives = [[[_zh("平")], [_zh("平")]]]
     result = MeterValidator().validate(["abc", "abc"], _alt_template_dict(alternatives))
     assert not result.passed
-    assert any("无音节" in e for e in result.errors)
+    assert any("no syllables" in e for e in result.errors)
 
 
 def test_validator_alternatives_none_when_missing() -> None:
-    """无 alternatives 键时返回空列表（覆盖早期返回）."""
+    """Returns an empty list when the alternatives key is missing (early return)."""
     assert MeterValidator()._constraint_alternatives({}) == []
 
 
 def test_validate_line_alternatives_match_second() -> None:
-    """单行校验：第二份约束满足即通过."""
+    """Single-line check: passes when the second table is satisfied."""
     alternatives = [
         [[_zh("仄"), _syl()], [_syl(), _syl()]],
         [[_zh("平"), _syl()], [_syl(), _syl()]],
@@ -225,7 +226,7 @@ def test_validate_line_alternatives_match_second() -> None:
 
 
 def test_validate_line_alternatives_no_match() -> None:
-    """单行校验：所有约束都不满足时给出错误."""
+    """Single-line check: reports errors when no table matches."""
     alternatives = [
         [[_zh("平"), _zh("仄")], [_syl(), _syl()]],
         [[_zh("仄"), _zh("平")], [_syl(), _syl()]],
@@ -237,7 +238,7 @@ def test_validate_line_alternatives_no_match() -> None:
 
 
 def test_validate_line_alternatives_short_table_is_free() -> None:
-    """单行校验：某份约束表短于行号时该份视为无约束（通过）."""
+    """Single-line check: a table shorter than the line index counts as free."""
     alternatives = [
         [[_zh("仄")]],
         [[_zh("平")]],
@@ -248,7 +249,7 @@ def test_validate_line_alternatives_short_table_is_free() -> None:
 
 
 def test_validate_line_alternatives_empty_line_constraints() -> None:
-    """单行校验：某份约束该行为空表时视为无约束（通过）."""
+    """Single-line check: an empty row counts as unconstrained (passes)."""
     alternatives = [
         [[], [_zh("仄")]],
         [[_zh("仄")], []],
@@ -259,7 +260,7 @@ def test_validate_line_alternatives_empty_line_constraints() -> None:
 
 
 def test_validate_line_alternatives_empty_variants() -> None:
-    """单行校验：行无音节时多约束不报逐位错误."""
+    """Single-line check: no per-position errors without syllables."""
     alternatives = [[[_zh("平")], [_zh("平")]]]
     template = _alt_template_dict(alternatives)
     result = MeterValidator().validate_line("abc", 0, template)
@@ -268,17 +269,17 @@ def test_validate_line_alternatives_empty_variants() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# 通用押韵模块
+# Generic rhyme module
 # --------------------------------------------------------------------------- #
 def test_last_word_variants() -> None:
-    """行末词提取：有词/空行."""
+    """Last-word extraction: word present / empty line."""
     assert rhyme_mod._last_word("The quick brown fox") == "fox"
     assert rhyme_mod._last_word("") == ""
     assert rhyme_mod._last_word("don't stop") == "stop"
 
 
 def test_syllable_rhyme_key_empty() -> None:
-    """通用音节韵脚 key：空韵腹韵尾返回空串."""
+    """Generic syllable rhyme key: empty nucleus/coda returns an empty string."""
     assert rhyme_mod._syllable_rhyme_key(_empty_syl()) == ""
     assert (
         rhyme_mod._syllable_rhyme_key(
@@ -289,7 +290,7 @@ def test_syllable_rhyme_key_empty() -> None:
 
 
 def test_rhyme_keys_english() -> None:
-    """英语按重读音节尾串生成韵脚 key；空行返回 None."""
+    """English builds keys from stressed tails; blank lines return None."""
     keys = rhyme_mod.rhyme_keys("en", "a light")
     assert keys is not None
     assert all(k.startswith("en:") for k in keys)
@@ -297,7 +298,7 @@ def test_rhyme_keys_english() -> None:
 
 
 def test_rhyme_keys_french() -> None:
-    """法语按词末元音核生成韵脚 key；空行返回 None."""
+    """French builds keys from the final vowel nucleus; blank returns None."""
     keys = rhyme_mod.rhyme_keys("fr", "il parle")
     assert keys is not None
     assert all(k.startswith("fr:") for k in keys)
@@ -305,7 +306,7 @@ def test_rhyme_keys_french() -> None:
 
 
 def test_rhyme_keys_zh_with_and_without_syllables() -> None:
-    """中文押韵 key 使用传入音节或自行分析；空行返回 None."""
+    """Chinese uses given syllables or analyzes itself; blank returns None."""
     keys = rhyme_mod.rhyme_keys("zh", "风")
     assert keys is not None and keys == {"zh:庚"}
     provided = [Syllable(onset="d", nucleus="e", coda="ng", attributes={})]
@@ -315,7 +316,7 @@ def test_rhyme_keys_zh_with_and_without_syllables() -> None:
 
 
 def test_rhyme_keys_generic_language() -> None:
-    """其他语言使用韵腹+韵尾；无音节返回 None."""
+    """Other languages use nucleus+coda; no syllables returns None."""
     provided = [Syllable(onset="c", nucleus="a", coda="", attributes={})]
     assert rhyme_mod.rhyme_keys("it", "casa", provided) == {"it:a"}
     assert rhyme_mod.rhyme_keys("it", "") is None
@@ -323,7 +324,7 @@ def test_rhyme_keys_generic_language() -> None:
 
 
 def test_parse_rhyme_scheme() -> None:
-    """韵式解析支持分隔符与不押韵标记."""
+    """Rhyme-scheme parsing supports separators and a no-rhyme marker."""
     assert rhyme_mod.parse_rhyme_scheme("ABAB CDCD") == [
         "A",
         "B",
@@ -339,64 +340,64 @@ def test_parse_rhyme_scheme() -> None:
 
 
 def test_normalize_rhyme_scheme_branches() -> None:
-    """韵式校验：空、非法字符、长度不符、合法."""
+    """Scheme validation: empty, invalid chars, wrong length, valid."""
     assert rhyme_mod.normalize_rhyme_scheme("", 4) == ("", None)
     scheme, error = rhyme_mod.normalize_rhyme_scheme("A-B1", 3)
-    assert scheme == "" and error is not None and "非法字符" in error
+    assert scheme == "" and error is not None and "invalid character" in error
     scheme, error = rhyme_mod.normalize_rhyme_scheme("AB", 4)
-    assert scheme == "" and error is not None and "长度" in error
+    assert scheme == "" and error is not None and "length" in error
     assert rhyme_mod.normalize_rhyme_scheme("ABAB CDCD", 8) == ("ABABCDCD", None)
 
 
 def test_check_rhyme_scheme_empty_and_too_long() -> None:
-    """空韵式不检查；韵式长于诗稿时报错."""
+    """Empty schemes are skipped; a scheme longer than the poem errors."""
     assert rhyme_mod.check_rhyme_scheme("zh", ["春江"], "") == []
     errors = rhyme_mod.check_rhyme_scheme("zh", ["春江"], "AB")
-    assert any("超过诗稿行数" in e for e in errors)
+    assert any("more than the poem's" in e for e in errors)
 
 
 def test_check_rhyme_scheme_pass_and_mismatch() -> None:
-    """同韵组共享韵脚通过，不同韵脚报错."""
+    """A shared rhyme passes; different rhymes error."""
     good = ["春江花月风", "野渡无人灯"]
     assert rhyme_mod.check_rhyme_scheme("zh", good, "AA") == []
     bad = ["春江花月风", "野渡无人空"]
     errors = rhyme_mod.check_rhyme_scheme("zh", bad, "AA")
-    assert any("不匹配" in e for e in errors)
+    assert any("mismatch" in e for e in errors)
 
 
 def test_check_rhyme_scheme_unable_line_and_single_group() -> None:
-    """无法确定韵脚的行报错；单行韵组跳过检查."""
+    """Unresolvable lines error; single-line groups are skipped."""
     errors = rhyme_mod.check_rhyme_scheme("en", ["!!!", "???"], "AA")
-    assert any("无法确定韵脚" in e for e in errors)
+    assert any("cannot determine the rhyme" in e for e in errors)
     assert rhyme_mod.check_rhyme_scheme("zh", ["春江花月风"], "A") == []
 
 
 def test_check_rhyme_scheme_no_rhyme_marker() -> None:
-    """韵式中的 '-' 行不参与押韵检查."""
+    """Scheme '-' lines do not participate in rhyme checks."""
     poem = ["春江花月风", "-", "野渡无人灯"]
     assert rhyme_mod.check_rhyme_scheme("zh", poem, "A-A") == []
 
 
 def test_check_rhyme_scheme_distinct() -> None:
-    """不同韵组互异：共享韵脚报错，不共享通过."""
+    """Distinct groups: a shared rhyme errors, otherwise passes."""
     poem = ["a light", "a night", "a night", "a light"]
     errors = rhyme_mod.check_rhyme_scheme("en", poem, "ABAB", distinct=True)
-    assert any("互不相同" in e for e in errors)
+    assert any("should be distinct" in e for e in errors)
     poem2 = ["a light", "a day", "a night", "the day"]
     assert rhyme_mod.check_rhyme_scheme("en", poem2, "ABAB", distinct=True) == []
 
 
 def test_rhyme_scheme_description() -> None:
-    """韵式描述：空串返回空，非空按每 4 行分组."""
+    """Scheme description: empty returns empty; otherwise grouped by 4 lines."""
     assert rhyme_mod.rhyme_scheme_description("") == ""
     assert "ABAB CDCD" in rhyme_mod.rhyme_scheme_description("abab cdcd")
 
 
 # --------------------------------------------------------------------------- #
-# 模板工具：草稿规整与工具执行
+# Template tools: draft normalization and dispatch
 # --------------------------------------------------------------------------- #
 def test_draft_normalize_fixes_invalid_fields() -> None:
-    """草稿规整：非法语言/行数/音节数/约束值被修正."""
+    """Draft normalization fixes illegal language/lines/syllables/values."""
     draft = tools.TemplateDraft()
     draft.language = "xx"
     draft.lines = "oops"  # type: ignore[assignment]
@@ -410,7 +411,7 @@ def test_draft_normalize_fixes_invalid_fields() -> None:
 
 
 def test_draft_normalize_pads_and_truncates() -> None:
-    """草稿规整：补齐缺失约束单元格、截断多余约束种类."""
+    """Draft normalization pads missing cells and truncates extra kinds."""
     draft = tools.TemplateDraft()
     draft.lines = 2
     draft.syllables_per_line = [3, 2]
@@ -428,7 +429,7 @@ def test_draft_normalize_pads_and_truncates() -> None:
 
 
 def test_draft_to_payload_and_constraint_tables() -> None:
-    """草稿序列化与约束表转换（zh 与 fr）."""
+    """Draft serialization and constraint-table conversion (zh and fr)."""
     draft = tools.TemplateDraft(name="x")
     draft.language = "zh"
     draft.lines = 1
@@ -447,7 +448,7 @@ def test_draft_to_payload_and_constraint_tables() -> None:
 
 
 def test_draft_from_payload_tolerant() -> None:
-    """从前端草稿构造时容错非法字段."""
+    """Building from a frontend draft tolerates illegal fields."""
     draft = tools.draft_from_payload(
         {
             "name": " n ",
@@ -469,7 +470,7 @@ def test_draft_from_payload_tolerant() -> None:
 
 
 def test_normalize_constraint_value() -> None:
-    """约束值归一化：空、别名、非法、无维度语言."""
+    """Value normalization: empty, alias, illegal, no-dimension language."""
     assert normalize_constraint_value("zh", "") == ""
     assert normalize_constraint_value("zh", "平") == "平"
     assert normalize_constraint_value("en", "重") == "heavy"
@@ -479,7 +480,7 @@ def test_normalize_constraint_value() -> None:
 
 
 def test_execute_set_template_info() -> None:
-    """设置模板信息：名称/语言/行数与错误分支."""
+    """Set template info: name/language/lines and error branches."""
     draft = tools.TemplateDraft()
     assert "error" in tools.execute_set_template_info(draft, {"name": " "})
     assert "error" in tools.execute_set_template_info(draft, {"language": "xx"})
@@ -491,7 +492,7 @@ def test_execute_set_template_info() -> None:
 
 
 def test_execute_set_syllables() -> None:
-    """设置每行音节数：错误分支与成功."""
+    """Set syllables per line: error branches and success."""
     draft = tools.TemplateDraft()
     draft.lines = 2
     draft.normalize()
@@ -505,7 +506,7 @@ def test_execute_set_syllables() -> None:
 
 
 def test_execute_set_kind_count() -> None:
-    """设置约束种类：非法值、扩容、缩容."""
+    """Set constraint kind count: illegal, growing, shrinking."""
     draft = tools.TemplateDraft()
     assert "error" in tools.execute_set_kind_count(draft, {"count": "x"})
     assert "error" in tools.execute_set_kind_count(draft, {"count": 0})
@@ -517,7 +518,7 @@ def test_execute_set_kind_count() -> None:
 
 
 def test_execute_set_constraints() -> None:
-    """填写约束：错误分支与成功（含越界/非法值/非列表行）."""
+    """Fill constraints: error branches and success (out-of-range/bad rows)."""
     draft = tools.TemplateDraft()
     draft.lines = 2
     draft.syllables_per_line = [2, 2]
@@ -539,7 +540,7 @@ def test_execute_set_constraints() -> None:
 
 
 def test_execute_set_rhyme_and_code() -> None:
-    """设置韵式与自定义代码."""
+    """Set the rhyme scheme and custom code."""
     draft = tools.TemplateDraft()
     draft.lines = 4
     draft.normalize()
@@ -554,7 +555,7 @@ def test_execute_set_rhyme_and_code() -> None:
 
 
 def test_draft_from_payload_accepts_syllables() -> None:
-    """从前端草稿构造时接受每行音节数组."""
+    """Building from a frontend draft accepts per-line syllable arrays."""
     draft = tools.draft_from_payload(
         {"language": "zh", "lines": 2, "syllables_per_line": [3, 4]}
     )
@@ -562,7 +563,7 @@ def test_draft_from_payload_accepts_syllables() -> None:
 
 
 def test_execute_set_from_template_converts() -> None:
-    """从中文模板转化为英语：复制行数/音节数并按映射转换属性值."""
+    """Convert a Chinese template to English: copy lines/syllables, map values."""
     draft = tools.TemplateDraft(language="en", lines=1)
     draft.normalize()
     result = tools.execute_set_from_template(
@@ -575,7 +576,7 @@ def test_execute_set_from_template_converts() -> None:
     assert result["status"] == "ok"
     assert draft.lines == 7
     assert result["source_language"] == "zh"
-    # 押韵韵式随模板一起转化/复制。
+    # The rhyme scheme is converted/copied along with the template.
     assert draft.rhyme_scheme == "AAABBAA"
     values = {
         value for table in draft.alternatives for row in table for value in row if value
@@ -585,7 +586,7 @@ def test_execute_set_from_template_converts() -> None:
 
 
 def test_execute_set_from_template_auto_fallback_value() -> None:
-    """未配置映射时源值退化处理：目标值保持自由，但行数/音节数仍复制."""
+    """Without a mapping, values stay free while lines/syllables are still copied."""
     draft = tools.TemplateDraft(language="en", lines=1)
     draft.normalize()
     result = tools.execute_set_from_template(
@@ -599,7 +600,7 @@ def test_execute_set_from_template_auto_fallback_value() -> None:
 
 
 def test_execute_set_from_template_interval_and_free() -> None:
-    """区间音节数取中点；源模板无逐位约束时全部自由."""
+    """A range takes the midpoint; free source templates stay unconstrained."""
     draft = tools.TemplateDraft(language="zh", lines=1)
     draft.normalize()
     result = tools.execute_set_from_template(draft, {"template_key": "fr_rondeau"})
@@ -612,7 +613,7 @@ def test_execute_set_from_template_interval_and_free() -> None:
 
 
 def test_execute_set_from_template_errors() -> None:
-    """未知模板 / 空 key / 非法映射值均报错."""
+    """Unknown template / empty key / invalid mapping value all error."""
     draft = tools.TemplateDraft()
     draft.normalize()
     assert "error" in tools.execute_set_from_template(draft, {"template_key": ""})
@@ -626,7 +627,7 @@ def test_execute_set_from_template_errors() -> None:
 
 
 def test_execute_set_from_template_via_dispatch() -> None:
-    """set_from_template 可通过统一分发表调用."""
+    """set_from_template can be invoked through the unified dispatch."""
     draft = tools.TemplateDraft(language="en", lines=1)
     draft.normalize()
     result = tools.execute_template_tool(
@@ -636,7 +637,7 @@ def test_execute_set_from_template_via_dispatch() -> None:
 
 
 def test_convert_syllable_count_branches() -> None:
-    """区间/非法值的音节数转换分支."""
+    """Syllable-count conversion branches for ranges/invalid values."""
     from src.templates.convert import convert_syllable_count
 
     assert convert_syllable_count(5) == 5
@@ -646,11 +647,11 @@ def test_convert_syllable_count_branches() -> None:
 
 
 def test_set_from_template_tolerates_odd_tables() -> None:
-    """源模板音节数不足/约束表异常/属性非字典时仍能转化."""
+    """Conversion survives short syllables/odd tables/non-dict attributes."""
     from src.templates import PoetryTemplate, _registry, register
 
     class _Dummy(PoetryTemplate):
-        """异常结构模板（用于覆盖容错分支）."""
+        """Odd-structure template (covers tolerance branches)."""
 
         name = "异常结构"
         language = "fr"
@@ -658,7 +659,7 @@ def test_set_from_template_tolerates_odd_tables() -> None:
         syllables_per_line: ClassVar[list[int]] = [2]
 
         def get_syllable_constraints(self) -> Any:
-            """返回非标准约束表."""
+            """Return a non-standard constraint table."""
             return [
                 [{"attributes": "bad"}, {"attributes": {"length": "long"}}],
                 "not-a-list",
@@ -679,7 +680,7 @@ def test_set_from_template_tolerates_odd_tables() -> None:
 
 
 def test_execute_set_rule_description() -> None:
-    """AI 工具可设置/清除模板规则描述（将作为写作 AI prompt）."""
+    """AI tools set/clear the template rule description (a writing-AI prompt)."""
     draft = tools.TemplateDraft()
     result = tools.execute_template_tool(
         draft,
@@ -697,7 +698,7 @@ def test_execute_set_rule_description() -> None:
 
 
 def test_draft_rule_note_roundtrip() -> None:
-    """草稿载荷包含规则描述，且长度受限."""
+    """The draft payload includes the rule description, with a length cap."""
     draft = tools.draft_from_payload({"rule_note": "规则描述"})
     assert draft.to_payload()["rule_note"] == "规则描述"
     long_draft = tools.draft_from_payload({"rule_note": "x" * 5000})
@@ -706,10 +707,10 @@ def test_draft_rule_note_roundtrip() -> None:
 
 
 def test_set_from_template_carries_rule_note() -> None:
-    """AI 转化时规则描述随草稿携带."""
+    """The rule description is carried by the draft during AI conversion."""
 
     class _WithNote(PoetryTemplate):
-        """带规则描述的测试模板."""
+        """Test template with a rule description."""
 
         name = "带描述"
         language = "zh"
@@ -718,7 +719,7 @@ def test_set_from_template_carries_rule_note() -> None:
         rule_note = "注意对仗"
 
         def get_syllable_constraints(self) -> list[list[dict[str, Any]]]:
-            """一份自由约束."""
+            """One free constraint table."""
             return [[_syl()]]
 
     from src.templates import _registry, register
@@ -738,7 +739,7 @@ def test_set_from_template_carries_rule_note() -> None:
 
 
 def test_draft_structural_rules_roundtrip() -> None:
-    """草稿载荷可携带结构规则；非法结构规则被丢弃."""
+    """The payload can carry structural rules; invalid ones are dropped."""
     rules = {
         "kind": "jinti",
         "attribute": "stress",
@@ -758,7 +759,7 @@ def test_draft_structural_rules_roundtrip() -> None:
 
 
 def test_set_from_template_carries_structural_rules() -> None:
-    """AI 转化绝句时结构规则随草稿携带（不再丢失三平尾/孤平）."""
+    """Structural rules are carried when converting a quatrain (none lost)."""
     draft = tools.TemplateDraft(language="en", lines=1)
     draft.normalize()
     result = tools.execute_set_from_template(
@@ -775,7 +776,7 @@ def test_set_from_template_carries_structural_rules() -> None:
 
 
 def test_execute_template_tool_all_dispatch() -> None:
-    """全部工具分发分支均可执行."""
+    """Every tool dispatch branch can be executed."""
     draft = tools.TemplateDraft()
     draft.lines = 1
     draft.normalize()
@@ -810,7 +811,7 @@ def test_execute_template_tool_all_dispatch() -> None:
 
 
 def test_execute_template_tool_dispatch() -> None:
-    """工具分发：读取草稿、未知工具、提交前校验名称."""
+    """Dispatch: read draft, unknown tool, name check before submit."""
     draft = tools.TemplateDraft()
     draft.lines = 1
     draft.normalize()
@@ -825,15 +826,15 @@ def test_execute_template_tool_dispatch() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# 模板编辑 AI 代理
+# Template-editing AI agent
 # --------------------------------------------------------------------------- #
 def _patch_editor_llm(monkeypatch: pytest.MonkeyPatch, stub: type[Any]) -> None:
-    """把 editor_ai 的 LLMClient 替换为桩类."""
+    """Replace editor_ai's LLMClient with a stub class."""
     monkeypatch.setattr(editor_ai, "LLMClient", stub)
 
 
 def test_editor_no_tool_with_name_returns(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AI 直接回答且草稿已有名称时结束（含思考/回答事件）."""
+    """Ends when the AI answers directly and the draft already has a name."""
     _patch_editor_llm(
         monkeypatch,
         make_stub(
@@ -856,7 +857,7 @@ def test_editor_no_tool_with_name_returns(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_editor_reminder_then_tools(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AI 未调工具且草稿无名称时先提醒，随后调工具完成配置."""
+    """Reminds when no tool is called without a name; tools then finish config."""
     _patch_editor_llm(
         monkeypatch,
         make_stub(
@@ -875,7 +876,7 @@ def test_editor_reminder_then_tools(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_editor_submit_flow(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AI 调用 submit_template 时 submitted=True."""
+    """submitted=True when the AI calls submit_template."""
     _patch_editor_llm(
         monkeypatch,
         make_stub(
@@ -892,7 +893,7 @@ def test_editor_submit_flow(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_editor_llm_exception(monkeypatch: pytest.MonkeyPatch) -> None:
-    """LLM 调用异常时返回错误并推送 error 事件."""
+    """An LLM exception returns an error and emits an error event."""
     stub = make_stub()
 
     class _Boom(stub):  # type: ignore[misc, valid-type]
@@ -903,12 +904,12 @@ def test_editor_llm_exception(monkeypatch: pytest.MonkeyPatch) -> None:
     events: list[dict[str, Any]] = []
     agent = TemplateEditorAI({"base_url": "u", "api_key": "k", "model": "m"})
     result = agent.edit("配置", {}, emit=events.append)
-    assert "失败" in result.message
+    assert "failed" in result.message
     assert events[0]["type"] == "error"
 
 
 def test_editor_max_rounds(monkeypatch: pytest.MonkeyPatch) -> None:
-    """达到最大轮数时停止并推送 info 事件."""
+    """Stops at the maximum round count and emits an info event."""
     _patch_editor_llm(
         monkeypatch,
         make_stub(chat=[tool_call("set_template_info", {"name": "x"})]),
@@ -921,7 +922,7 @@ def test_editor_max_rounds(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_editor_non_dict_tool_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
-    """工具参数非 dict 时按空字典执行."""
+    """Non-dict tool arguments execute as an empty dict."""
     _patch_editor_llm(
         monkeypatch,
         make_stub(
@@ -949,7 +950,7 @@ def test_editor_non_dict_tool_arguments(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 def test_format_value_mapping_branches() -> None:
-    """属性值映射说明：普通映射 / 空映射 / 目标无属性."""
+    """Value mapping notes: normal / empty mapping / no target attribute."""
     text = editor_ai.format_value_mapping("zh", "en", {"平": "heavy", "仄": "light"})
     assert "tone" in text and "stress" in text
     assert "平（平声）→ heavy（重读）" in text
@@ -966,7 +967,7 @@ def test_format_value_mapping_branches() -> None:
 
 
 def test_build_rewrite_system_contains_context() -> None:
-    """转写提示包含映射、源代码、目标规格、运行环境与规则描述."""
+    """Rewrite prompt includes mapping, source code, spec, env, and rule note."""
     text = editor_ai._build_rewrite_system(
         "zh",
         "en",
@@ -983,7 +984,7 @@ def test_build_rewrite_system_contains_context() -> None:
 
 
 def test_rewriter_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AI 返回合法代码时转写成功."""
+    """Rewrite succeeds when the AI returns valid code."""
     stub = make_stub(
         chat=[tool_call("submit_code", {"code": "errors.append('x')", "notes": "说明"})]
     )
@@ -1002,7 +1003,7 @@ def test_rewriter_success(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_rewriter_retries_empty_and_syntax_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """空代码/语法错误时重试，直到拿到合法代码."""
+    """Retries on empty code/syntax errors until valid code arrives."""
     stub = make_stub(
         chat=[
             tool_call("submit_code", {"code": ""}),
@@ -1029,7 +1030,7 @@ def test_rewriter_retries_empty_and_syntax_error(
 def test_rewriter_no_tool_calls_then_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AI 未调用工具时提示后继续，并在下一轮成功."""
+    """Prompts when no tool is called, then succeeds on the next round."""
     stub = make_stub(
         chat=[
             {"role": "assistant", "content": "代码如下", "tool_calls": []},
@@ -1047,7 +1048,7 @@ def test_rewriter_no_tool_calls_then_success(
 
 
 def test_rewriter_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
-    """调用异常 / 始终无合法代码时返回错误."""
+    """Returns an error on exceptions / never-valid code."""
     stub = make_stub(chat=[])
     monkeypatch.setattr(editor_ai, "LLMClient", stub)
 
@@ -1085,13 +1086,13 @@ def test_rewriter_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_editor_result_dataclass() -> None:
-    """EditorResult 保存结果."""
+    """EditorResult stores the result."""
     draft = tools.TemplateDraft()
     result = EditorResult(draft, True, "ok")
     assert result.draft is draft and result.submitted and result.message == "ok"
 
 
 def test_editor_stub_client_unused_path() -> None:
-    """StubLLMClient 作为 editor 客户端时也能构造（接口一致性）."""
+    """StubLLMClient can be built as an editor client (interface parity)."""
     stub = StubLLMClient("u", "k", "m")
     assert stub.base_url == "u"

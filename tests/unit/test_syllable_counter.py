@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""统一音节计数 / 整行分析入口单元测试（符号层）."""
+"""Unit tests for the unified syllable counter and whole-line analysis entry point."""
 
 import pytest
 
@@ -16,52 +16,52 @@ from src.prosody.syllable_counter import (
 
 
 def test_count_syllables_zh() -> None:
-    """验证 count syllables zh."""
+    """Verify count_syllables for Chinese."""
     assert count_syllables("床前明月光", "zh") == 5
 
 
 def test_analyze_line_zh_syllables() -> None:
-    """验证 analyze line zh syllables."""
+    """Verify analyze_line returns syllables for Chinese."""
     syls = analyze_line("光", "zh")
     assert len(syls) == 1
     assert syls[0].nucleus == "ua"
 
 
 def test_analyze_line_it_sinalefe() -> None:
-    """验证 analyze line it sinalefe."""
-    # poeti e: 跨词元音并读 -> 3 音节
+    """Verify analyze_line merges adjacent vowels across words in Italian."""
+    # "poeti e": adjacent vowels across words merge into one -> 3 syllables.
     assert count_syllables("poeti e", "it") == 3
 
 
 def test_analyze_line_la_routes() -> None:
-    """验证 analyze line la routes."""
+    """Verify analyze_line routes Latin lines to the Latin analyzer."""
     syls = analyze_line("amor", "la")
     assert all(isinstance(s, Syllable) for s in syls)
     assert len(syls) == 2
 
 
 def test_get_analyzer_unknown_language() -> None:
-    """验证 get analyzer unknown language."""
+    """Verify get_analyzer raises for an unknown language."""
     with pytest.raises(ValueError):
         get_analyzer("xx")
 
 
 def test_register_analyzer_override() -> None:
-    """验证 register analyzer override."""
+    """Verify register_analyzer overrides an existing registration."""
 
     class Dummy(SyllableAnalyzer):
-        """用于测试 register 覆盖的桩分析器."""
+        """Stub analyzer used to test registration overrides."""
 
         language = "dummy"
 
         def analyze_word(self, word: str) -> list[Syllable]:
-            """返回空音节列表.
+            """Return an empty syllable list.
 
             Args:
-                word: 待分析单词。
+                word: Word to analyze.
 
             Returns:
-                空列表。
+                An empty list.
 
             """
             return []
@@ -72,5 +72,5 @@ def test_register_analyzer_override() -> None:
 
     register_analyzer("dummy", Dummy())
     assert isinstance(get_analyzer("dummy"), Dummy)
-    # 再次注册覆盖同样可行（不影响其他测试：无其它用例使用 "dummy"）
+    # Registering again overrides the previous entry (safe: no other test uses "dummy").
     register_analyzer("dummy", Dummy())

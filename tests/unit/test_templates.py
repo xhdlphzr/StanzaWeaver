@@ -1,14 +1,15 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""符号层模板单元测试：覆盖各语言模板 validate_full 的格律规则.
+"""Symbol-layer template tests covering validate_full meter rules per language.
 
-此前模板（zh/en/fr/it/la）的格律校验逻辑缺少直接单元测试，本文件补齐覆盖：
-孤平、三平尾、近体诗结构（相对/相粘/平仄脚）、押韵、词牌换韵；
-英语商籁体/维拉内拉/英雄双行体的重音押韵与叠句；
-法语回旋诗/三韵叠句/叙事歌的叠句与音节统一；
-意大利语三行体/八行体/歌谣的第10音节重读、链韵与韵脚约束；
-拉丁语哀歌双行体的五步格停顿（caesura）、末6音节音长与 AA 押韵。
+The metrical checks of the zh/en/fr/it/la templates lacked direct unit tests;
+this file fills the gap: guping, three-level tails, regulated-verse structure
+(opposition/cohesion/tone feet), rhyme, and ci rhyme changes; English sonnet /
+villanelle / heroic-couplet stress rhyme and refrains; French rondeau /
+triolet / ballade refrains and uniform syllables; Italian terza rima /
+ottava rima / canzone tenth-syllable stress, chained rhyme and feet; Latin
+elegiac-distich pentameter caesura, last-6-syllable length and AA rhyme.
 """
 
 from src.models.syllable import Syllable
@@ -36,18 +37,18 @@ from src.templates.zh import (
 
 
 # --------------------------------------------------------------------------- #
-# 音节构造辅助                                                              #
+# Syllable construction helpers                                                              #
 # --------------------------------------------------------------------------- #
 def _zs(nucleus: str, coda: str, tone: str) -> Syllable:
-    """构造中文音节（平仄 + 韵腹/韵尾）.
+    """Build a Chinese syllable (tone + nucleus/coda).
 
     Args:
-        nucleus: 韵腹。
-        coda: 韵尾。
-        tone: 平仄。
+        nucleus: Nucleus vowel.
+        coda: Coda.
+        tone: Tone (level/oblique).
 
     Returns:
-        构造好的 Syllable 实例。
+        The constructed Syllable instance.
 
     """
     return Syllable(
@@ -59,26 +60,26 @@ def _zs(nucleus: str, coda: str, tone: str) -> Syllable:
 
 
 def _zline(specs: list[tuple[str, str, str]]) -> list[Syllable]:
-    """由 (韵腹, 韵尾, 平仄) 列表构造一行音节.
+    """Build one line of syllables from (nucleus, coda, tone) tuples.
 
     Args:
-        specs: (韵腹, 韵尾, 平仄) 元组列表。
+        specs: (nucleus, coda, tone) tuple list.
 
     Returns:
-        Syllable 列表。
+        The Syllable list.
 
     """
     return [_zs(n, c, t) for (n, c, t) in specs]
 
 
 def _es(stress: str = "") -> Syllable:
-    """构造英文音节（stress 可为 'heavy'/'light'/''）.
+    """Build an English syllable (stress may be 'heavy'/'light'/'').
 
     Args:
-        stress: 重音标记。
+        stress: Stress marker.
 
     Returns:
-        构造好的 Syllable 实例。
+        The constructed Syllable instance.
 
     """
     return Syllable(
@@ -90,14 +91,14 @@ def _es(stress: str = "") -> Syllable:
 
 
 def _en_syls(n_lines: int, n_syl: int = 10) -> list[list[Syllable]]:
-    """构造每行 n_syl 音节、偶数位重的英文音节表（满足重音下限）.
+    """Build English syllable lines of n_syl syllables with even positions stressed.
 
     Args:
-        n_lines: 行数。
-        n_syl: 每行音节数。
+        n_lines: Line count.
+        n_syl: Syllables per line.
 
     Returns:
-        嵌套的 Syllable 列表。
+        Nested Syllable lists.
 
     """
     return [
@@ -107,15 +108,15 @@ def _en_syls(n_lines: int, n_syl: int = 10) -> list[list[Syllable]]:
 
 
 def _is(nucleus: str, coda: str = "", stress: str = "") -> Syllable:
-    """构造意大利语音节（韵腹/韵尾 + 重音）.
+    """Build an Italian syllable (nucleus/coda + stress).
 
     Args:
-        nucleus: 韵腹。
-        coda: 韵尾。
-        stress: 重音标记。
+        nucleus: Nucleus vowel.
+        coda: Coda.
+        stress: Stress marker.
 
     Returns:
-        构造好的 Syllable 实例。
+        The constructed Syllable instance.
 
     """
     return Syllable(
@@ -127,15 +128,15 @@ def _is(nucleus: str, coda: str = "", stress: str = "") -> Syllable:
 
 
 def _ls(nucleus: str, coda: str = "", length: str = "") -> Syllable:
-    """构造拉丁语音节（韵腹/韵尾 + 长短）.
+    """Build a Latin syllable (nucleus/coda + length).
 
     Args:
-        nucleus: 韵腹。
-        coda: 韵尾。
-        length: 长短标记。
+        nucleus: Nucleus vowel.
+        coda: Coda.
+        length: Length marker.
 
     Returns:
-        构造好的 Syllable 实例。
+        The constructed Syllable instance.
 
     """
     return Syllable(
@@ -147,10 +148,10 @@ def _ls(nucleus: str, coda: str = "", length: str = "") -> Syllable:
 
 
 # --------------------------------------------------------------------------- #
-# 中文：孤平 / 三平尾（直接单元）                                          #
+# Chinese: guping / three-level tail (direct units)                                          #
 # --------------------------------------------------------------------------- #
 def test_check_guping_direct() -> None:
-    """验证 check guping direct."""
+    """Verify direct guping detection."""
     ping_foot_only_one = _zline(
         [
             ("a", "", "仄"),
@@ -186,7 +187,7 @@ def test_check_guping_direct() -> None:
 
 
 def test_check_sanpingwei_direct() -> None:
-    """验证 check sanpingwei direct."""
+    """Verify direct three-level-tail detection."""
     san = _zline([("a", "", "平"), ("a", "", "平"), ("a", "", "平")])
     assert _check_sanpingwei(san)
     not_san = _zline([("a", "", "平"), ("a", "", "平"), ("a", "", "仄")])
@@ -194,13 +195,13 @@ def test_check_sanpingwei_direct() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# 中文：五绝 / 七绝 有效与各项违规                                          #
+# Chinese: five-/seven-character quatrains, valid and violating                                          #
 # --------------------------------------------------------------------------- #
 def _valid_wujue_syllables() -> list[list[Syllable]]:
-    """五绝有效音节列表.
+    """Valid five-character quatrain syllables.
 
     Returns:
-        4 行 Syllable 列表。
+        4 lines of Syllables.
 
     """
     return [
@@ -244,10 +245,10 @@ def _valid_wujue_syllables() -> list[list[Syllable]]:
 
 
 def _valid_qijue_syllables() -> list[list[Syllable]]:
-    """七绝有效音节列表.
+    """Valid seven-character quatrain syllables.
 
     Returns:
-        4 行 Syllable 列表。
+        4 lines of Syllables.
 
     """
     return [
@@ -299,12 +300,12 @@ def _valid_qijue_syllables() -> list[list[Syllable]]:
 
 
 def test_wujue_valid() -> None:
-    """验证 wujue valid."""
+    """Verify a valid five-character quatrain passes."""
     assert WujueTemplate().validate_full([""] * 4, _valid_wujue_syllables()) == []
 
 
 def test_wujue_guping_detected() -> None:
-    """验证 wujue guping detected."""
+    """Verify guping is detected in a five-character quatrain."""
     syls = _valid_wujue_syllables()
     syls[3] = _zline(
         [
@@ -316,11 +317,11 @@ def test_wujue_guping_detected() -> None:
         ]
     )
     errs = WujueTemplate().validate_full([""] * 4, syls)
-    assert any("孤平" in e for e in errs)
+    assert any("Isolated level" in e for e in errs)
 
 
 def test_wujue_sanpingwei_detected() -> None:
-    """验证 wujue sanpingwei detected."""
+    """Verify a three-level tail is detected in a five-character quatrain."""
     syls = _valid_wujue_syllables()
     syls[1] = _zline(
         [
@@ -332,64 +333,64 @@ def test_wujue_sanpingwei_detected() -> None:
         ]
     )
     errs = WujueTemplate().validate_full([""] * 4, syls)
-    assert any("三平尾" in e for e in errs)
+    assert any("Three level-tone tail" in e for e in errs)
 
 
 def test_wujue_rhyme_mismatch() -> None:
-    """验证 wujue rhyme mismatch."""
+    """Verify a five-character quatrain rhyme mismatch."""
     syls = _valid_wujue_syllables()
     syls[3][-1] = _zs("o", "ng", "平")
     errs = WujueTemplate().validate_full([""] * 4, syls)
-    assert any("押韵" in e for e in errs)
+    assert any("do not rhyme" in e for e in errs)
 
 
 def test_qijue_valid() -> None:
-    """验证 qijue valid."""
+    """Verify a valid seven-character quatrain passes."""
     assert QijueTemplate().validate_full([""] * 4, _valid_qijue_syllables()) == []
 
 
 def test_wulv_rhyme_mismatch() -> None:
-    """验证 wulv rhyme mismatch."""
+    """Verify a five-character regulated-verse rhyme mismatch."""
     syls: list[list[Syllable]] = []
     for k in range(8):
         tone = "平" if k % 2 == 1 else "仄"
         coda = "ng" if (k % 2 == 1 and k != 7) else ("ong" if k == 7 else "")
         syls.append([_zs("a", coda, tone) for _ in range(5)])
     errs = WulvTemplate().validate_full([""] * 8, syls)
-    assert any("押韵" in e for e in errs)
+    assert any("do not rhyme" in e for e in errs)
 
 
 def test_qilv_sanpingwei_detected() -> None:
-    """验证 qilv sanpingwei detected."""
+    """Verify a three-level tail is detected in a seven-character regulated verse."""
     syls: list[list[Syllable]] = []
     for k in range(8):
         tone = "平" if k % 2 == 1 else "仄"
         syls.append([_zs("a", "", tone) for _ in range(7)])
     syls[1] = [_zs("a", "", "平") for _ in range(7)]
     errs = QilvTemplate().validate_full([""] * 8, syls)
-    assert any("三平尾" in e for e in errs)
+    assert any("Three level-tone tail" in e for e in errs)
 
 
 # --------------------------------------------------------------------------- #
-# 中文：词牌 相见欢（换韵 / 平韵转回）                                    #
+# Chinese: Xiangjianhuan ci form (rhyme change / level-rhyme return)                                    #
 # --------------------------------------------------------------------------- #
 def _xjh_syllables() -> list[list[Syllable]]:
-    """相见词牌有效音节列表.
+    """Valid Xiangjianhuan ci syllables.
 
     Returns:
-        7 行 Syllable 列表。
+        7 lines of Syllables.
 
     """
 
     def mk(n: int, key: str | None) -> list[Syllable]:
-        """生成 n 个音节的列表，末尾可替换韵尾.
+        """Build a list of n syllables, optionally replacing the final coda.
 
         Args:
-            n: 音节数量。
-            key: 韵尾标记（None 则不替换）。
+            n: Syllable count.
+            key: Rhyme-tail marker (None keeps the default).
 
         Returns:
-            Syllable 列表。
+            The Syllable list.
 
         """
         out: list[Syllable] = []
@@ -412,24 +413,25 @@ def _xjh_syllables() -> list[list[Syllable]]:
 
 
 def test_xiangjianhuan_valid() -> None:
-    """验证 xiangjianhuan valid."""
+    """Verify a valid Xiangjianhuan passes."""
     assert XiangjianhuanTemplate().validate_full([""] * 7, _xjh_syllables()) == []
 
 
 def test_xiangjianhuan_lower_ping_not_returned() -> None:
-    """验证 xiangjianhuan lower ping not returned."""
+    """Verify the lower level rhyme not returning to the upper is reported."""
     syls = _xjh_syllables()
     syls[6][-1] = _zs("o", "ng", "")
     errs = XiangjianhuanTemplate().validate_full([""] * 7, syls)
-    assert any("转回" in e or "押韵" in e for e in errs)
+    assert any("return to the upper stanza" in e or "do not rhyme" in e for e in errs)
 
 
 # --------------------------------------------------------------------------- #
-# 英语：商籁体 / 维拉内拉 / 英雄双行体                                   #
+# English: sonnet / villanelle / heroic couplet                                   #
 # --------------------------------------------------------------------------- #
 def test_sonnet_quatrain_ab_distinct() -> None:
-    """验证 sonnet quatrain ab distinct."""
-    # A 组末行(行3)与 B 组末行(行4)同韵 -> 同一联内 A/B 韵脚应不同
+    """Verify sonnet quatrain A/B rhymes must differ."""
+    # A-group last line (line 3) and B-group last line (line 4) share a rhyme
+    # -> A/B rhymes within one couplet should differ.
     poem = [
         "x light",
         "y night",
@@ -452,7 +454,7 @@ def test_sonnet_quatrain_ab_distinct() -> None:
 
 
 def test_sonnet_rhyme_mismatch() -> None:
-    """验证 sonnet rhyme mismatch."""
+    """Verify a sonnet rhyme mismatch is reported."""
     poem = [
         "x light",
         "y love",
@@ -471,11 +473,11 @@ def test_sonnet_rhyme_mismatch() -> None:
     ]
     syls = _en_syls(14)
     errs = ShakespeareSonnetTemplate().validate_full(poem, syls)
-    assert any("不匹配" in e for e in errs)
+    assert any("mismatch" in e for e in errs)
 
 
 def test_villanelle_refrain_mismatch() -> None:
-    """验证 villanelle refrain mismatch."""
+    """Verify a villanelle refrain mismatch is reported."""
     base = [
         "a light",
         "b love",
@@ -503,22 +505,22 @@ def test_villanelle_refrain_mismatch() -> None:
     poem[17] = "DIFFERENT line"
     syls = _en_syls(19)
     errs = VillanelleTemplate().validate_full(poem, syls)
-    assert any("叠句" in e for e in errs)
+    assert any("Refrain" in e for e in errs)
 
 
 def test_heroic_couplet_rhyme() -> None:
-    """验证 heroic couplet rhyme."""
+    """Verify a heroic couplet rhyme mismatch."""
     poem = ["the light of night", "a song of stone"]
     syls = _en_syls(2)
     errs = HeroicCoupletTemplate().validate_full(poem, syls)
-    assert any("不匹配" in e for e in errs)
+    assert any("mismatch" in e for e in errs)
 
 
 # --------------------------------------------------------------------------- #
-# 法语：回旋诗 / 三韵叠句 / 叙事歌（叠句 + 音节统一）                  #
+# French: rondeau / triolet / ballade (refrains + uniform syllables)                  #
 # --------------------------------------------------------------------------- #
 def test_rondeau_refrain_mismatch() -> None:
-    """验证 rondeau refrain mismatch."""
+    """Verify a rondeau refrain mismatch."""
     poem = [
         "premier vers ici mot",
         "b",
@@ -540,11 +542,11 @@ def test_rondeau_refrain_mismatch() -> None:
     poem[14] = "dernier mot different"
     t = RondeauTemplate()
     errs = t.validate_full(poem, [[] for _ in range(15)])
-    assert any("叠句" in e for e in errs)
+    assert any("Refrain" in e for e in errs)
 
 
 def test_triolet_refrain_mismatch() -> None:
-    """验证 triolet refrain mismatch."""
+    """Verify a triolet refrain mismatch."""
     poem = [
         "refrain un",
         "refrain deux",
@@ -559,51 +561,51 @@ def test_triolet_refrain_mismatch() -> None:
     poem[6] = "changed"
     poem[7] = "changed deux"
     errs = TrioletTemplate().validate_full(poem, [[] for _ in range(8)])
-    assert any("叠句" in e for e in errs)
+    assert any("Refrain" in e for e in errs)
 
 
 def test_ballade_syllable_uniform_mismatch() -> None:
-    """验证 ballade syllable uniform mismatch."""
+    """Verify a ballade syllable uniformity mismatch."""
     poem = ["a" for _ in range(28)]
     syls = [[_is("a") for _ in range(8)] for _ in range(28)]
     syls[10] = [_is("a") for _ in range(9)]
     errs = BalladeTemplate().validate_full(poem, syls)
-    assert any("音节数不一致" in e for e in errs)
+    assert any("syllable count differs" in e for e in errs)
 
 
 def test_ballade_refrain_mismatch() -> None:
-    """验证 ballade refrain mismatch."""
+    """Verify a ballade refrain mismatch."""
     poem = ["a" for _ in range(28)]
     syls = [[_is("a") for _ in range(8)] for _ in range(28)]
     poem[15] = "changed refrain"
     poem[23] = "changed refrain"
     poem[27] = "changed refrain"
     errs = BalladeTemplate().validate_full(poem, syls)
-    assert any("叠句" in e for e in errs)
+    assert any("Refrain" in e for e in errs)
 
 
 # --------------------------------------------------------------------------- #
-# 意大利语：三行体 / 八行体 / 歌谣                                        #
+# Italian: terza rima / ottava rima / canzone                                        #
 # --------------------------------------------------------------------------- #
 def test_terzarima_tenth_stress_missing() -> None:
-    """验证 terzarima tenth stress missing."""
+    """Verify a missing tenth-syllable stress in terza rima."""
     line = [_is("a") for _ in range(11)]
     syls = [line for _ in range(14)]
     errs = TerzaRimaTemplate().validate_full([""] * 14, syls)
-    assert any("第10音节" in e for e in errs)
+    assert any("syllable 10" in e for e in errs)
 
 
 def test_terzarima_rhyme_mismatch() -> None:
-    """验证 terzarima rhyme mismatch."""
+    """Verify a terza rima rhyme mismatch."""
 
     def mk(key: str) -> list[Syllable]:
-        """生成 11 音节行，末尾韵尾为 key.
+        """Build an 11-syllable line whose final rhyme tail is key.
 
         Args:
-            key: 韵尾标记。
+            key: Rhyme-tail marker.
 
         Returns:
-            Syllable 列表。
+            The Syllable list.
 
         """
         out = [_is("a") for _ in range(10)]
@@ -618,20 +620,20 @@ def test_terzarima_rhyme_mismatch() -> None:
     syls = aba + bcb + cdc + ded + ee
     poem = [""] * 14
     errs = TerzaRimaTemplate().validate_full(poem, syls)
-    assert any("不匹配" in e for e in errs)
+    assert any("mismatch" in e for e in errs)
 
 
 def test_ottava_rima_tenth_stress_ok_rhyme_mismatch() -> None:
-    """验证 ottava rima tenth stress ok rhyme mismatch."""
+    """Verify an ottava rima rhyme mismatch with the tenth stress present."""
 
     def mk(key: str) -> list[Syllable]:
-        """生成 11 音节行，第十位重音，末尾韵尾为 key.
+        """Build an 11-syllable line with the tenth stressed and tail key.
 
         Args:
-            key: 韵尾标记。
+            key: Rhyme-tail marker.
 
         Returns:
-            Syllable 列表。
+            The Syllable list.
 
         """
         out = [_is("a") for _ in range(10)]
@@ -641,21 +643,21 @@ def test_ottava_rima_tenth_stress_ok_rhyme_mismatch() -> None:
 
     lines = [mk("a"), mk("b"), mk("a"), mk("b"), mk("a"), mk("b"), mk("c"), mk("c2")]
     errs = OttavaRimaTemplate().validate_full([""] * 8, lines)
-    assert any("不匹配" in e for e in errs)
+    assert any("mismatch" in e for e in errs)
 
 
 def test_canzone_constraints() -> None:
-    """验证 canzone constraints."""
+    """Verify the canzone constraints."""
     syls: list[list[Syllable]] = []
 
     def eleven(key: str) -> list[Syllable]:
-        """生成 11 音节行，第九位重音，末尾韵尾为 key.
+        """Build an 11-syllable line with the ninth stressed and tail key.
 
         Args:
-            key: 韵尾标记。
+            key: Rhyme-tail marker.
 
         Returns:
-            Syllable 列表。
+            The Syllable list.
 
         """
         out = [_is("x") for _ in range(11)]
@@ -665,13 +667,13 @@ def test_canzone_constraints() -> None:
         return out
 
     def seven(key: str) -> list[Syllable]:
-        """生成 7 音节行，末尾韵尾为 key（重音）.
+        """Build a 7-syllable line whose final rhyme tail is key and stressed.
 
         Args:
-            key: 韵尾标记。
+            key: Rhyme-tail marker.
 
         Returns:
-            Syllable 列表。
+            The Syllable list.
 
         """
         out = [_is("x") for _ in range(7)]
@@ -684,21 +686,21 @@ def test_canzone_constraints() -> None:
         syls.append(seven("a"))
     syls.append(seven("a"))
     errs = CanzoneTemplate().validate_full([""] * 13, syls)
-    assert any("连续同一韵脚" in e or "末三行" in e for e in errs)
+    assert any("same rhyme three times" in e or "final three lines" in e for e in errs)
 
 
 # --------------------------------------------------------------------------- #
-# 拉丁语：六步格 / 哀歌双行体 / 十一音节诗                              #
+# Latin: hexameter / elegiac distich / hendecasyllable                              #
 # --------------------------------------------------------------------------- #
 def test_hexameter_all_short_reports_error() -> None:
-    """验证 hexameter all short reports error."""
+    """Verify all-short hexameter reports an error."""
     syls = [_ls("a", "", "short") for _ in range(14)]
     errs = HexameterTemplate().validate_full(["x"], [syls])
     assert errs
 
 
 def test_distichon_caesura_missing() -> None:
-    """验证 distichon caesura missing."""
+    """Verify a distich missing the pentameter caesura."""
     hexa = [
         _ls("a", "", "long"),
         _ls("a", "", "short"),
@@ -736,7 +738,7 @@ def test_distichon_caesura_missing() -> None:
 
 
 def test_distichon_rhyme_mismatch() -> None:
-    """验证 distichon rhyme mismatch."""
+    """Verify a distich rhyme mismatch."""
     hexa = [_ls("a", "ng", "long") for _ in range(14)]
     penta = [_ls("a", "ng", "long") for _ in range(12)]
     hexa[-1] = _ls("a", "ng", "long")
@@ -744,11 +746,11 @@ def test_distichon_rhyme_mismatch() -> None:
     errs = DistichonTemplate().validate_full(
         ["arma virum", "armavirumquecano"], [hexa, penta]
     )
-    assert any("押韵" in e for e in errs)
+    assert any("mismatch" in e for e in errs)
 
 
 def test_hendecasyllabus_boundary_missing() -> None:
-    """验证 hendecasyllabus boundary missing."""
+    """Verify a hendecasyllable missing the foot boundary."""
     line = [_ls("a", "", "long") for _ in range(11)]
     line[1] = _ls("a", "", "long")
     line[3] = _ls("a", "", "long")
@@ -757,11 +759,11 @@ def test_hendecasyllabus_boundary_missing() -> None:
     line[8] = _ls("a", "", "long")
     line[9] = _ls("a", "", "long")
     errs = HendecasyllabusTemplate().validate_full(["aaaaaaaaaaa"], [line])
-    assert any("边界" in e for e in errs)
+    assert any("foot boundary" in e for e in errs)
 
 
 def test_hendecasyllabus_missing_long() -> None:
-    """验证 hendecasyllabus missing long."""
+    """Verify a hendecasyllable missing a long syllable."""
     line = [_ls("a", "", "short") for _ in range(11)]
     errs = HendecasyllabusTemplate().validate_full(["a a a a a a a a a a a"], [line])
-    assert any("长音节" in e for e in errs)
+    assert any("should be long" in e for e in errs)

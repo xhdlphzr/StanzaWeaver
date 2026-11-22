@@ -1,18 +1,22 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""中文音节分析器（基于 pypinyin）.
+"""Chinese syllable analyzer (based on pypinyin).
 
-- 韵母拆解表 FINAL_TO_PARTS：将拼音韵母拆为韵腹 + 韵尾。
-- 整行分析时由调用方拼接全行后一次性交给 pypinyin，
-  借助其词库按上下文消歧多音字（弹琴→tán、银行→háng）。
-- 声调映射：1/2 声与轻声（含无调号）→ 平，3/4 声 → 仄。
+- FINAL_TO_PARTS final-splitting table: splits a pinyin final into nucleus plus
+  coda.
+- For whole-line analysis the caller joins the whole line and hands it to
+  pypinyin once, so its lexicon can disambiguate polyphonic characters from
+  context (弹琴 -> tán, 银行 -> háng).
+- Tone mapping: tones 1/2 and the neutral tone (including no tone mark) map to
+  平; tones 3/4 map to 仄.
 """
 
 import warnings
 
-# pypinyin<=0.55.0 在 Python 3.14 下触发 codecs.open() 弃用警告（第三方库未适配），
-# 于 import 前屏蔽该特定警告
+# pypinyin<=0.55.0 triggers a codecs.open() deprecation warning on Python 3.14
+# (the third-party library has not adapted yet); suppress that specific warning
+# before import.
 warnings.filterwarnings(
     "ignore",
     message=r"codecs\.open\(\) is deprecated.*",
@@ -100,13 +104,13 @@ _ZE_TONES = {"3", "4"}
 
 
 def _split_final(final_str: str) -> tuple[str, str]:
-    """将带声调的韵母串拆为 (韵腹, 韵尾).
+    """Split a toned final string into (nucleus, coda).
 
     Args:
-        final_str: 如 "iao3"、"ang"、"üe4"。
+        final_str: For example "iao3", "ang", or "üe4".
 
     Returns:
-        (韵腹, 韵尾)；无法识别时原样返回 (final_str, "")。
+        (nucleus, coda); (final_str, "") unchanged when unrecognized.
 
     """
     if not final_str:
@@ -123,16 +127,18 @@ def _split_final(final_str: str) -> tuple[str, str]:
 
 
 def _tone_to_pingze(tone_str: str) -> str:
-    """声调 → 平仄标签.
+    """Map a tone to a 平/仄 label.
 
-    一声、二声与轻声（含无调号）均归为平声；三声、四声归为仄声。
+    First tone, second tone and the neutral tone (including no tone mark) are
+    all 平; third and fourth tone are 仄.
 
     Args:
-        tone_str: 带声调数字的韵母串（如 "iao3"），无声调号（轻声/无调）
-            或空串也按平声处理。
+        tone_str: Final string with a tone digit (e.g. "iao3"); a string
+            without a tone mark (neutral/no tone) or an empty string is also
+            treated as 平.
 
     Returns:
-        "平" 或 "仄"。
+        "平" or "仄".
 
     """
     if not tone_str:
@@ -140,35 +146,37 @@ def _tone_to_pingze(tone_str: str) -> str:
     if tone_str[-1].isdigit():
         t = tone_str[-1]
     else:
-        # 无声调号视为轻声 → 平声
+        # No tone mark means the neutral tone -> 平.
         return "平"
     if t in _PING_TONES:
         return "平"
     if t in _ZE_TONES:
         return "仄"
-    # 5 声（轻声）等非常规数字亦归平声
+    # Unusual digits such as tone 5 (neutral) also map to 平.
     return "平"
 
 
 class ChineseAnalyzer(SyllableAnalyzer):
-    """中文音节分析器：逐字输出声母/韵腹/韵尾 + 平仄.
+    """Chinese syllable analyzer: per-character onset/nucleus/coda plus 平/仄.
 
-    analyze_word 接受任意长度文本（含整行），pypinyin 会按短语上下文
-    自动选择多音字的正确读音。
+    analyze_word accepts text of any length (including a whole line); pypinyin
+    automatically picks the correct reading of polyphonic characters based on
+    the phrase context.
     """
 
     language = "zh"
 
     def analyze_word(self, word: str) -> list[Syllable]:
-        """分析中文文本（可多字）的音节，返回首选（第一）读音.
+        """Analyze Chinese text (one or more characters), first reading only.
 
-        为向后兼容保留单读音接口：返回 :meth:`analyze_word_variants` 的首个变体。
+        Kept as a single-reading interface for backward compatibility: returns
+        the first variant of :meth:`analyze_word_variants`.
 
         Args:
-            word: 中文文本，如 "弹琴" 或整行诗。
+            word: Chinese text, e.g. "弹琴" or a whole line of verse.
 
         Returns:
-            每字一个 Syllable（平仄标在 attributes["tone"]）。
+            One Syllable per character (tone label in attributes["tone"]).
 
         """
         variants = self.analyze_word_variants(word)
@@ -177,18 +185,21 @@ class ChineseAnalyzer(SyllableAnalyzer):
         return variants[0]
 
     def analyze_word_variants(self, word: str) -> list[list[Syllable]]:
-        """返回某词的全部多音字读音组合（笛卡尔积）.
+        """Return all polyphonic reading combinations of a word.
 
-        对每个字调用 pypinyin 的 heteronym 模式，得到该字的候选
-        (声母, 韵母) 列表，再对所有字做笛卡尔积，得到整词的全部读音。
+        Each character is passed to pypinyin in heteronym mode to obtain its
+        candidate (onset, final) pairs, then the Cartesian product over all
+        characters yields every reading of the whole word.
 
-        结果上限 64 种组合；超出时按生成顺序保留前 64 种（确定性截断）。
+        At most 64 combinations are returned; excess combinations are truncated
+        in generation order (deterministic truncation).
 
         Args:
-            word: 中文文本，如 "中" 或 "弹琴"。
+            word: Chinese text, e.g. "中" or "弹琴".
 
         Returns:
-            读音列表；每个元素是一整词的 Syllable 序列（一种读法）。
+            List of readings; each element is the Syllable sequence of one
+            whole-word reading.
 
         """
         if not word:
@@ -199,9 +210,11 @@ class ChineseAnalyzer(SyllableAnalyzer):
             word, style=Style.FINALS_TONE3, strict=False, heteronym=True
         )
 
-        # 逐字候选 Syllable 列表：声母与韵母按读音配对，避免声母×韵母笛卡尔积
-        # 产生不存在的混读（如「长」的 zh+ang2）。pypinyin 在多个读音声母相同
-        # 时 INITIALS 会去重（如「中」只返回 ['zh']），故按长度广播对齐。
+        # Candidate Syllables per character: pair onsets with finals per reading
+        # to avoid the onset x final Cartesian product creating non-existent
+        # mixes (e.g. zh+ang2 for "长"). When several readings share the same
+        # onset, pypinyin deduplicates INITIALS (e.g. "中" returns only
+        # ['zh']), so align by broadcasting the length.
         candidates: list[list[Syllable]] = []
         for initials, finals in zip(initials_list, finals_list):
             if len(initials) == len(finals):
@@ -230,7 +243,7 @@ class ChineseAnalyzer(SyllableAnalyzer):
                         },
                     )
                 )
-            # 去重（按内容），保持顺序
+            # Deduplicate by content, preserving order.
             seen: set[tuple[str, str, str, str]] = set()
             deduped: list[Syllable] = []
             for syl in char_syls:
@@ -245,7 +258,7 @@ class ChineseAnalyzer(SyllableAnalyzer):
                     deduped.append(syl)
             candidates.append(deduped)
 
-        # 逐字笛卡尔积（上限 64）
+        # Per-character Cartesian product (capped at 64).
         result: list[list[Syllable]] = [[]]
         for char_syls in candidates:
             if not char_syls:
@@ -267,18 +280,21 @@ class ChineseAnalyzer(SyllableAnalyzer):
         return result
 
     def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-        """返回整行诗的全部读音组合（逐字笛卡尔积）.
+        """Return all reading combinations of a whole line.
 
-        先按 :meth:`tokenize_line` 将行拆为汉字，逐字调用
-        :meth:`analyze_word_variants` 得到候选读音，再对整行做笛卡尔积。
+        First splits the line into Chinese characters via :meth:`tokenize_line`,
+        calls :meth:`analyze_word_variants` per character to get candidate
+        readings, then takes the Cartesian product over the whole line.
 
-        结果上限 64 种组合；超出时按生成顺序保留前 64 种（确定性截断）。
+        At most 64 combinations are returned; excess combinations are truncated
+        in generation order (deterministic truncation).
 
         Args:
-            line: 一行诗。
+            line: One line of verse.
 
         Returns:
-            读音列表；每个元素是一整行的 Syllable 序列（一种读法）。
+            List of readings; each element is the Syllable sequence of one line
+            reading.
 
         """
         chars = self.tokenize_line(line)
@@ -300,13 +316,13 @@ class ChineseAnalyzer(SyllableAnalyzer):
         return result
 
     def tokenize_line(self, line: str) -> list[str]:
-        """逐字切分（仅保留汉字）.
+        """Split per character (keeping only Chinese characters).
 
         Args:
-            line: 一行诗。
+            line: One line of verse.
 
         Returns:
-            汉字字符列表。
+            List of Chinese characters.
 
         """
         return [

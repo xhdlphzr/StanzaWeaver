@@ -1,13 +1,15 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""检查 AI：句意终审.
+"""Checker AI: final sentence-level review.
 
-检查 AI 只依据**用户发给创作 AI 的原始提示词**与**模板规则描述**评审，
-不使用创作 AI 自己提炼的主题描述，避免评审基准被模型的二次概括带偏；
-用户最近的修改反馈（若有）也会一并提供，用于核对是否落实。
+The checker AI reviews only on the basis of **the original prompt the user sent
+to the writer AI** and **the template rule description**; it does not use the
+topic description distilled by the writer AI, so the review baseline is not
+skewed by the model's second-hand summary. The user's latest revision feedback
+(if any) is provided as well to verify whether it was applied.
 
-通过 submit 工具返回 pass/suggestions。
+The verdict is returned through the submit tool as pass/suggestions.
 """
 
 import json
@@ -20,13 +22,13 @@ CheckResult = dict[str, Any]
 
 
 def _template_rule_text(template: dict[str, Any]) -> str:
-    """取模板的规则描述（优先用户填写的 rule_note，否则自动描述）.
+    """Return the template's rule description (prefer rule_note).
 
     Args:
-        template: 模板字典。
+        template: Template dictionary.
 
     Returns:
-        规则描述文本；无则返回空串。
+        Rule description text; empty string when absent.
 
     """
     rule_note = str(template.get("rule_note", "") or "").strip()
@@ -41,18 +43,19 @@ def _build_checker_system(
     user_prompt: str = "",
     user_feedback: str = "",
 ) -> str:
-    """构造检查 AI 的系统提示.
+    """Build the checker AI system prompt.
 
-    只包含用户原始提示词与模板规则描述（不使用创作 AI 提炼的主题描述）。
+    Contains only the user's original prompt and the template rule description
+    (not the topic description distilled by the writer AI).
 
     Args:
-        poem: 诗行列表。
-        template: 模板字典。
-        user_prompt: 用户发给创作 AI 的原始提示词。
-        user_feedback: 用户最近的修改反馈（若有）。
+        poem: List of poem lines.
+        template: Template dictionary.
+        user_prompt: The original prompt the user sent to the writer AI.
+        user_feedback: The user's latest revision feedback (if any).
 
     Returns:
-        系统提示文本。
+        System prompt text.
 
     """
     parallelism_note = ""
@@ -105,13 +108,13 @@ def _build_checker_system(
 
 
 class CheckerAI:
-    """句意终审代理（独立 LLM 端点/模型）."""
+    """Final sentence-level checker (dedicated LLM endpoint/model)."""
 
     def __init__(self, config: dict[str, Any]):
-        """初始化检查 AI.
+        """Initialize the checker AI.
 
         Args:
-            config: {"base_url", "api_key", "model"}。
+            config: {"base_url", "api_key", "model"}.
 
         """
         self.client = LLMClient(
@@ -127,16 +130,17 @@ class CheckerAI:
         user_prompt: str = "",
         user_feedback: str = "",
     ) -> CheckResult:
-        """执行句意终审（最多重试 3 轮直到拿到 submit 结论）.
+        """Run the final sentence-level check (retry up to 3 times until submit).
 
         Args:
-            poem: 诗行列表。
-            template: 模板字典。
-            user_prompt: 用户发给创作 AI 的原始提示词（评审的唯一主题依据）。
-            user_feedback: 用户最近的修改反馈。
+            poem: List of poem lines.
+            template: Template dictionary.
+            user_prompt: Original prompt sent to the writer AI (the sole topic
+                basis for the review).
+            user_feedback: The user's latest revision feedback.
 
         Returns:
-            {"pass": bool, "suggestions": str}。
+            {"pass": bool, "suggestions": str}.
 
         """
         system_prompt = _build_checker_system(
@@ -176,7 +180,10 @@ class CheckerAI:
                             "tool_call_id": tc["id"],
                             "content": json.dumps(
                                 {
-                                    "error": "请调用 submit 工具给出评审结论（pass 和 suggestions）。"
+                                    "error": (
+                                        "Call the submit tool to give the review "
+                                        "verdict (pass and suggestions)."
+                                    )
                                 },
                                 ensure_ascii=False,
                             ),
@@ -192,7 +199,10 @@ class CheckerAI:
                         "content": "请务必调用 submit 工具给出评审结论（pass和suggestions）。",
                     }
                 )
-        except Exception as e:  # noqa: BLE001 - 终审兜底：任何调用失败转为"未通过+建议"
-            return {"pass": False, "suggestions": f"检查AI调用失败: {e}"}
+        except Exception as e:  # noqa: BLE001 - checker fallback: failure -> fail
+            return {"pass": False, "suggestions": f"Checker AI call failed: {e}"}
 
-        return {"pass": False, "suggestions": "检查AI在多次尝试后未能给出结论"}
+        return {
+            "pass": False,
+            "suggestions": "Checker AI did not return a verdict after several attempts",
+        }

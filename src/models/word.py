@@ -1,10 +1,11 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""数据模型：词条（Word）.
+"""Data model: word entry.
 
-词库（SQLite）中一个词条的表示：文本、语言、音节切分及释义。
-中文/英文导入的词条各占一条记录，多音字每个读音单独成条。
+Representation of one word entry in the vocabulary database (SQLite): text,
+language, syllable segmentation, and meaning. Chinese and English imports each
+take one record; polyphonic characters get one record per reading.
 """
 
 from dataclasses import dataclass, field
@@ -17,13 +18,13 @@ SyllableInput = Syllable | dict[str, Any]
 
 @dataclass
 class Word:
-    """一个词条.
+    """A word entry.
 
     Attributes:
-        text: 词条文本（英文为大写，中文原样）。
-        language: 语言代码（zh/en/it/fr/la）。
-        syllables: 音节切分列表。
-        meaning: 释义（中文词条来自 CC-CEDICT）。
+        text: Entry text (uppercased for English, kept as-is for Chinese).
+        language: Language code (zh/en/it/fr/la).
+        syllables: Syllable segmentation list.
+        meaning: Meaning (Chinese entries come from CC-CEDICT).
 
     """
 
@@ -34,19 +35,19 @@ class Word:
 
     @property
     def syllable_count(self) -> int:
-        """返回音节数.
+        """Return the number of syllables.
 
         Returns:
-            syllables 列表长度。
+            Length of the ``syllables`` list.
 
         """
         return len(self.syllables)
 
     def to_dict(self) -> dict[str, Any]:
-        """序列化为字典（含 syllables 列表的字典形式）.
+        """Serialize the word to a dictionary (with syllables as dicts).
 
         Returns:
-            {"text": ..., "language": ..., "syllables": [...], "meaning": ...}。
+            ``{"text": ..., "language": ..., "syllables": [...], "meaning": ...}``.
 
         """
         return {
@@ -60,13 +61,13 @@ class Word:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Word:
-        """从字典重建词条（to_dict 的逆操作）.
+        """Rebuild a word entry from a dictionary (inverse of :meth:`to_dict`).
 
         Args:
-            d: to_dict() 产生的字典。
+            d: Dictionary produced by ``to_dict()``.
 
         Returns:
-            还原后的 Word 实例。
+            The reconstructed Word instance.
 
         """
         syllables: list[Syllable] = []

@@ -1,12 +1,14 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""拉丁语格律模板：六步格、哀歌双行体、十一音节诗.
+"""Latin metrical templates: hexameter, elegiac distich, hendecasyllable.
 
-- 六步格：第 1-4 音步扬抑抑/扬扬自由替换，第 5 音步必须扬抑抑格，
-  第 6 音步 2 音节（扬扬或扬抑）。
-- 哀歌双行体：第 1 行六步格，第 2 行五步格（后 6 音节必须两个完整扬抑抑格）。
-- 十一音节诗：第 1 音步首音节必长，第 5/6 音节之间必须是词边界。
+- Hexameter: feet 1-4 freely alternate dactyls/spondees, foot 5 must be a
+  dactyl, foot 6 has 2 syllables (spondee or trochee).
+- Elegiac distich: line 1 is a hexameter, line 2 a pentameter (its last 6
+  syllables must be two complete dactyls).
+- Hendecasyllable: foot 1's first syllable must be long, and a word boundary
+  must occur between syllables 5 and 6.
 """
 
 from typing import Any, ClassVar
@@ -23,22 +25,23 @@ _S: dict[str, Any] = _make_syl(attributes={"length": "short"})
 
 
 def _validate_hex(syls: list[Syllable]) -> list[str]:
-    """六步格完整校验.
+    """Validate a hexameter line completely.
 
-    第 1-4 音步为扬抑抑格(长短短)或扬扬格(长长)自由替换；
-    第 5 音步必须为扬抑抑格（长短短）；第 6 音步为扬扬格或扬抑格（2 音节）。
+    Feet 1-4 freely alternate dactyls (long-short-short) and spondees
+    (long-long); foot 5 must be a dactyl (long-short-short); foot 6 is a
+    spondee or trochee (2 syllables).
 
     Args:
-        syls: 一行音节。
+        syls: Syllables of one line.
 
     Returns:
-        错误列表。
+        List of errors.
 
     """
     errors: list[str] = []
     n = len(syls)
     if n < 13:
-        errors.append(f"音节数不足: 至少13个，实际{n}个")
+        errors.append(f"Not enough syllables: need at least 13, got {n}")
         return errors
     i = 0
     feet: list[tuple[int, int, int]] = []
@@ -63,7 +66,7 @@ def _validate_hex(syls: list[Syllable]) -> list[str]:
         feet.append((5, i, n))
 
     if len(feet) < 6:
-        errors.append(f"音步不足: 需要6个音步，实际扫描出{len(feet)}个")
+        errors.append(f"Not enough feet: need 6 but only scanned {len(feet)}")
         return errors
 
     for foot_idx, start, end in feet:
@@ -72,14 +75,18 @@ def _validate_hex(syls: list[Syllable]) -> list[str]:
         if foot_idx < 4:
             if first_len != "long":
                 errors.append(
-                    f"第{foot_idx + 1}音步应以长音节开头，实际为{first_len or '未知'}"
+                    f"Foot {foot_idx + 1} should start with a long syllable "
+                    f"but starts with {first_len or 'unknown'}"
                 )
             if len(foot) == 3:
-                # 三音节音步必为扬抑抑格（dactyl 扫描已保证长短短），无需重复校验
+                # A three-syllable foot must be a dactyl (the dactyl scan
+                # already guarantees long-short-short), so no re-check needed.
                 pass
             elif len(foot) == 2 and foot[1].attributes.get("length") != "long":
                 errors.append(
-                    f"第{foot_idx + 1}音步扬扬格应两个长音节，实际第二个为{foot[1].attributes.get('length') or '未知'}"
+                    f"Foot {foot_idx + 1} spondee should have two long "
+                    f"syllables but the second is "
+                    f"{foot[1].attributes.get('length') or 'unknown'}"
                 )
         elif foot_idx == 4:
             if (
@@ -87,17 +94,23 @@ def _validate_hex(syls: list[Syllable]) -> list[str]:
                 or foot[1].attributes.get("length") != "short"
                 or foot[2].attributes.get("length") != "short"
             ):
-                errors.append("第5音步必须为扬抑抑格（长短短），实际不满足")
+                errors.append("Foot 5 must be a dactyl (long-short-short)")
         else:
             if len(foot) != 2:
-                errors.append(f"第6音步应为2音节（扬扬格或扬抑格），实际{len(foot)}个")
+                errors.append(
+                    f"Foot 6 should have 2 syllables (spondee or trochee) "
+                    f"but has {len(foot)}"
+                )
             elif first_len != "long":
-                errors.append(f"第6音步应以长音节开头，实际为{first_len or '未知'}")
+                errors.append(
+                    f"Foot 6 should start with a long syllable but starts "
+                    f"with {first_len or 'unknown'}"
+                )
     return errors
 
 
 class HexameterTemplate(PoetryTemplate):
-    """六步格：单行，可连续堆叠，逐行校验."""
+    """Hexameter: a single line, stackable, validated line by line."""
 
     name = "六步格"
     language = "la"
@@ -111,10 +124,10 @@ class HexameterTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无固定位置约束（音步可替换，由 validate_full 贪心扫描）.
+        """No fixed-position constraints (feet may be substituted; validate_full scans).
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         return None
@@ -122,14 +135,14 @@ class HexameterTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """逐音步校验六步格结构.
+        """Validate hexameter structure foot by foot.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
         errors: list[str] = []
@@ -139,7 +152,10 @@ class HexameterTemplate(PoetryTemplate):
 
 
 class DistichonTemplate(PoetryTemplate):
-    """哀歌双行体：第 1 行六步格，第 2 行五步格（末 6 音节两完整扬抑抑格）."""
+    """Elegiac distich: line 1 is a hexameter, line 2 a pentameter.
+
+    The last 6 syllables of line 2 are two complete dactyls.
+    """
 
     name = "哀歌双行体"
     language = "la"
@@ -159,27 +175,28 @@ class DistichonTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """无固定位置约束（同六步格）.
+        """No fixed-position constraints (same as hexameter).
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         return None
 
     @staticmethod
     def _has_pentameter_caesura(line: str, total: int) -> bool:
-        """判断五步格诗行前后两半之间（即倒数第 6 音节处）是否存在词界停顿.
+        """Check whether a caesura (word boundary) divides the pentameter in two.
 
-        五步格后半固定为两个完整扬抑抑格（6 音节），故停顿须落在
-        ``total - 6`` 个音节之后的词边界上。
+        The second half of a pentameter is two complete dactyls (6 syllables),
+        so the caesura must fall on a word boundary after ``total - 6``
+        syllables.
 
         Args:
-            line: 第 2 行（五步格）文本。
-            total: 整行音节总数。
+            line: Text of line 2 (the pentameter).
+            total: Total syllable count of the line.
 
         Returns:
-            若在前半与后半之间存在词界返回 True，否则 False。
+            True when a word boundary separates the two halves, else False.
 
         """
         if total < 6:
@@ -199,14 +216,16 @@ class DistichonTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：第 1 行六步格、第 2 行末 6 音节扬抑抑×2、中部 caesura、AA 押韵.
+        """Full check: line 1 hexameter, line 2 last 6 syllables dactyl x2.
+
+        Also checks the mid-line caesura and the AA rhyme.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
         errors: list[str] = []
@@ -222,25 +241,32 @@ class DistichonTemplate(PoetryTemplate):
                 actual = s.attributes.get("length", "")
                 if actual and actual != exp:
                     errors.append(
-                        f"第2行倒数第{6 - j}音节应为{exp}（后2.5音步须为两个完整扬抑抑格），实际为{actual}"
+                        f"Line 2 syllable {6 - j} from the end should be "
+                        f"{exp} (the last 2.5 feet must be two complete "
+                        f"dactyls) but is {actual}"
                     )
             line2 = poem[1] if len(poem) > 1 else ""
             if not self._has_pentameter_caesura(line2, len(pent_syls)):
                 errors.append(
-                    "第2行五步格中部缺少停顿（caesura）：前半(2.5音步)与后半(2.5音步)之间须有词界"
+                    "Pentameter line 2 lacks a mid-line caesura: a word "
+                    "boundary is required between the first 2.5 feet and the "
+                    "last 2.5 feet"
                 )
         elif len(pent_syls) >= 2:
-            errors.append("第2行音节数不足: 至少11个")
+            errors.append("Line 2 has too few syllables: at least 11 required")
         if len(poem) >= 2 and syllables[0] and syllables[1]:
             r0 = syllables[0][-1].nucleus + syllables[0][-1].coda
             r1 = syllables[1][-1].nucleus + syllables[1][-1].coda
             if r0 and r1 and r0 != r1:
-                errors.append(f"押韵不匹配: 第1行韵脚为'{r0}'，第2行韵脚为'{r1}'")
+                errors.append(
+                    f"Rhyme mismatch: line 1 rhymes with '{r0}', line 2 "
+                    f"rhymes with '{r1}'"
+                )
         return errors
 
 
 class HendecasyllabusTemplate(PoetryTemplate):
-    """十一音节诗：5 音步，第 5/6 音节间须为词边界."""
+    """Hendecasyllable: 5 feet, with a word boundary between syllables 5 and 6."""
 
     name = "十一音节诗"
     language = "la"
@@ -255,10 +281,10 @@ class HendecasyllabusTemplate(PoetryTemplate):
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
-        """固定音步模式约束（第1音步首音节必长）.
+        """Fixed foot-pattern constraints (foot 1's first syllable must be long).
 
         Returns:
-            逐位音节约束表。
+            Per-position syllable constraint table.
 
         """
         return [
@@ -280,14 +306,14 @@ class HendecasyllabusTemplate(PoetryTemplate):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """完整检查：固定长音位 + 第 5/6 音节间词边界.
+        """Full check: fixed long positions + word boundary between syllables 5/6.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表。
+            poem: List of poem lines.
+            syllables: Syllables per line.
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
         errors: list[str] = []
@@ -295,7 +321,7 @@ class HendecasyllabusTemplate(PoetryTemplate):
             return errors
         syls = syllables[0]
         if len(syls) < 11:
-            errors.append(f"音节数不足: 需要11个，实际{len(syls)}个")
+            errors.append(f"Not enough syllables: need 11 but got {len(syls)}")
         patterns = [
             (2, "long"),
             (4, "long"),
@@ -307,7 +333,7 @@ class HendecasyllabusTemplate(PoetryTemplate):
             if pos < len(syls):
                 actual = syls[pos].attributes.get("length", "")
                 if actual and actual != expected:
-                    errors.append(f"第{pos + 1}音节应为长音节，实际为{actual}")
+                    errors.append(f"Syllable {pos + 1} should be long but is {actual}")
 
         if poem:
             line = poem[0]
@@ -323,12 +349,15 @@ class HendecasyllabusTemplate(PoetryTemplate):
                     break
                 cum += n
             if not boundary_ok:
-                errors.append("第5与第6音节之间必须是音步边界（词边界），当前边界缺失")
+                errors.append(
+                    "Syllables 5 and 6 must be separated by a foot boundary "
+                    "(word boundary); it is missing"
+                )
         return errors
 
 
 def register_latin_templates() -> None:
-    """注册全部拉丁语模板."""
+    """Register all Latin templates."""
     register("la_hexameter", HexameterTemplate())
     register("la_distichon", DistichonTemplate())
     register("la_hendecasyllabus", HendecasyllabusTemplate())

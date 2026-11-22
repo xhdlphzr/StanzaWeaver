@@ -3,23 +3,23 @@
 
 #!/usr/bin/env bash
 #
-# run.sh - 运行 StanzaWeaver Docker 容器（Web 服务）
+# run.sh - run the StanzaWeaver Docker container (web service)
 #
-# 用法:
-#   ./scripts/run.sh                    # 前台运行
-#   ./scripts/run.sh -d -l              # 后台运行并跟随日志
-#   ./scripts/run.sh -p 8080            # 自定义宿主机端口
-#   ./scripts/run.sh --no-volume        # 不挂载数据卷（数据不持久化）
+# Usage:
+#   ./scripts/run.sh                    # run in the foreground
+#   ./scripts/run.sh -d -l              # run detached and follow logs
+#   ./scripts/run.sh -p 8080            # custom host port
+#   ./scripts/run.sh --no-volume        # do not mount the data volume (data is not persisted)
 #
-# 选项:
-#   -i, --image <img>   镜像标签 (默认 stanzaweaver:latest)
-#   -n, --name <name>   容器名 (默认 stanzaweaver)
-#   -p, --port <port>   宿主机映射端口 (默认 5000)
-#   -v, --volume <vol>  数据卷名 (默认 stanzaweaver-data)
-#   -d, --detach        后台运行
-#   -l, --logs          运行后跟随日志 (Ctrl+C 退出，容器保持运行)
-#       --no-volume     不挂载数据卷
-#   -h, --help          显示帮助
+# Options:
+#   -i, --image <img>   image tag (default stanzaweaver:latest)
+#   -n, --name <name>   container name (default stanzaweaver)
+#   -p, --port <port>   host port mapping (default 5000)
+#   -v, --volume <vol>  volume name (default stanzaweaver-data)
+#   -d, --detach        run detached
+#   -l, --logs          follow logs (Ctrl+C exits, container keeps running)
+#       --no-volume     do not mount the data volume
+#   -h, --help          show help
 set -euo pipefail
 
 IMAGE="stanzaweaver:latest"
@@ -45,17 +45,17 @@ while [[ $# -gt 0 ]]; do
         -l|--logs)       LOGS="1"; shift ;;
         --no-volume)     NO_VOLUME="1"; shift ;;
         -h|--help)       usage ;;
-        *) echo "未知参数: $1"; usage ;;
+        *) echo "Unknown argument: $1"; usage ;;
     esac
 done
 
-echo "[run] 启动容器 $NAME (镜像: $IMAGE, 端口: $PORT)"
+echo "[run] Starting container $NAME (image: $IMAGE, port: $PORT)"
 
 if [[ -z "$NO_VOLUME" ]]; then
     docker volume create "$VOLUME" >/dev/null 2>&1 || true
 fi
 
-# 清理同名旧容器（避免端口/名称冲突）
+# Remove any old container with the same name (avoids port/name conflicts)
 docker rm -f "$NAME" >/dev/null 2>&1 || true
 
 RUN_ARGS=(run --name "$NAME" -p "${PORT}:5000" --restart unless-stopped)
@@ -72,9 +72,9 @@ RUN_ARGS+=("$IMAGE")
 
 docker "${RUN_ARGS[@]}"
 
-echo "[run] 访问: http://localhost:${PORT}"
+echo "[run] Open: http://localhost:${PORT}"
 
 if [[ -n "$LOGS" ]]; then
-    echo "[run] 跟随日志 (Ctrl+C 退出，容器保持运行)..."
+    echo "[run] Following logs (Ctrl+C to exit; the container keeps running)..."
     docker logs -f "$NAME"
 fi

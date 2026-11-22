@@ -1,10 +1,11 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""统一模板转化模块（src.templates.convert）的单元测试.
+"""Unit tests for the unified template conversion module (convert).
 
-覆盖：约束值归一化、音节数/约束表规整、映射校验、单元格转换、
-完整模板转化（押韵与自定义代码复制）以及内置模板韵式声明合法性。
+Cover constraint-value normalization, syllable/constraint-table shaping,
+mapping validation, cell conversion, full template conversion (rhyme and
+custom code copying) and built-in template rhyme-scheme validity.
 """
 
 from typing import Any, ClassVar
@@ -17,28 +18,28 @@ from src.templates.rhyme import normalize_rhyme_scheme
 
 
 def _cell(**attributes: str) -> dict[str, Any]:
-    """构造约束单元格（默认三属性齐全）."""
+    """Build a constraint cell with all three attributes by default."""
     attrs = {"tone": "", "stress": "", "length": ""}
     attrs.update(attributes)
     return {"onset": "", "nucleus": "", "coda": "", "attributes": attrs}
 
 
 def _free() -> dict[str, Any]:
-    """构造空约束单元格."""
+    """Build an empty constraint cell."""
     return _cell()
 
 
 # --------------------------------------------------------------------------- #
-# 基础辅助
+# Basic helpers
 # --------------------------------------------------------------------------- #
 def test_constraint_scheme_known_and_unknown() -> None:
-    """已知语言返回属性维度，未知语言返回空维度."""
+    """Known languages return their attribute axis; unknown ones return empty."""
     assert conv.constraint_scheme("zh") == ("tone", ("平", "仄"))
     assert conv.constraint_scheme("xx") == ("", ())
 
 
 def test_normalize_constraint_value_branches() -> None:
-    """约束值归一化：空/规范值/别名/非法/无维度语言."""
+    """Constraint value normalization: empty/canonical/alias/invalid/none."""
     assert conv.normalize_constraint_value("zh", "") == ""
     assert conv.normalize_constraint_value("zh", "平") == "平"
     assert conv.normalize_constraint_value("en", "重") == "heavy"
@@ -48,7 +49,7 @@ def test_normalize_constraint_value_branches() -> None:
 
 
 def test_normalize_syllables_padding() -> None:
-    """音节数规整：截断/补齐/容错."""
+    """Syllable count shaping: truncate/pad/tolerate bad values."""
     assert conv._normalize_syllables({"syllables_per_line": [3, 4, 5]}, 2) == [3, 4]
     assert conv._normalize_syllables({"syllables_per_line": [3]}, 3) == [3, 3, 3]
     assert conv._normalize_syllables({}, 2) == [7, 7]
@@ -56,7 +57,7 @@ def test_normalize_syllables_padding() -> None:
 
 
 def test_source_tables_prefers_alternatives() -> None:
-    """有 alternatives 时使用全部约束表并补齐每行单元格."""
+    """With alternatives, use every constraint table and pad each row."""
     table1 = [[_cell(tone="平")], []]
     table2 = [[_cell(tone="仄")], [_cell(tone="平")]]
     source = {
@@ -73,7 +74,7 @@ def test_source_tables_prefers_alternatives() -> None:
 
 
 def test_source_tables_single_and_missing() -> None:
-    """无 alternatives 时使用单表；无约束时返回一份空表."""
+    """Without alternatives use one table; with no constraints return empty."""
     single = conv._source_tables({"syllable_constraints": [[_cell(tone="平")]]}, 1, [1])
     assert len(single) == 1 and single[0][0][0]["attributes"]["tone"] == "平"
     empty = conv._source_tables({}, 1, [2])
@@ -81,7 +82,7 @@ def test_source_tables_single_and_missing() -> None:
 
 
 def test_source_tables_tolerates_bad_rows() -> None:
-    """约束表中的非列表行/非字典单元格被容错."""
+    """Non-list rows and non-dict cells in constraint tables are tolerated."""
     source = {"syllable_constraints": [[{"attributes": "bad"}, "x"], "bad-row"]}
     tables = conv._source_tables(source, 2, [2, 1])
     assert tables[0][0] == [{"attributes": "bad"}, {}]
@@ -89,21 +90,23 @@ def test_source_tables_tolerates_bad_rows() -> None:
 
 
 def test_normalize_mapping_branches() -> None:
-    """映射校验：None、非对象、非法源/目标值、别名、合法."""
+    """Mapping validation: None, non-object, invalid source/target, valid."""
     assert conv._normalize_mapping(None, "zh", "en") == ({}, None)
     mapping, error = conv._normalize_mapping([], "zh", "en")
     assert mapping == {} and error is not None
     mapping, error = conv._normalize_mapping({"??": "heavy"}, "zh", "en")
-    assert mapping == {} and error is not None and "源属性值" in error
+    assert mapping == {} and error is not None
+    assert "Invalid source attribute value" in error
     mapping, error = conv._normalize_mapping({"平": "??"}, "zh", "en")
-    assert mapping == {} and error is not None and "目标属性值" in error
+    assert mapping == {} and error is not None
+    assert "Invalid target attribute value" in error
     mapping, error = conv._normalize_mapping({"平": "重", "": "heavy"}, "zh", "en")
     assert error is None
     assert mapping == {"平": "heavy"}
 
 
 def test_convert_cell_branches() -> None:
-    """单元格转换：正常映射、缺失源值、目标无属性、映射值非法."""
+    """Cell conversion: normal mapping, missing value, no target attribute."""
     mapping = {"平": "heavy"}
     converted = conv._convert_cell(
         _cell(tone="平", onset="zh"), "tone", "stress", ("light", "heavy"), mapping
@@ -123,20 +126,20 @@ def test_convert_cell_branches() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# 完整模板转化
+# Full template conversion
 # --------------------------------------------------------------------------- #
 def test_convert_template_errors() -> None:
-    """未知目标语言/未知模板/非法映射均返回错误."""
+    """Unknown target language, unknown template and bad mapping error out."""
     _, error = conv.convert_template("zh_wujue", "xx")
-    assert error is not None and "目标语言" in error
+    assert error is not None and "Unsupported target language" in error
     _, error = conv.convert_template("nope", "en")
-    assert error is not None and "未知模板" in error
+    assert error is not None and "Unknown template" in error
     _, error = conv.convert_template("zh_xiangjianhuan", "en", {"??": "heavy"})
     assert error is not None
 
 
 def test_convert_builtin_sonnet_carries_rhyme() -> None:
-    """内置商籁体转化：行数/音节/押韵韵式复制，仅约束属性值转换."""
+    """Built-in sonnet conversion: copy lines/syllables/rhyme, remap values."""
     spec, error = conv.convert_template(
         "en_sonnet", "zh", {"light": "平", "heavy": "仄"}
     )
@@ -162,10 +165,10 @@ def test_convert_builtin_sonnet_carries_rhyme() -> None:
 
 
 def test_convert_custom_template_carries_rhyme_and_code() -> None:
-    """自定义模板转化：多约束/韵式/自定义代码均复制."""
+    """Custom template conversion: multi-constraints, rhyme and code copied."""
 
     class _Custom(PoetryTemplate):
-        """带韵式与代码的测试模板."""
+        """Test template with a rhyme scheme and custom code."""
 
         name = "自定义测试"
         language = "zh"
@@ -178,14 +181,14 @@ def test_convert_custom_template_carries_rhyme_and_code() -> None:
         def get_syllable_constraint_alternatives(
             self,
         ) -> list[list[list[dict[str, Any]]]]:
-            """两份约束表."""
+            """Two constraint tables."""
             return [
                 [[_cell(tone="平"), _free()], [_cell(tone="仄"), _free()]],
                 [[_cell(tone="仄"), _free()], [_cell(tone="平"), _free()]],
             ]
 
         def get_syllable_constraints(self) -> list[list[dict[str, Any]]]:
-            """第一份约束表."""
+            """First constraint table."""
             return self.get_syllable_constraint_alternatives()[0]
 
     register("test_convert_custom", _Custom())
@@ -204,10 +207,10 @@ def test_convert_custom_template_carries_rhyme_and_code() -> None:
 
 
 def test_convert_drops_invalid_source_scheme() -> None:
-    """源模板韵式与行数不匹配时丢弃韵式（避免生成非法模板）."""
+    """Drop a source rhyme scheme that does not match the line count."""
 
     class _BadScheme(PoetryTemplate):
-        """韵式长度错误的测试模板."""
+        """Test template with a wrong-length rhyme scheme."""
 
         name = "坏韵式"
         language = "zh"
@@ -227,13 +230,13 @@ def test_convert_drops_invalid_source_scheme() -> None:
 
 
 def test_convert_tolerates_bad_lines(monkeypatch: pytest.MonkeyPatch) -> None:
-    """源模板行数字段非法时回退默认行数."""
+    """Fall back to the default line count when source lines are invalid."""
 
     class _Fake:
-        """返回非法行数的假模板."""
+        """Fake template returning an invalid line count."""
 
         def to_dict(self) -> dict[str, Any]:
-            """返回 lines 非法的模板字典."""
+            """Return a template dict whose lines field is invalid."""
             return {
                 "name": "坏行数",
                 "language": "zh",
@@ -253,7 +256,7 @@ def test_convert_tolerates_bad_lines(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_constraint_tables_to_values() -> None:
-    """约束字典表转值表：中文属性、无属性语言、非字典单元格."""
+    """Constraint dict tables to value tables: attributes and bad cells."""
     tables = [[[_cell(tone="平"), _cell()]]]
     assert conv.constraint_tables_to_values(tables, "zh") == [[["平", ""]]]
     assert conv.constraint_tables_to_values(tables, "en") == [[["", ""]]]
@@ -263,10 +266,10 @@ def test_constraint_tables_to_values() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# 内置模板的韵式声明
+# Built-in template rhyme-scheme declarations
 # --------------------------------------------------------------------------- #
 def test_builtin_rhyme_schemes_are_valid() -> None:
-    """所有内置模板声明的韵式长度必须与行数一致（保证可安全转化）."""
+    """Every built-in rhyme scheme must match its line count (safe to convert)."""
     checked = 0
     for template in list(_registry.values()):
         scheme = template.rhyme_scheme
@@ -302,15 +305,15 @@ def test_builtin_rhyme_schemes_are_valid() -> None:
     ],
 )
 def test_builtin_rhyme_scheme_values(key: str, scheme: str) -> None:
-    """内置模板韵式声明与模板逻辑一致（用于跨语言复制押韵）."""
+    """Built-in rhyme-scheme declarations match template logic (safe copies)."""
     assert _registry[key].rhyme_scheme == scheme
 
 
 def test_to_dict_includes_conversion_fields() -> None:
-    """模板字典包含押韵/自定义代码/结构规则字段（供转化复制）."""
+    """Template dict includes rhyme, custom code and structural rule fields."""
 
     class _Plain(PoetryTemplate):
-        """最简模板."""
+        """Minimal template."""
 
         name = "plain"
         language = "zh"
@@ -328,10 +331,10 @@ def test_to_dict_includes_conversion_fields() -> None:
 
 
 def test_convert_carries_rule_note() -> None:
-    """模板规则描述随转化复制，并计入“已携带”清单."""
+    """Rule notes are copied by conversion and listed as carried."""
 
     class _WithNote(PoetryTemplate):
-        """带规则描述的测试模板."""
+        """Test template with a rule description."""
 
         name = "带描述"
         language = "zh"
@@ -340,7 +343,7 @@ def test_convert_carries_rule_note() -> None:
         rule_note = "上下联需对仗，意境清远。"
 
         def get_syllable_constraints(self) -> list[list[dict[str, Any]]]:
-            """一份自由约束."""
+            """One free constraint row."""
             return [[_free(), _free()]]
 
     register("test_convert_note", _WithNote())
@@ -354,10 +357,10 @@ def test_convert_carries_rule_note() -> None:
 
 
 def test_describe_includes_rule_note() -> None:
-    """模板规则描述会进入 describe()（即写作 AI 的 prompt）."""
+    """Rule notes flow into describe() (the writing AI's prompt)."""
 
     class _WithNote(PoetryTemplate):
-        """带规则描述的测试模板."""
+        """Test template with a rule description."""
 
         name = "描述模板"
         language = "zh"
@@ -369,10 +372,10 @@ def test_describe_includes_rule_note() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# 数据化结构规则的转化
+# Conversion of data-driven structural rules
 # --------------------------------------------------------------------------- #
 def test_convert_jinti_carries_structural_rules() -> None:
-    """绝句转化：结构规则（平仄骨架/三平尾/孤平）按映射换成目标语言属性值."""
+    """Quatrain conversion remaps structural rules to target-language values."""
     spec, error = conv.convert_template(
         "zh_wujue", "en", {"平": "heavy", "仄": "light"}
     )
@@ -392,7 +395,7 @@ def test_convert_jinti_carries_structural_rules() -> None:
 
 
 def test_convert_reuses_builtin_description() -> None:
-    """转化后直接复用内置模板的规则描述，供用户继续修改."""
+    """Conversion reuses the built-in rule note so users can keep editing."""
     source = _registry["zh_wujue"]
     spec, error = conv.convert_template(
         "zh_wujue", "en", {"平": "heavy", "仄": "light"}
@@ -404,10 +407,10 @@ def test_convert_reuses_builtin_description() -> None:
 
 
 def test_convert_prefers_rule_note_over_description() -> None:
-    """用户自填的规则描述优先于模板自动描述."""
+    """A user-provided rule note wins over the template's automatic one."""
 
     class _Both(PoetryTemplate):
-        """同时带用户描述与自动描述的测试模板."""
+        """Test template with both a user note and an automatic description."""
 
         name = "双描述"
         language = "zh"
@@ -426,10 +429,10 @@ def test_convert_prefers_rule_note_over_description() -> None:
 
 
 def test_convert_empty_description_stays_empty() -> None:
-    """源模板既无规则描述也无摘要时，转化结果为空."""
+    """No rule note or description on the source yields an empty result."""
 
     class _NoNote(PoetryTemplate):
-        """无描述测试模板."""
+        """Test template without any description."""
 
         name = "无描述"
         language = "zh"
@@ -446,7 +449,7 @@ def test_convert_empty_description_stays_empty() -> None:
 
 
 def test_convert_jinti_identity_values() -> None:
-    """同语言转化时结构规则属性与值保持不变."""
+    """Same-language conversion keeps structural rule attributes and values."""
     spec, error = conv.convert_template("zh_wujue", "zh", {"平": "平", "仄": "仄"})
     assert error is None
     assert spec["structural_rules"]["attribute"] == "tone"
@@ -454,30 +457,32 @@ def test_convert_jinti_identity_values() -> None:
 
 
 def test_convert_jinti_drop_reasons() -> None:
-    """映射不完整/目标语言无属性/映射退化时结构规则不携带并给出原因."""
+    """Incomplete/attribute-less/degenerate mappings drop rules with a reason."""
     spec, error = conv.convert_template("zh_wujue", "en", {"平": "heavy"})
     assert error is None
     assert spec["structural_rules"] is None
-    assert any("映射未覆盖" in rule for rule in spec["dropped_rules"])
+    assert any("does not cover" in rule for rule in spec["dropped_rules"])
 
     spec, error = conv.convert_template("zh_wujue", "fr", {"平": "平"})
     assert error is None
     assert spec["structural_rules"] is None
-    assert any("没有可对应的音节属性" in rule for rule in spec["dropped_rules"])
+    assert any(
+        "no matching syllable attribute" in rule for rule in spec["dropped_rules"]
+    )
 
     spec, error = conv.convert_template(
         "zh_wujue", "en", {"平": "heavy", "仄": "heavy"}
     )
     assert error is None
     assert spec["structural_rules"] is None
-    assert any("同一目标值" in rule for rule in spec["dropped_rules"])
+    assert any("same target value" in rule for rule in spec["dropped_rules"])
 
 
 def test_convert_invalid_source_structural_dropped() -> None:
-    """源模板结构规则数据非法时不崩溃，按未携带处理."""
+    """Invalid source structural rules do not crash; they are not carried."""
 
     class _BadRules(PoetryTemplate):
-        """结构规则非法的测试模板."""
+        """Test template with invalid structural rules."""
 
         name = "坏结构规则"
         language = "zh"
@@ -490,13 +495,15 @@ def test_convert_invalid_source_structural_dropped() -> None:
         spec, error = conv.convert_template("test_bad_structural", "en")
         assert error is None
         assert spec["structural_rules"] is None
-        assert any("结构规则无效" in rule for rule in spec["dropped_rules"])
+        assert any(
+            "structural rules are invalid" in rule for rule in spec["dropped_rules"]
+        )
     finally:
         _registry.pop("test_bad_structural", None)
 
 
 def test_convert_reports_dropped_special_rules() -> None:
-    """源模板的语言专属特殊规则会列入“未携带”清单."""
+    """Language-specific special rules are listed in the dropped rules."""
     spec, error = conv.convert_template(
         "zh_rumengling", "en", {"平": "heavy", "仄": "light"}
     )
@@ -506,10 +513,10 @@ def test_convert_reports_dropped_special_rules() -> None:
 
 
 def test_convert_multi_kinds_carried_codes() -> None:
-    """多约束 + 自定义代码的转化会报告对应的携带项."""
+    """Multi-constraint plus custom-code conversion reports carried items."""
 
     class _Multi(PoetryTemplate):
-        """多约束模板."""
+        """Multi-constraint template."""
 
         name = "多约束"
         language = "zh"
@@ -520,11 +527,11 @@ def test_convert_multi_kinds_carried_codes() -> None:
         def get_syllable_constraint_alternatives(
             self,
         ) -> list[list[list[dict[str, Any]]]]:
-            """两份约束表."""
+            """Two constraint tables."""
             return [[[_cell(tone="平"), _free()]], [[_cell(tone="仄"), _free()]]]
 
         def get_syllable_constraints(self) -> list[list[dict[str, Any]]]:
-            """第一份约束表."""
+            """First constraint table."""
             return self.get_syllable_constraint_alternatives()[0]
 
     register("test_convert_multi", _Multi())

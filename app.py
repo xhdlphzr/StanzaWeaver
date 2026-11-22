@@ -1,12 +1,15 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""StanzaWeaver 应用入口（Flask + SocketIO + pywebview）.
+"""StanzaWeaver application entry point (Flask + SocketIO + pywebview).
 
-- HTTP API：模板列表、LLM 配置、历史记录、自定义模板、导入状态；
-- SocketIO：generate / feedback 事件驱动四步流水线，progress/done/error 推送；
-- 安全：仅限本机访问（Host 校验）+ CSRF 令牌保护写接口；
-- 首次运行自动导入词库（后台线程）。
+- HTTP API: template list, LLM config, history, custom templates, import
+  status;
+- SocketIO: generate / feedback events drive the four-step pipeline and
+  push progress/done/error;
+- Security: local access only (Host check) + CSRF token protection for
+  write endpoints;
+- Vocabulary import on first run (background thread).
 """
 
 import importlib.util
@@ -49,35 +52,36 @@ register_italian_templates()
 register_french_templates()
 register_latin_templates()
 
-#: 内置模板的默认显示顺序（注册顺序；用于“重置模板顺序”）。
+#: Default display order of built-in templates (registration order; used by
+#: the "reset template order" action).
 _DEFAULT_BUILTIN_ORDER: list[str] = [item["key"] for item in list_dicts()]
 
 _vocab_importing = True
 
 
 def _auto_import() -> None:
-    """后台线程：首次运行自动导入词库."""
+    """Background thread: import the vocabulary automatically on first run."""
     global _vocab_importing
     from src.knowledge.vocabulary import init_db
 
     try:
         init_db()
-        logger.info("[StanzaWeaver] 检查词库...")
+        logger.info("[StanzaWeaver] Checking vocabulary...")
         from src.knowledge.importer import import_all
 
         import_all()
-    except Exception as e:  # noqa: BLE001 - 词库导入兜底：失败仅记录，不影响启动
-        logger.error("[StanzaWeaver] 词库导入失败: %s", e)
+    except Exception as e:  # noqa: BLE001 - vocabulary import failure: log only
+        logger.error("[StanzaWeaver] Vocabulary import failed: %s", e)
     finally:
         _vocab_importing = False
         _llm_ping_event.set()
 
 
 def _ping_one_endpoint(endpoint_name: str) -> None:
-    """探测单个 LLM 端点连通性.
+    """Probe the connectivity of a single LLM endpoint.
 
     Args:
-        endpoint_name: 端点名称（"writer" / "checker" / "editor"）。
+        endpoint_name: Endpoint name ("writer" / "checker" / "editor").
 
     """
     from src.agents.base import LLMClient
@@ -96,15 +100,17 @@ def _ping_one_endpoint(endpoint_name: str) -> None:
         )
         client.chat([{"role": "user", "content": "hi"}])
         _llm_status[endpoint_name] = "ok"
-    except Exception:  # noqa: BLE001 - ping 兜底
+    except Exception:  # noqa: BLE001 - ping fallback
         _llm_status[endpoint_name] = "error"
 
 
 def _auto_ping() -> None:
-    """后台线程：启动时探测一次 LLM 端点，之后仅在配置保存/词库导入后重探.
+    """Probe LLM endpoints at startup, then only after config changes.
 
-    不再定时轮询：避免用户点击"取消设置"等操作后被误认为重新检测连接性；
-    连通性只在保存配置（或词库导入完成、手动点击检查）时刷新。
+    No periodic polling: this avoids mistaking actions such as the user's
+    "cancel settings" for a connectivity re-check; connectivity is refreshed
+    only when config is saved (or vocabulary import finishes, or the check
+    button is clicked).
     """
     time.sleep(5)
     while True:
@@ -121,11 +127,13 @@ def _auto_ping() -> None:
 
 
 def _start_background_threads() -> None:
-    """按需启动后台导入/连通性探测线程.
+    """Start the background import/connectivity-probe threads on demand.
 
-    仅在 ``start_server`` 启动 HTTP 服务时调用；测试环境下不启动（由
-    conftest 注入 STANZA_WEAVER_TEST=1），避免异步线程读取被测试重定向的
-    数据库路径而污染临时词库，也避免仅 import app 就发起网络请求。
+    Only called when ``start_server`` starts the HTTP service; it is skipped
+    in the test environment (conftest injects STANZA_WEAVER_TEST=1) to keep
+    async threads from reading a test-redirected database path and polluting
+    the temporary vocabulary, and to avoid network requests on a bare
+    ``import app``.
     """
     if os.environ.get("STANZA_WEAVER_TEST") != "1":
         threading.Thread(target=_auto_import, daemon=True).start()
@@ -146,19 +154,22 @@ _llm_status: dict[str, str] = {
 _llm_ping_event = threading.Event()
 
 
-#: 环境变量：覆盖自定义模板目录（Docker/便携部署可指向持久化目录）。
+#: Environment variable: overrides the custom template directory (Docker or
+#: portable deployments can point it at a persistent directory).
 _CUSTOM_TEMPLATES_DIR_ENV = "STANZAWEAVER_TEMPLATES_DIR"
 
 
 def _custom_templates_dir() -> Path:
-    """返回自定义模板文件所在目录.
+    """Return the directory that holds custom template files.
 
-    源码运行时使用仓库内的 ``src/templates``（开发方便）；PyInstaller 编译版
-    的程序目录通常不可写、且升级会整体替换，因此改用用户数据目录
-    ``~/.stanza_weaver/templates``。可用 ``STANZAWEAVER_TEMPLATES_DIR`` 覆盖。
+    Source runs use the in-repo ``src/templates`` (convenient for
+    development); PyInstaller builds live in an install directory that is
+    usually read-only and gets replaced wholesale on upgrade, so the user
+    data directory ``~/.stanza_weaver/templates`` is used instead. Can be
+    overridden with ``STANZAWEAVER_TEMPLATES_DIR``.
 
     Returns:
-        自定义模板目录路径（不保证已存在）。
+        Custom template directory path (not guaranteed to exist).
 
     """
     override = os.environ.get(_CUSTOM_TEMPLATES_DIR_ENV, "").strip()
@@ -170,10 +181,14 @@ def _custom_templates_dir() -> Path:
 
 
 def _legacy_custom_templates_dir() -> Path | None:
-    """返回编译版旧版本的自定义模板目录（安装目录内，用于兼容/迁移）.
+    """Return the old custom template directory of compiled builds.
+
+    It lives inside the install directory and is kept for compatibility /
+    migration.
 
     Returns:
-        旧目录路径；源码模式或与新目录相同时返回 None。
+        Legacy directory path; None in source mode or when identical to the
+        new directory.
 
     """
     if not getattr(sys, "frozen", False):
@@ -188,11 +203,11 @@ def _legacy_custom_templates_dir() -> Path | None:
 
 
 def _migrate_legacy_custom_templates(primary: Path, legacy: Path | None) -> None:
-    """把旧版本安装目录内的自定义模板复制到新目录（已存在则跳过）.
+    """Copy custom templates from the old install directory (skip existing).
 
     Args:
-        primary: 新的自定义模板目录。
-        legacy: 旧模板目录（可为 None）。
+        primary: New custom template directory.
+        legacy: Legacy template directory (may be None).
 
     """
     if legacy is None or not legacy.exists():
@@ -200,7 +215,11 @@ def _migrate_legacy_custom_templates(primary: Path, legacy: Path | None) -> None
     try:
         primary.mkdir(parents=True, exist_ok=True)
     except OSError as e:
-        logger.warning("[StanzaWeaver] 自定义模板目录创建失败 %s: %s", primary, e)
+        logger.warning(
+            "[StanzaWeaver] Failed to create custom template directory %s: %s",
+            primary,
+            e,
+        )
         return
     for f in sorted(legacy.glob("custom_*.py")):
         dest = primary / f.name
@@ -208,31 +227,37 @@ def _migrate_legacy_custom_templates(primary: Path, legacy: Path | None) -> None
             continue
         try:
             shutil.copy2(f, dest)
-            logger.info("[StanzaWeaver] 已迁移自定义模板 %s -> %s", f.name, primary)
+            logger.info(
+                "[StanzaWeaver] Migrated custom template %s -> %s", f.name, primary
+            )
         except OSError as e:
-            logger.warning("[StanzaWeaver] 自定义模板迁移失败 %s: %s", f.name, e)
+            logger.warning(
+                "[StanzaWeaver] Failed to migrate custom template %s: %s", f.name, e
+            )
 
 
 def _load_custom_template_module(file_path: Path) -> Any:
-    """从文件加载自定义模板模块（支持编译版的用户数据目录）.
+    """Load a custom template module from a file.
 
-    生成的模板通过相对导入复用 ``src.templates`` 包内的基类与语言模块，
-    因此模块名固定为 ``src.templates.<文件名>``，与模块所在目录无关。
+    Supports the user data directory of compiled builds. Generated
+    templates reuse the base classes and language modules of the
+    ``src.templates`` package via relative imports, so the module name is
+    fixed to ``src.templates.<file name>`` regardless of the directory.
 
     Args:
-        file_path: 模板源码文件路径。
+        file_path: Template source file path.
 
     Returns:
-        已执行的模块对象。
+        The executed module object.
 
     Raises:
-        ImportError: 无法为文件创建有效的模块规格。
+        ImportError: When no valid module spec can be built for the file.
 
     """
     module_name = f"src.templates.{file_path.stem}"
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     if spec is None or spec.loader is None:
-        raise ImportError(f"无法加载模板模块: {file_path}")
+        raise ImportError(f"Unable to load template module: {file_path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     try:
@@ -244,11 +269,12 @@ def _load_custom_template_module(file_path: Path) -> Any:
 
 
 def _register_custom_templates() -> None:
-    """注册自定义模板（重启自动恢复）.
+    """Register custom templates (restored automatically on restart).
 
-    源码模式读取 ``src/templates``；编译版读取用户数据目录，并兼容迁移
-    旧版安装目录（``_internal/src/templates``）内的模板。旧目录先加载、
-    新目录后加载，同名模板以用户目录版本为准。
+    Source mode reads ``src/templates``; compiled builds read the user data
+    directory and also migrate templates from the old install directory
+    (``_internal/src/templates``). The old directory loads first and the new
+    one second, so a user-directory template wins on name collisions.
     """
     primary = _custom_templates_dir()
     legacy = _legacy_custom_templates_dir()
@@ -265,25 +291,29 @@ def _register_custom_templates() -> None:
                 for attr in dir(module):
                     if attr.startswith("register_custom_"):
                         getattr(module, attr)()
-            except Exception as e:  # noqa: BLE001 - 自定义模板可含任意用户代码，注册失败仅记录
-                logger.error("[StanzaWeaver] 自定义模板注册失败 %s: %s", f.name, e)
+            except Exception as e:  # noqa: BLE001 - user code; log failures
+                logger.error(
+                    "[StanzaWeaver] Failed to register custom template %s: %s",
+                    f.name,
+                    e,
+                )
 
 
 def _template_order_path() -> Path:
-    """用户自定义模板顺序的持久化文件路径.
+    """Path of the file that persists the user-defined template order.
 
     Returns:
-        ``~/.stanza_weaver/template_order.json``。
+        ``~/.stanza_weaver/template_order.json``.
 
     """
     return Path.home() / ".stanza_weaver" / "template_order.json"
 
 
 def _load_template_order() -> list[str]:
-    """读取已保存的模板顺序.
+    """Read the saved template order.
 
     Returns:
-        key 列表；文件不存在/损坏/格式非法时返回空列表。
+        List of keys; empty when the file is missing, corrupt, or invalid.
 
     """
     path = _template_order_path()
@@ -297,13 +327,14 @@ def _load_template_order() -> list[str]:
 
 
 def _save_template_order(keys: list[str]) -> None:
-    """把模板顺序写入用户数据目录.
+    """Write the template order to the user data directory.
 
     Args:
-        keys: 按显示顺序排列的模板 key 列表。
+        keys: Template keys in display order.
 
     Raises:
-        OSError: 写入失败时抛出，由调用方决定是否回报错误。
+        OSError: Raised on write failure; the caller decides whether to
+            report it.
 
     """
     path = _template_order_path()
@@ -314,13 +345,15 @@ def _save_template_order(keys: list[str]) -> None:
 
 
 def _default_template_order() -> list[str]:
-    """计算“重置为默认”后的模板顺序.
+    """Compute the template order after "reset to default".
 
-    内置模板按注册默认顺序排列；自定义模板保持当前相对顺序并追加在内置
-    模板之后；其余模板保持当前顺序追加在最后。
+    Built-in templates come first in their default registration order;
+    custom templates keep their current relative order and are appended
+    after the built-ins; the remaining templates keep their current order
+    and are appended last.
 
     Returns:
-        按默认规则排列的完整 key 顺序。
+        Full key order following the default rules.
     """
     current = [item["key"] for item in list_dicts()]
     current_set = set(current)
@@ -338,7 +371,7 @@ def _default_template_order() -> list[str]:
 
 
 def _apply_saved_template_order() -> None:
-    """启动时应用已保存的模板顺序（测试环境跳过，避免外部数据影响测试）."""
+    """Apply the saved template order at startup (skipped in tests)."""
     if os.environ.get("STANZA_WEAVER_TEST") == "1":
         return
     keys = _load_template_order()
@@ -352,23 +385,23 @@ _apply_saved_template_order()
 
 @app.before_request
 def _guard_local_access() -> Any:
-    """仅允许本机访问（Host 校验）.
+    """Allow local access only (Host check).
 
     Returns:
-        None 表示通过；jsonify Response 表示拒绝（403）。
+        None to pass; a jsonify Response to reject with 403.
 
     """
     host = request.host or ""
     if not host.startswith(("127.0.0.1", "localhost")):
-        return jsonify({"status": "error", "message": "拒绝非本机访问"}), 403
+        return jsonify({"status": "error", "message": "Non-local access denied"}), 403
     return None
 
 
 def _require_csrf() -> bool:
-    """校验 CSRF 令牌.
+    """Validate the CSRF token.
 
     Returns:
-        令牌匹配返回 True。
+        True when the token matches.
 
     """
     return request.headers.get("X-CSRF-Token", "") == _CSRF_TOKEN
@@ -376,10 +409,10 @@ def _require_csrf() -> bool:
 
 @app.route("/api/import-status")
 def api_import_status() -> Any:
-    """查询词库导入状态.
+    """Query the vocabulary import status.
 
     Returns:
-        JSON Response，含 importing 布尔字段。
+        JSON Response with an importing boolean field.
 
     """
     return jsonify({"importing": _vocab_importing})
@@ -387,11 +420,11 @@ def api_import_status() -> Any:
 
 @app.route("/api/llm-status")
 def api_llm_status() -> Any:
-    """查询 LLM 端点连通状态.
+    """Query LLM endpoint connectivity status.
 
     Returns:
-        JSON Response，含 writer 和 checker 状态
-       （"unknown" / "checking" / "ok" / "error"）。
+        JSON Response with the writer and checker statuses
+        ("unknown" / "checking" / "ok" / "error").
 
     """
     return jsonify(dict(_llm_status))
@@ -399,14 +432,14 @@ def api_llm_status() -> Any:
 
 @app.route("/api/llm-ping", methods=["POST"])
 def api_llm_ping() -> Any:
-    """手动触发 LLM 端点连通性探测.
+    """Manually trigger an LLM endpoint connectivity probe.
 
     Returns:
-        JSON Response，含 writer 和 checker 最新状态。
+        JSON Response with the latest writer and checker statuses.
 
     """
     if not _require_csrf():
-        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+        return jsonify({"status": "error", "message": "Missing security token"}), 403
     _llm_status["writer"] = "checking"
     _llm_status["checker"] = "checking"
     _llm_status["editor"] = "checking"
@@ -422,13 +455,13 @@ _I18N_DIR = Path(__file__).parent / "i18n"
 
 @app.route("/api/i18n/<lang>")
 def api_i18n(lang: str) -> Any:
-    """返回指定语言的翻译 JSON.
+    """Return the translation JSON for the given language.
 
     Args:
-        lang: 语言代码（"zh" 或 "en"）。
+        lang: Language code ("zh" or "en").
 
     Returns:
-        JSON Response，翻译字典。
+        JSON Response, translation dictionary.
 
     """
     if lang not in ("zh", "en"):
@@ -443,10 +476,10 @@ def api_i18n(lang: str) -> Any:
 
 @app.route("/")
 def index() -> str:
-    """主页面（注入 CSRF 令牌）.
+    """Main page (injects the CSRF token).
 
     Returns:
-        渲染后的 HTML 字符串。
+        Rendered HTML string.
 
     """
     return render_template("index.html", csrf_token=_CSRF_TOKEN)
@@ -454,10 +487,10 @@ def index() -> str:
 
 @app.route("/api/templates")
 def api_templates() -> Any:
-    """模板列表接口.
+    """Template list endpoint.
 
     Returns:
-        JSON Response，模板字典列表。
+        JSON Response, list of template dictionaries.
 
     """
     return jsonify(list_dicts())
@@ -465,10 +498,10 @@ def api_templates() -> Any:
 
 @app.route("/api/templates/meta")
 def api_templates_meta() -> Any:
-    """自定义模板编辑器的逐语言约束元数据.
+    """Per-language constraint metadata for the custom template editor.
 
     Returns:
-        JSON Response：{语言: {"attribute", "values", "helpers"}}。
+        JSON Response: {language: {"attribute", "values", "helpers"}}.
 
     """
     meta: dict[str, dict[str, Any]] = {}
@@ -483,90 +516,101 @@ def api_templates_meta() -> Any:
 
 @app.route("/api/templates/order", methods=["POST"])
 def api_reorder_templates() -> Any:
-    """保存用户自定义的模板显示顺序.
+    """Persist the user-defined template display order.
 
     Returns:
-        JSON Response：成功时返回重排后的 key 顺序。
+        JSON Response: the reordered key list on success.
 
     Raises:
-        400: 请求格式错误。
-        403: CSRF 令牌校验失败。
-        500: 顺序文件写入失败。
+        400: Invalid request format.
+        403: CSRF token validation failed.
+        500: Failed to write the order file.
 
     """
     if not _require_csrf():
-        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+        return jsonify({"status": "error", "message": "Missing security token"}), 403
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return jsonify({"status": "error", "message": "请求格式错误"}), 400
+        return jsonify({"status": "error", "message": "Invalid request format"}), 400
     raw_order = data.get("order")
     if not isinstance(raw_order, list) or not all(
         isinstance(key, str) for key in raw_order
     ):
-        return jsonify({"status": "error", "message": "顺序必须是模板 key 列表"}), 400
+        return jsonify(
+            {"status": "error", "message": "Order must be a list of template keys"}
+        ), 400
     ordered = set_order(raw_order)
     try:
         _save_template_order(ordered)
     except OSError as e:
-        return jsonify({"status": "error", "message": f"保存模板顺序失败: {e}"}), 500
+        return jsonify(
+            {"status": "error", "message": f"Failed to save template order: {e}"}
+        ), 500
     socketio.emit("templates_updated", {"count": len(list_dicts())})
-    logger.info("模板顺序已更新: %d 个模板", len(ordered))
+    logger.info("Template order updated: %d templates", len(ordered))
     return jsonify({"status": "ok", "order": ordered})
 
 
 @app.route("/api/templates/order/reset", methods=["POST"])
 def api_reset_template_order() -> Any:
-    """把模板顺序重置为默认顺序.
+    """Reset the template order to the default order.
 
-    内置模板恢复默认顺序，自定义模板保持相对顺序并排在内置模板之后。
+    Built-in templates return to their default order; custom templates keep
+    their relative order and follow the built-ins.
 
     Returns:
-        JSON Response：成功时返回重置后的 key 顺序。
+        JSON Response: the reset key order on success.
 
     Raises:
-        403: CSRF 令牌校验失败。
-        500: 顺序文件写入失败。
+        403: CSRF token validation failed.
+        500: Failed to write the order file.
 
     """
     if not _require_csrf():
-        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+        return jsonify({"status": "error", "message": "Missing security token"}), 403
     ordered = set_order(_default_template_order())
     try:
         _save_template_order(ordered)
     except OSError as e:
-        return jsonify({"status": "error", "message": f"保存模板顺序失败: {e}"}), 500
+        return jsonify(
+            {"status": "error", "message": f"Failed to save template order: {e}"}
+        ), 500
     socketio.emit("templates_updated", {"count": len(list_dicts())})
-    logger.info("模板顺序已重置为默认: %d 个模板", len(ordered))
+    logger.info("Template order reset to default: %d templates", len(ordered))
     return jsonify({"status": "ok", "order": ordered})
 
 
 @app.route("/api/templates/delete", methods=["POST"])
 def api_delete_template() -> Any:
-    """删除自定义模板（移除注册并删除落盘源码）.
+    """Delete a custom template (unregister it and remove the on-disk source).
 
     Returns:
-        JSON Response：成功时返回删除的 key。
+        JSON Response: the deleted key on success.
 
     Raises:
-        400: 请求格式错误或尝试删除内置模板。
-        403: CSRF 令牌校验失败。
-        404: 模板不存在。
-        500: 模板文件删除失败。
+        400: Invalid request format or an attempt to delete a built-in.
+        403: CSRF token validation failed.
+        404: Template not found.
+        500: Failed to delete the template file.
 
     """
     if not _require_csrf():
-        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+        return jsonify({"status": "error", "message": "Missing security token"}), 403
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return jsonify({"status": "error", "message": "请求格式错误"}), 400
+        return jsonify({"status": "error", "message": "Invalid request format"}), 400
     key = str(data.get("key", "")).strip()
     if not key:
-        return jsonify({"status": "error", "message": "请选择要删除的模板"}), 400
+        return jsonify(
+            {"status": "error", "message": "Select a template to delete"}
+        ), 400
     registered_keys = [item["key"] for item in list_dicts()]
     if key not in registered_keys:
-        return jsonify({"status": "error", "message": "模板不存在"}), 404
+        return jsonify({"status": "error", "message": "Template not found"}), 404
     if not key.startswith("custom_"):
-        return jsonify({"status": "error", "message": "内置模板不能删除"}), 400
+        return jsonify(
+            {"status": "error", "message": "Built-in templates cannot be deleted"}
+        ), 400
     for directory in (_custom_templates_dir(), _legacy_custom_templates_dir()):
         if directory is None:
             continue
@@ -577,32 +621,34 @@ def api_delete_template() -> Any:
             path.unlink()
         except OSError as e:
             return jsonify(
-                {"status": "error", "message": f"模板文件删除失败: {e}"}
+                {"status": "error", "message": f"Failed to delete template file: {e}"}
             ), 500
     unregister(key)
     sys.modules.pop(f"src.templates.{key}", None)
     try:
         _save_template_order([item["key"] for item in list_dicts()])
     except OSError as e:
-        logger.warning("删除模板后保存顺序失败: %s", e)
+        logger.warning("Failed to save template order after deleting a template: %s", e)
     socketio.emit("templates_updated", {"count": len(list_dicts())})
-    logger.info("自定义模板已删除: %s", key)
+    logger.info("Custom template deleted: %s", key)
     return jsonify({"status": "ok", "key": key, "count": len(list_dicts())})
 
 
 def _template_source_code(base_key: str, template: Any) -> str:
-    """返回源模板可供 AI 转写的代码文本.
+    """Return the source code of a source template for AI rewriting.
 
-    自定义模板优先读取落盘的源码文件；找不到时按模板规格重建等价源码。
-    内置模板返回模板类源码，并附带同模块内定义的辅助函数/常量，便于 AI
-    理解三平尾、孤平、步格等规则代码。
+    Custom templates prefer the on-disk source file; when it is missing,
+    equivalent source is rebuilt from the template spec. Built-in templates
+    return the template class source plus helper functions/constants defined
+    in the same module, so the AI can understand rule code such as
+    three-ping-tails, isolated-ping, and step patterns.
 
     Args:
-        base_key: 源模板 key。
-        template: 源模板对象（PoetryTemplate 实例）。
+        base_key: Source template key.
+        template: Source template object (PoetryTemplate instance).
 
     Returns:
-        源码文本；无法获取时返回空串。
+        Source text; empty string when unavailable.
     """
     if base_key.startswith("custom_"):
         for directory in (_custom_templates_dir(), _legacy_custom_templates_dir()):
@@ -646,8 +692,10 @@ def _template_source_code(base_key: str, template: Any) -> str:
                 structural_rules=data.get("structural_rules"),
                 rule_note=str(data.get("rule_note", "")),
             )
-        except Exception as e:  # noqa: BLE001 - 源码重建仅用于 AI 参考，失败返回空
-            logger.warning("自定义模板源码重建失败 %s: %s", base_key, e)
+        except Exception as e:  # noqa: BLE001 - source rebuild: AI reference only
+            logger.warning(
+                "Failed to rebuild custom template source %s: %s", base_key, e
+            )
             return ""
 
     class_object = type(template)
@@ -677,29 +725,34 @@ def _template_source_code(base_key: str, template: Any) -> str:
 
 @app.route("/api/templates/convert", methods=["POST"])
 def api_convert_template() -> Any:
-    """统一的跨语言模板转化接口.
+    """Unified cross-language template conversion endpoint.
 
-    读取源模板的完整规格（行数/每行音节/逐位约束/押韵韵式/自定义代码），
-    只把逐位约束的属性值按映射转换为目标语言属性值，其余原样复制。
-    前端“应用转换”与模板编辑 AI 的 set_from_template 工具共用此实现。
+    Reads the source template's full spec (line count / syllables per line /
+    per-position constraints / rhyme scheme / custom code) and converts only
+    the per-position constraint attribute values into target-language values
+    according to the mapping; everything else is copied verbatim. The
+    frontend "apply conversion" action and the template editor AI's
+    set_from_template tool share this implementation.
 
     Returns:
-        JSON Response：成功时返回转化后的模板规格；失败返回错误信息。
+        JSON Response: the converted template spec on success; an error
+        message on failure.
 
     Raises:
-        400: 请求格式错误、未知模板/语言或映射非法。
-        403: CSRF 令牌校验失败。
+        400: Invalid request format, unknown template/language, or an
+            invalid mapping.
+        403: CSRF token validation failed.
 
     """
     if not _require_csrf():
-        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+        return jsonify({"status": "error", "message": "Missing security token"}), 403
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return jsonify({"status": "error", "message": "请求格式错误"}), 400
+        return jsonify({"status": "error", "message": "Invalid request format"}), 400
     base_key = str(data.get("base_template_key", "")).strip()
     language = str(data.get("language", ""))
     if not base_key:
-        return jsonify({"status": "error", "message": "请选择源模板"}), 400
+        return jsonify({"status": "error", "message": "Select a source template"}), 400
     from src.templates.convert import convert_template
 
     spec, error = convert_template(base_key, language, data.get("mapping"))
@@ -717,12 +770,15 @@ def api_convert_template() -> Any:
 
             editor_config = get_config().editor
             if not editor_config.get("api_key"):
-                ai_error = "模板AI未配置，请先在设置中填写模板AI的 API Key"
+                ai_error = (
+                    "Template AI is not configured; set a template AI API key "
+                    "in Settings first"
+                )
             else:
                 source_template = get_template(base_key)
                 source_code = _template_source_code(base_key, source_template)
                 if not source_code:
-                    ai_error = "无法获取源模板代码，未进行 AI 转写"
+                    ai_error = "Unable to get source template code; AI rewrite skipped"
                 else:
                     rewritten = TemplateCodeRewriter(editor_config).rewrite(
                         source_language=str(spec.get("source_language", "")),
@@ -741,9 +797,11 @@ def api_convert_template() -> Any:
                             carried.append("ai_code")
                         spec["carried_rules"] = carried
                     else:
-                        ai_error = str(rewritten.get("message", "模板代码转写失败"))
-        except Exception as e:  # noqa: BLE001 - AI 转写失败降级为确定性转化结果
-            ai_error = f"模板代码 AI 转写失败: {e}"
+                        ai_error = str(
+                            rewritten.get("message", "Template code rewrite failed")
+                        )
+        except Exception as e:  # noqa: BLE001 - AI rewrite: deterministic fallback
+            ai_error = f"Template code AI rewrite failed: {e}"
         if ai_error:
             spec["ai_rewrite_error"] = ai_error
     return jsonify(spec)
@@ -751,17 +809,17 @@ def api_convert_template() -> Any:
 
 @app.route("/api/config", methods=["GET"])
 def api_get_config() -> Any:
-    """读取 LLM 配置.
+    """Read the LLM configuration.
 
     Returns:
-        JSON Response，含 writer 和 checker 端点配置。
+        JSON Response with the writer and checker endpoint configs.
 
     Raises:
-        403: CSRF 令牌校验失败。
+        403: CSRF token validation failed.
 
     """
     if not _require_csrf():
-        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+        return jsonify({"status": "error", "message": "Missing security token"}), 403
     from src.config import get_config
 
     config = get_config()
@@ -777,30 +835,30 @@ def api_get_config() -> Any:
 
 @app.route("/api/config", methods=["POST"])
 def api_save_config() -> Any:
-    """保存 LLM 配置.
+    """Save the LLM configuration.
 
     Returns:
-        JSON Response（成功或错误）。
+        JSON Response (success or error).
 
     Raises:
-        400: 请求格式错误。
-        403: CSRF 令牌校验失败。
+        400: Invalid request format.
+        403: CSRF token validation failed.
 
     """
     if not _require_csrf():
-        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+        return jsonify({"status": "error", "message": "Missing security token"}), 403
     from src.config import get_config
 
     config = get_config()
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return jsonify({"status": "error", "message": "请求格式错误"}), 400
+        return jsonify({"status": "error", "message": "Invalid request format"}), 400
     for key in ("writer", "checker", "editor"):
         if key in data:
             value = data[key]
             if not isinstance(value, dict):
                 return jsonify(
-                    {"status": "error", "message": f"{key} 配置格式错误"}
+                    {"status": "error", "message": f"Invalid format for {key} config"}
                 ), 400
             config.__setattr__(key, value)
     if "language" in data:
@@ -809,7 +867,8 @@ def api_save_config() -> Any:
             config.language = lang
     config.save()
     logger.info(
-        "LLM 配置已保存 (writer.base_url=%s, checker.base_url=%s, editor.base_url=%s)",
+        "LLM configuration saved (writer.base_url=%s, checker.base_url=%s, "
+        "editor.base_url=%s)",
         config.writer["base_url"],
         config.checker["base_url"],
         config.editor["base_url"],
@@ -823,18 +882,18 @@ def api_save_config() -> Any:
 
 @socketio.on("connect")
 def handle_connect() -> None:
-    """Socket 连接建立.
+    """Socket connection established.
 
-    无返回值，无副作用。
+    No return value and no side effects.
     """
 
 
 def _emit_done(session_id: str, result: Any) -> None:
-    """向会话推送 done 事件.
+    """Push a done event to the session.
 
     Args:
-        session_id: SocketIO 会话 ID。
-        result: 流水线结果状态。
+        session_id: SocketIO session ID.
+        result: Pipeline result state.
 
     """
     socketio.emit(
@@ -856,53 +915,58 @@ def _emit_done(session_id: str, result: Any) -> None:
 
 @socketio.on("generate")
 def handle_generate(data: dict[str, Any]) -> None:
-    """开始生成：后台线程跑四步流水线.
+    """Start generation: run the four-step pipeline in a background thread.
 
     Args:
-        data: 事件负载（topic 主题、template_key 模板键）。
+        data: Event payload (topic, template_key).
 
     """
     from src.pipeline.pipeline import PoetryPipeline
 
     topic = str(data.get("topic", ""))
     template_key = str(data.get("template_key", ""))
-    session_id = request.sid  # type: ignore[attr-defined]  # flask_socketio 注入
+    session_id = request.sid  # type: ignore[attr-defined]  # socketio
 
     if not topic or not template_key:
-        emit("error", {"message": "主题和模板不能为空"})
+        emit("error", {"message": "Topic and template must not be empty"})
         return
 
     logger.info(
-        "generate 开始 session=%s template=%s topic=%r", session_id, template_key, topic
+        "generate started session=%s template=%s topic=%r",
+        session_id,
+        template_key,
+        topic,
     )
     pipeline = PoetryPipeline()
 
     def on_progress(state_dict: dict[str, Any]) -> None:
-        """推送流水线进度到该会话.
+        """Push pipeline progress to the session.
 
         Args:
-            state_dict: 流水线状态字典。
+            state_dict: Pipeline state dictionary.
 
         """
         socketio.emit("progress", state_dict, to=session_id)
 
     def run() -> None:
-        """在后台线程执行四步流水线并推送 done/error 事件."""
+        """Run the four-step pipeline in a background thread and emit events."""
         try:
             result = pipeline.run(
                 topic=topic,
                 template_key=template_key,
                 on_progress=on_progress,
             )
-        except Exception as e:  # noqa: BLE001 - 生成线程兜底：任何失败转为前端错误事件
-            logger.error("generate 失败 session=%s: %s", session_id, e)
-            socketio.emit("error", {"message": f"生成失败: {e}"}, to=session_id)
+        except Exception as e:  # noqa: BLE001 - generation thread: emit error
+            logger.error("generate failed session=%s: %s", session_id, e)
+            socketio.emit(
+                "error", {"message": f"Generation failed: {e}"}, to=session_id
+            )
             return
         _active_states[session_id] = {
             "pipeline_state": result,
         }
         logger.info(
-            "generate 完成 session=%s checker_pass=%s rounds=%s",
+            "generate finished session=%s checker_pass=%s rounds=%s",
             session_id,
             result.checker_pass,
             result.refine_rounds,
@@ -914,51 +978,55 @@ def handle_generate(data: dict[str, Any]) -> None:
 
 @socketio.on("feedback")
 def handle_feedback(data: dict[str, Any]) -> None:
-    """用户反馈续跑：打回 Step 3 按反馈重新炼句.
+    """Continue from user feedback: re-run Step 3 polishing with it.
 
     Args:
-        data: 事件负载（feedback 用户反馈文本）。
+        data: Event payload (user feedback text).
 
     """
     from src.pipeline.pipeline import PoetryPipeline
 
     feedback = str(data.get("feedback", ""))
-    session_id = request.sid  # type: ignore[attr-defined]  # flask_socketio 注入
+    session_id = request.sid  # type: ignore[attr-defined]  # socketio
 
     session_data = _active_states.get(session_id, {})
     pipeline_state = session_data.get("pipeline_state")
     if pipeline_state is None:
-        emit("error", {"message": "没有活跃的生成会话，请先生成诗歌"})
+        emit(
+            "error", {"message": "No active generation session; generate a poem first"}
+        )
         return
 
     pipeline = PoetryPipeline()
 
     def on_progress(state_dict: dict[str, Any]) -> None:
-        """推送流水线进度到该会话.
+        """Push pipeline progress to the session.
 
         Args:
-            state_dict: 流水线状态字典。
+            state_dict: Pipeline state dictionary.
 
         """
         socketio.emit("progress", state_dict, to=session_id)
 
     def run() -> None:
-        """在后台线程按用户反馈续跑流水线并推送 done/error 事件."""
+        """Re-run the pipeline in a background thread and emit events."""
         try:
             result = pipeline.continue_with_feedback(
                 state=pipeline_state,
                 user_feedback=feedback,
                 on_progress=on_progress,
             )
-        except Exception as e:  # noqa: BLE001 - 反馈线程兜底：任何失败转为前端错误事件
-            logger.error("feedback 失败 session=%s: %s", session_id, e)
-            socketio.emit("error", {"message": f"反馈处理失败: {e}"}, to=session_id)
+        except Exception as e:  # noqa: BLE001 - feedback thread: emit error
+            logger.error("feedback failed session=%s: %s", session_id, e)
+            socketio.emit(
+                "error", {"message": f"Feedback processing failed: {e}"}, to=session_id
+            )
             return
         _active_states[session_id] = {
             "pipeline_state": result,
         }
         logger.info(
-            "feedback 完成 session=%s checker_pass=%s rounds=%s",
+            "feedback finished session=%s checker_pass=%s rounds=%s",
             session_id,
             result.checker_pass,
             result.refine_rounds,
@@ -969,13 +1037,13 @@ def handle_feedback(data: dict[str, Any]) -> None:
 
 
 def _sequence_payload(state: Any) -> dict[str, Any]:
-    """把诗组状态转为可推送/可序列化的字典.
+    """Convert the poem-sequence state into a serializable dictionary.
 
     Args:
-        state: SequenceState。
+        state: SequenceState.
 
     Returns:
-        前端可用的诗组字典。
+        Sequence dictionary usable by the frontend.
 
     """
     return {
@@ -1006,54 +1074,56 @@ def _sequence_payload(state: Any) -> dict[str, Any]:
 
 @socketio.on("generate_sequence")
 def handle_generate_sequence(data: dict[str, Any]) -> None:
-    """开始诗组生成：规划 → 逐首生成/检查 → 汇总.
+    """Start sequence generation: plan → generate/check each poem → assemble.
 
     Args:
-        data: 事件负载（topic 诗组总目标；template_keys 每首格律 key 列表）。
+        data: Event payload (topic = overall goal; template_keys = meters).
 
     """
     from src.pipeline.sequence import PoemSequencePipeline
 
     topic = str(data.get("topic", ""))
-    session_id = request.sid  # type: ignore[attr-defined]  # flask_socketio 注入
+    session_id = request.sid  # type: ignore[attr-defined]  # socketio
 
     if not topic:
-        emit("error", {"message": "诗组主题不能为空"})
+        emit("error", {"message": "Sequence topic must not be empty"})
         return
 
     template_keys: list[str] | None = None
     if "template_keys" in data:
         raw = data.get("template_keys")
         if not isinstance(raw, list) or not raw:
-            emit("error", {"message": "请至少为每首诗选择格律"})
+            emit("error", {"message": "Select a meter for each poem"})
             return
         template_keys = [str(item) for item in raw]
 
-    logger.info("generate_sequence 开始 session=%s topic=%r", session_id, topic)
+    logger.info("generate_sequence started session=%s topic=%r", session_id, topic)
     pipeline = PoemSequencePipeline()
 
     def on_progress(state_dict: dict[str, Any]) -> None:
-        """推送诗组规划/生成进度到该会话.
+        """Push sequence planning/generation progress to the session.
 
         Args:
-            state_dict: 诗组状态字典。
+            state_dict: Sequence state dictionary.
 
         """
         socketio.emit("sequence_progress", state_dict, to=session_id)
 
     def run() -> None:
-        """在后台线程执行诗组流水线并推送 sequence_done/error 事件."""
+        """Run the sequence pipeline in a background thread and emit events."""
         try:
             state = pipeline.run(
                 topic, on_progress=on_progress, template_keys=template_keys
             )
-        except Exception as e:  # noqa: BLE001 - 诗组线程兜底：任何失败转为前端错误事件
-            logger.error("generate_sequence 失败 session=%s: %s", session_id, e)
-            socketio.emit("error", {"message": f"诗组生成失败: {e}"}, to=session_id)
+        except Exception as e:  # noqa: BLE001 - sequence thread: emit error
+            logger.error("generate_sequence failed session=%s: %s", session_id, e)
+            socketio.emit(
+                "error", {"message": f"Sequence generation failed: {e}"}, to=session_id
+            )
             return
         _active_sequences[session_id] = {"sequence_state": state}
         logger.info(
-            "generate_sequence 完成 session=%s poems=%s ok=%s",
+            "generate_sequence finished session=%s poems=%s ok=%s",
             session_id,
             len(state.poems),
             state.ok,
@@ -1065,19 +1135,19 @@ def handle_generate_sequence(data: dict[str, Any]) -> None:
 
 @socketio.on("disconnect")
 def handle_disconnect() -> None:
-    """连接断开：清理会话状态."""
-    _active_states.pop(request.sid, None)  # type: ignore[attr-defined]  # flask_socketio 注入
-    _active_sequences.pop(request.sid, None)  # type: ignore[attr-defined]  # flask_socketio 注入
+    """Disconnect: clean up the session state."""
+    _active_states.pop(request.sid, None)  # type: ignore[attr-defined]  # socketio
+    _active_sequences.pop(request.sid, None)  # type: ignore[attr-defined]  # socketio
 
 
 def _render_constraint_table(constraints: list[Any]) -> str:
-    """把一份逐位约束表渲染为 Python 字面量源码.
+    """Render one per-position constraint table as Python literal source.
 
     Args:
-        constraints: 逐位约束（行 -> 单元格 -> {attributes}）。
+        constraints: Per-position constraints (line -> cell -> {attributes}).
 
     Returns:
-        Python 列表字面量源码。
+        Python list literal source.
 
     """
     constraints_code: list[str] = []
@@ -1113,26 +1183,31 @@ def _build_custom_template_code(
     structural_rules: dict[str, Any] | None = None,
     rule_note: str = "",
 ) -> str:
-    """生成自定义模板的 Python 源码（供 /api/templates/custom 落盘）.
+    """Generate Python source for a custom template (written to disk).
 
     Args:
-        name: 模板显示名。
-        language: 语言代码（zh/en/fr/it/la）。
-        lines: 行数。
-        syllables_per_line: 每行音节数。
-        dimension: 该语言的逐位约束属性键（"" 表示无语位约束）。
-        constraints: 逐位约束（行 -> 单元格 -> {attributes}）。
-        custom_code: 用户提供的 validate_full 附加代码。
-        class_name: 生成的模板类名。
-        file_key: 注册键（custom_<name>）。
-        alternatives: 多份逐位约束表（满足任意一份即可）；为空时用 constraints。
-        rhyme_scheme: 归一化韵式（如 "ABABCDCDEFEFGG"；空串表示不押韵）。
-        rhyme_distinct: 不同韵组是否须互不相同。
-        structural_rules: 已数据化的结构规则（如近体诗平仄骨架/三平尾/孤平）。
-        rule_note: 用户填写的模板规则描述（会作为 prompt 提供给写作 AI）。
+        name: Template display name.
+        language: Language code (zh/en/fr/it/la).
+        lines: Number of lines.
+        syllables_per_line: Syllables per line.
+        dimension: Per-position constraint attribute key ("" = none).
+        constraints: Per-position constraints (line -> cell -> {attributes}).
+        custom_code: Extra validate_full code supplied by the user.
+        class_name: Generated template class name.
+        file_key: Registration key (custom_<name>).
+        alternatives: Multiple constraint tables (any one suffices);
+            constraints is used when empty.
+        rhyme_scheme: Normalized rhyme scheme (e.g. "ABABCDCDEFEFGG"; empty
+            means no rhyme).
+        rhyme_distinct: Whether distinct rhyme groups must all differ.
+        structural_rules: Materialized structural rules (e.g. jinti tone
+            skeleton / three-ping-tails / isolated-ping).
+        rule_note: User-written template rule description (given to the
+            writer AI as a prompt).
 
     Returns:
-        可直接写入 src/templates/custom_*.py 的源码文本。
+        Source text that can be written directly to
+        src/templates/custom_*.py.
 
     """
     tables: list[Any] = (
@@ -1144,10 +1219,12 @@ def _build_custom_template_code(
         tables = [[]]
     rendered_tables = [_render_constraint_table(list(table or [])) for table in tables]
 
-    # 生成文件的 REUSE 头。SPDX 标记拆开拼接，避免本文件源码中出现被
-    # REUSE 误解析为许可证表达式的连续字面量（reuse lint 会报 invalid）。
+    # REUSE header for the generated file. The SPDX tag is split and joined so
+    # this file never contains a contiguous literal that REUSE would
+    # misinterpret as a license expression (reuse lint reports it invalid).
     spdx_line = "# SPDX-License-" + "Identifier: MIT"
-    # 有数据化结构规则时，押韵与结构由 check_jinti_rules 统一校验，避免重复。
+    # With materialized structural rules, rhyme and structure are checked by
+    # check_jinti_rules together to avoid duplication.
     rhyme_import = (
         "from .rhyme import check_rhyme_scheme\n"
         if rhyme_scheme and not structural_rules
@@ -1251,22 +1328,23 @@ def _create_custom_template(
     structural_rules: dict[str, Any] | None = None,
     rule_note: str = "",
 ) -> tuple[int, dict[str, Any]]:
-    """落盘并热注册一个自定义模板.
+    """Persist a custom template and hot-register it.
 
     Args:
-        name: 模板显示名。
-        language: 语言代码。
-        lines: 行数。
-        syllables_per_line: 每行音节数。
-        alternatives: 多份逐位约束表。
-        custom_code: 自定义整体校验代码。
-        rhyme_scheme: 归一化韵式。
-        rhyme_distinct: 不同韵组是否须互不相同。
-        structural_rules: 已数据化的结构规则（可选）。
-        rule_note: 用户填写的模板规则描述（可选，作为写作 AI 的 prompt）。
+        name: Template display name.
+        language: Language code.
+        lines: Number of lines.
+        syllables_per_line: Syllables per line.
+        alternatives: Multiple per-position constraint tables.
+        custom_code: Custom whole-poem validation code.
+        rhyme_scheme: Normalized rhyme scheme.
+        rhyme_distinct: Whether distinct rhyme groups must all differ.
+        structural_rules: Materialized structural rules (optional).
+        rule_note: User-written template rule description (optional; prompt
+            for the writer AI).
 
     Returns:
-        (HTTP 状态码, 响应载荷)；成功载荷含模板 key。
+        (HTTP status code, response payload); success includes the key.
 
     """
     import re
@@ -1275,7 +1353,10 @@ def _create_custom_template(
     if not safe_name:
         return 400, {
             "status": "error",
-            "message": "模板名需包含字母或数字（当前名称无法生成合法标识符）",
+            "message": (
+                "Template name must contain letters or digits (cannot form "
+                "a valid identifier)"
+            ),
         }
 
     from src.templates.rhyme import normalize_rhyme_scheme
@@ -1314,21 +1395,24 @@ def _create_custom_template(
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(code_body, encoding="utf-8")
     except OSError as e:
-        return 500, {"status": "error", "message": f"模板文件写入失败: {e}"}
+        return 500, {
+            "status": "error",
+            "message": f"Failed to write template file: {e}",
+        }
 
     try:
         module = _load_custom_template_module(file_path)
         reg_func = getattr(module, f"register_custom_{safe_name}", None)
         if reg_func:
             reg_func()
-    except Exception as e:  # noqa: BLE001 - 用户代码模板注册兜底：任何导入/执行错误回报 500
-        return 500, {"status": "error", "message": f"注册失败: {e}"}
+    except Exception as e:  # noqa: BLE001 - template registration error -> 500
+        return 500, {"status": "error", "message": f"Template registration failed: {e}"}
 
     socketio.emit("templates_updated", {"count": len(list_dicts())})
-    logger.info("自定义模板已创建: %s (%s, %d 行)", name, language, lines)
+    logger.info("Custom template created: %s (%s, %d lines)", name, language, lines)
     return 200, {
         "status": "ok",
-        "message": f"模板'{name}'已创建并注册",
+        "message": f"Template '{name}' created and registered",
         "count": len(list_dicts()),
         "key": file_key,
     }
@@ -1337,13 +1421,13 @@ def _create_custom_template(
 def _create_custom_template_from_draft(
     draft: Any,
 ) -> tuple[int, dict[str, Any]]:
-    """把模板编辑 AI 的草稿落盘并注册.
+    """Persist and register the template editor AI's draft.
 
     Args:
-        draft: TemplateDraft 实例。
+        draft: TemplateDraft instance.
 
     Returns:
-        (HTTP 状态码, 响应载荷)。
+        (HTTP status code, response payload).
 
     """
     return _create_custom_template(
@@ -1364,22 +1448,24 @@ def _create_custom_template_from_draft(
 
 @app.route("/api/templates/custom", methods=["POST"])
 def api_create_custom_template() -> Any:
-    """创建自定义格律模板（落盘为 src/templates/custom_*.py 并热注册）.
+    """Create a custom metrical template (persisted and hot-registered).
+
+    The template is written as src/templates/custom_*.py.
 
     Returns:
-        JSON Response（成功含模板 key，或错误信息）。
+        JSON Response (template key on success, or an error message).
 
     Raises:
-        400: 请求格式错误或模板代码无效。
-        403: CSRF 令牌校验失败。
+        400: Invalid request format or invalid template code.
+        403: CSRF token validation failed.
 
     """
     if not _require_csrf():
-        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+        return jsonify({"status": "error", "message": "Missing security token"}), 403
 
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return jsonify({"status": "error", "message": "请求格式错误"}), 400
+        return jsonify({"status": "error", "message": "Invalid request format"}), 400
     name = str(data.get("name", "")).strip()
     language = str(data.get("language", "zh"))
     try:
@@ -1393,17 +1479,24 @@ def api_create_custom_template() -> Any:
     custom_code = str(data.get("code", "")).strip()
 
     if not name:
-        return jsonify({"status": "error", "message": "模板名称不能为空"}), 400
+        return jsonify(
+            {"status": "error", "message": "Template name must not be empty"}
+        ), 400
     schemes = custom_template_schemes()
     if language not in schemes:
-        return jsonify({"status": "error", "message": "不支持的语言"}), 400
+        return jsonify({"status": "error", "message": "Unsupported language"}), 400
     try:
         syllables_per_line = [max(1, int(s)) for s in syllables_per_line][:lines]
     except TypeError, ValueError:
-        return jsonify({"status": "error", "message": "每行音节数格式错误"}), 400
+        return jsonify(
+            {"status": "error", "message": "Invalid syllables-per-line format"}
+        ), 400
     if len(syllables_per_line) != lines:
         return jsonify(
-            {"status": "error", "message": "音节数列表长度必须等于行数"}
+            {
+                "status": "error",
+                "message": "Syllables list length must equal the number of lines",
+            }
         ), 400
 
     raw_alternatives = data.get("alternatives")
@@ -1427,7 +1520,10 @@ def api_create_custom_template() -> Any:
     rule_note = str(data.get("rule_note", "") or "").strip()
     if len(rule_note) > 4000:
         return jsonify(
-            {"status": "error", "message": "模板规则描述不能超过 4000 字"}
+            {
+                "status": "error",
+                "message": "Template rule description must not exceed 4000 characters",
+            }
         ), 400
 
     status, payload = _create_custom_template(
@@ -1447,10 +1543,12 @@ def api_create_custom_template() -> Any:
 
 @socketio.on("edit_template")
 def handle_edit_template(data: dict[str, Any]) -> None:
-    """模板编辑 AI：后台线程配置模板并实时推送思考/回答/工具调用.
+    """Template editor AI: configure the template in a background thread.
+
+    Thoughts, answers, and tool calls are streamed to the frontend.
 
     Args:
-        data: 事件负载（prompt 用户描述；draft 当前模板草稿）。
+        data: Event payload (prompt = description; draft = current draft).
 
     """
     from src.agents.editor_ai import TemplateEditorAI
@@ -1459,12 +1557,12 @@ def handle_edit_template(data: dict[str, Any]) -> None:
     prompt = str(data.get("prompt", "")).strip()
     raw_draft = data.get("draft")
     draft_payload = raw_draft if isinstance(raw_draft, dict) else {}
-    session_id = request.sid  # type: ignore[attr-defined]  # flask_socketio 注入
+    session_id = request.sid  # type: ignore[attr-defined]  # socketio
 
     if not prompt:
         socketio.emit(
             "template_ai_done",
-            {"status": "error", "message": "请先描述想要的模板"},
+            {"status": "error", "message": "Describe the template you want first"},
             to=session_id,
         )
         return
@@ -1475,34 +1573,37 @@ def handle_edit_template(data: dict[str, Any]) -> None:
             "template_ai_done",
             {
                 "status": "error",
-                "message": "模板AI未配置，请先在设置中填写模板AI的 API Key",
+                "message": (
+                    "Template AI is not configured; set a template AI API key "
+                    "in Settings first"
+                ),
             },
             to=session_id,
         )
         return
 
-    logger.info("edit_template 开始 session=%s prompt=%r", session_id, prompt)
+    logger.info("edit_template started session=%s prompt=%r", session_id, prompt)
 
     def run() -> None:
-        """在后台线程运行模板编辑 AI 并推送事件."""
+        """Run the template editor AI in a background thread and push events."""
         try:
             agent = TemplateEditorAI(editor_config)
 
             def on_event(event: dict[str, Any]) -> None:
-                """推送一条模板AI事件到该会话.
+                """Push one template-AI event to the session.
 
                 Args:
-                    event: 事件字典。
+                    event: Event dictionary.
 
                 """
                 socketio.emit("template_ai", event, to=session_id)
 
             result = agent.edit(prompt, draft_payload, emit=on_event)
-        except Exception as e:  # noqa: BLE001 - 模板AI线程兜底：任何失败转为前端错误事件
-            logger.error("edit_template 失败 session=%s: %s", session_id, e)
+        except Exception as e:  # noqa: BLE001 - template-AI thread: emit error
+            logger.error("edit_template failed session=%s: %s", session_id, e)
             socketio.emit(
                 "template_ai_done",
-                {"status": "error", "message": f"模板AI处理失败: {e}"},
+                {"status": "error", "message": f"Template AI processing failed: {e}"},
                 to=session_id,
             )
             return
@@ -1523,7 +1624,7 @@ def handle_edit_template(data: dict[str, Any]) -> None:
 
         status, body = _create_custom_template_from_draft(result.draft)
         if status == 200:
-            logger.info("模板AI已创建模板: %s", body.get("key"))
+            logger.info("Template AI created template: %s", body.get("key"))
             socketio.emit(
                 "template_ai_done",
                 {
@@ -1540,7 +1641,7 @@ def handle_edit_template(data: dict[str, Any]) -> None:
                 {
                     "status": "error",
                     "draft": draft_result,
-                    "message": str(body.get("message", "创建模板失败")),
+                    "message": str(body.get("message", "Template creation failed")),
                 },
                 to=session_id,
             )
@@ -1552,10 +1653,10 @@ _HISTORY_DB_PATH: Path | None = None
 
 
 def set_history_db_path(path: Path) -> None:
-    """覆盖历史记录数据库路径（主要供测试使用）.
+    """Override the history database path (mainly for tests).
 
     Args:
-        path: 新的数据库文件路径。
+        path: New database file path.
 
     """
     global _HISTORY_DB_PATH
@@ -1563,10 +1664,10 @@ def set_history_db_path(path: Path) -> None:
 
 
 def get_history_db_path() -> Path:
-    """返回历史记录数据库路径（默认 ~/.stanza_weaver/history.db）.
+    """Return the history database path (default ~/.stanza_weaver/history.db).
 
     Returns:
-        数据库文件路径。
+        Database file path.
 
     """
     global _HISTORY_DB_PATH
@@ -1576,7 +1677,7 @@ def get_history_db_path() -> Path:
 
 
 def _init_history_db() -> None:
-    """初始化历史记录表（幂等）."""
+    """Initialize the history table (idempotent)."""
     import sqlite3
 
     hdb = get_history_db_path()
@@ -1597,10 +1698,10 @@ def _init_history_db() -> None:
 
 @app.route("/api/history", methods=["GET"])
 def api_get_history() -> Any:
-    """读取历史记录（最近 50 条）.
+    """Read history records (latest 50).
 
     Returns:
-        JSON Response，历史记录列表。
+        JSON Response, list of history records.
 
     """
     import sqlite3
@@ -1628,24 +1729,24 @@ def api_get_history() -> Any:
 
 @app.route("/api/history", methods=["POST"])
 def api_save_history() -> Any:
-    """保存历史记录（定稿后由前端调用）.
+    """Save a history record (called by the frontend after the final draft).
 
     Returns:
-        JSON Response（成功或错误）。
+        JSON Response (success or error).
 
     Raises:
-        400: 请求格式错误。
-        403: CSRF 令牌校验失败。
+        400: Invalid request format.
+        403: CSRF token validation failed.
 
     """
     import sqlite3
 
     if not _require_csrf():
-        return jsonify({"status": "error", "message": "缺少安全令牌"}), 403
+        return jsonify({"status": "error", "message": "Missing security token"}), 403
 
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return jsonify({"status": "error", "message": "请求格式错误"}), 400
+        return jsonify({"status": "error", "message": "Invalid request format"}), 400
 
     _init_history_db()
     hdb = get_history_db_path()
@@ -1661,35 +1762,39 @@ def api_save_history() -> Any:
     conn.commit()
     conn.close()
     logger.info(
-        "历史记录已保存: %s (%s)", data.get("template_name", ""), data.get("topic", "")
+        "History record saved: %s (%s)",
+        data.get("template_name", ""),
+        data.get("topic", ""),
     )
     return jsonify({"status": "ok"})
 
 
 def start_server() -> None:
-    """启动 SocketIO 服务.
+    """Start the SocketIO service.
 
-    监听地址/端口可用环境变量 STANZAWEAVER_HOST / STANZAWEAVER_PORT 覆盖
-    （Docker 部署时设 STANZAWEAVER_HOST=0.0.0.0 配合端口映射）。
+    The listen address/port can be overridden with the STANZAWEAVER_HOST /
+    STANZAWEAVER_PORT environment variables (for Docker deployments set
+    STANZAWEAVER_HOST=0.0.0.0 together with port mapping).
     """
     host = os.environ.get("STANZAWEAVER_HOST", "127.0.0.1")
     try:
         port = int(os.environ.get("STANZAWEAVER_PORT", "5000"))
     except ValueError:
         port = 5000
-    logger.info("[StanzaWeaver] 服务启动 http://%s:%s", host, port)
+    logger.info("[StanzaWeaver] Server started at http://%s:%s", host, port)
     _start_background_threads()
     socketio.run(app, host=host, port=port, allow_unsafe_werkzeug=True)
 
 
 def main() -> None:
-    """入口：优先 pywebview 桌面窗口，否则纯 HTTP 服务.
+    """Entry point: prefer the pywebview window, else a plain HTTP service.
 
-    桌面窗口初始化失败（如无显示环境/缺 GUI 库）时自动回退到 HTTP 服务，
-    保证 Docker 等无头环境可用。
+    If desktop-window initialization fails (e.g. no display environment or
+    missing GUI libraries), fall back to the HTTP service automatically so
+    headless environments such as Docker keep working.
 
     Returns:
-        None。
+        None.
 
     """
     try:
@@ -1709,8 +1814,8 @@ def main() -> None:
             min_size=(700, 500),
         )
         webview.start()
-    except Exception as e:  # noqa: BLE001 - GUI 初始化失败兜底：回退 HTTP 服务
-        logger.warning("GUI 初始化失败，回退到 HTTP 服务模式: %s", e)
+    except Exception as e:  # noqa: BLE001 - GUI-init fallback: use HTTP
+        logger.warning("GUI initialization failed; falling back to HTTP mode: %s", e)
         t.join()
 
 

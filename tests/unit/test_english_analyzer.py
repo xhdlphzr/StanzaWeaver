@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""英语音节分析器单元测试（符号层，离线播种 CMUdict）."""
+"""Unit tests for the English syllable analyzer (symbol layer, offline CMUdict seeding)."""
 
 from unittest import mock
 
@@ -9,9 +9,9 @@ from src.prosody.english import EnglishAnalyzer
 
 
 def test_parse_phones_single_syllable() -> None:
-    """验证 parse phones single syllable."""
+    """Verify _parse_phones for a single-syllable word."""
     a = EnglishAnalyzer()
-    # test /tɛst/: onset t, nucleus ɛ, coda st, 主重音
+    # test /tɛst/: onset t, nucleus ɛ, coda st, with primary stress.
     syls = a._parse_phones(["T", "EH1", "S", "T"])
     assert len(syls) == 1
     s = syls[0]
@@ -22,9 +22,9 @@ def test_parse_phones_single_syllable() -> None:
 
 
 def test_parse_phones_two_syllables() -> None:
-    """验证 parse phones two syllables."""
+    """Verify _parse_phones for a two-syllable word."""
     a = EnglishAnalyzer()
-    # happy /hæpi/: 前重后轻
+    # happy /hæpi/: first syllable stressed, second light.
     syls = a._parse_phones(["HH", "AE1", "P", "IY0"])
     assert len(syls) == 2
     assert syls[0].onset == "HH"
@@ -36,7 +36,7 @@ def test_parse_phones_two_syllables() -> None:
 
 
 def test_analyze_word_seeded() -> None:
-    """验证 analyze word seeded."""
+    """Verify analyze_word for a seeded word."""
     a = EnglishAnalyzer()
     syls = a.analyze_word("light")
     assert len(syls) == 1
@@ -45,7 +45,7 @@ def test_analyze_word_seeded() -> None:
 
 
 def test_fallback_analyze_unknown_word() -> None:
-    """验证 fallback analyze unknown word."""
+    """Verify the fallback analysis for an unknown word."""
     a = EnglishAnalyzer()
     syls = a._fallback_analyze("rhythm")
     assert len(syls) == 1
@@ -54,18 +54,19 @@ def test_fallback_analyze_unknown_word() -> None:
 
 
 def test_rhyme_tail_seeded() -> None:
-    """验证 rhyme tail seeded."""
+    """Verify rhyme_tail for a seeded word."""
     a = EnglishAnalyzer()
     assert a.rhyme_tail("light") == "AY1 T"
-    # 未知词无发音，不应作为韵脚 key
+    # An unknown word has no pronunciation, so it cannot serve as a rhyme key.
     assert a.rhyme_tail("zzznotaword") is None
 
 
 def test_count_syllables_offline() -> None:
-    """验证 count syllables 离线回退（不依赖真实词库 / cmudict）.
+    """Verify count_syllables falls back offline (no real lexicon / cmudict).
 
-    强制发音查询返回空，使分析器走启发式回退，结果纯由正则可确定：
-    "rhythm"（y 计 1）+ "xyz"（y 计 1）= 2。
+    Force pronunciation lookups to return nothing so the analyzer uses its
+    heuristic fallback, making the result purely regex-determined:
+    "rhythm" (y counts 1) + "xyz" (y counts 1) = 2.
     """
     a = EnglishAnalyzer()
     with mock.patch.object(EnglishAnalyzer, "_get_pronunciations", return_value=[]):

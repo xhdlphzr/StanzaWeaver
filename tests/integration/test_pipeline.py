@@ -1,9 +1,10 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""Pipeline 集成测试：用桩 LLM 客户端替代 OpenAI，验证四步流水线闭环.
+"""Pipeline integration tests: a stub LLM client replaces OpenAI.
 
-不发起任何真实网络请求——描述/初稿/炼句/终审均由预置脚本驱动。
+Verifies the four-step pipeline end to end with no real network requests:
+description/draft/refinement/final review are all scripted.
 """
 
 import pytest
@@ -13,22 +14,22 @@ from src.pipeline.pipeline import PoetryPipeline
 from tests.helpers import make_stub, tool_call
 
 DESC = "测试主题：静夜思"
-# 五言绝句（合律：二四相间/联内相对/联间相粘/二四行押平声韵）。
+# Regulated five-character quatrain: valid tonal pattern, opposition, and rhyme.
 DRAFT = "远岫依烟岭\n溪流伴月明\n桃红迷柳岸\n古道远山风"
 REVISED_LINE = "远岸栖云树"
 
 
 def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
-    """注入桩 LLM 客户端，使 Pipeline 完全离线运行.
+    """Inject stub LLM clients so the pipeline runs fully offline.
 
     Args:
-        monkeypatch: pytest monkeypatch 实例。
+        monkeypatch: pytest monkeypatch instance.
 
     """
     writer_stub = make_stub(
         stream=[DESC, DRAFT],
         chat=[
-            # Step 2: generate_draft 用 submit 提交（content 包含诗稿）
+            # Step 2: generate_draft submits via submit (content holds the poem)
             {
                 "role": "assistant",
                 "content": DRAFT,
@@ -40,7 +41,7 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
                     }
                 ],
             },
-            # Step 3: refine 第一轮 modify（修改后仍需通过全量格律校验）
+            # Step 3: first refine round modifies (result must still pass meter)
             tool_call(
                 "modify",
                 {"modify_type": "line", "line": 0, "content": REVISED_LINE},
@@ -53,7 +54,7 @@ def _patch_llm(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_pipeline_full_run(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 pipeline full run."""
+    """Verify a full pipeline run."""
     _patch_llm(monkeypatch)
     pipeline = PoetryPipeline(
         writer_config={"base_url": "x", "api_key": "x", "model": "x"},
@@ -64,14 +65,15 @@ def test_pipeline_full_run(monkeypatch: pytest.MonkeyPatch) -> None:
     assert state.checker_pass is True
     assert state.title == "静夜思"
     assert state.final_poem == ["静夜思"] + state.draft
-    # 炼句确实修改了首行，且修改后通过全量格律校验（否则不会结束炼句）
+    # Refinement changed the first line and the result still passes full meter
+    # validation (otherwise refinement would not end).
     assert state.draft[0] == REVISED_LINE
     assert state.refine_rounds >= 1
     assert state.description == DESC
 
 
 def test_pipeline_continue_with_feedback(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 pipeline continue with feedback."""
+    """Verify pipeline continuation with feedback."""
     _patch_llm(monkeypatch)
     pipeline = PoetryPipeline(
         writer_config={"base_url": "x", "api_key": "x", "model": "x"},
@@ -80,8 +82,10 @@ def test_pipeline_continue_with_feedback(monkeypatch: pytest.MonkeyPatch) -> Non
     state = pipeline.run("静夜思", "zh_wujue")
     assert state.checker_pass is True
 
-    # 用户反馈续跑：新建流水线（新的桩客户端迭代器）再次进入炼句并定稿。
-    # 当前诗稿已合律，续跑时模型直接 submit，submit 的全量校验同样通过。
+    # Continue with feedback: a new pipeline (fresh stub iterators) enters
+    # refinement again and finalizes.
+    # The draft is already valid, so the model submits directly and the full
+    # submit validation passes too.
     pipeline2 = PoetryPipeline(
         writer_config={"base_url": "x", "api_key": "x", "model": "x"},
         checker_config={"base_url": "x", "api_key": "x", "model": "x"},

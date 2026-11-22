@@ -1,35 +1,35 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""法语音节分析器单元测试（符号层）."""
+"""Unit tests for the French syllable analyzer (symbol layer)."""
 
 from src.prosody.french import FrenchAnalyzer
 from src.templates.fr import RondeauTemplate
 
 
 def test_count_syllables_parle() -> None:
-    """验证 count syllables parle."""
+    """Verify count_syllables for "parle"."""
     a = FrenchAnalyzer()
-    # par-le：词尾 e muet 省略 -> 1 音节
+    # par-le: the final mute e is dropped -> 1 syllable.
     assert a.count_syllables("parle") == 1
 
 
 def test_rhyme_key_parle() -> None:
-    """验证 rhyme key parle."""
+    """Verify rhyme_key for "parle"."""
     a = FrenchAnalyzer()
-    # 词尾 e muet 省略后，韵脚取末个发音元音核 a
+    # Once the final mute e is dropped, the rhyme tail is the last vowel nucleus a.
     assert a.rhyme_key("parle") == "a"
 
 
 def test_count_syllables_bonjour() -> None:
-    """验证 count syllables bonjour."""
+    """Verify count_syllables for "bonjour"."""
     a = FrenchAnalyzer()
-    # bon-jour: 2 音节
+    # bon-jour: 2 syllables.
     assert a.count_syllables("bonjour") == 2
 
 
 def test_digraph_eau() -> None:
-    """验证 digraph eau."""
+    """Verify the "eau" digraph is one nucleus."""
     a = FrenchAnalyzer()
     syls = a.analyze_word("eau")
     assert len(syls) == 1
@@ -37,9 +37,9 @@ def test_digraph_eau() -> None:
 
 
 def test_single_nucleus_words() -> None:
-    """验证 single nucleus words."""
+    """Verify words with a single nucleus count as one syllable."""
     a = FrenchAnalyzer()
-    # FR-1：三合/二合元音视为单一音节核
+    # FR-1: triphthongs and diphthongs are treated as a single nucleus.
     assert a.count_syllables("oui") == 1
     assert a.count_syllables("bien") == 1
     assert a.count_syllables("viens") == 1
@@ -51,14 +51,14 @@ def test_single_nucleus_words() -> None:
 
 
 def test_final_mute_e_silent() -> None:
-    """验证 final mute e silent."""
+    """Verify a final mute e is silent."""
     a = FrenchAnalyzer()
-    # 词尾 e muet 省略（标准法语）：entre/table/porte/parle 均 1 音节
+    # Final mute e is dropped (standard French): entre/table/porte/parle = 1 syllable.
     assert a.count_syllables("entre") == 1
     assert a.count_syllables("table") == 1
     assert a.count_syllables("porte") == 1
     assert a.count_syllables("parle") == 1
-    # 尾元音非 e 或 e 前无其它元音核时照常计数
+    # Count normally when the final vowel is not e, or e has no other vowel nucleus before it.
     assert a.count_syllables("maison") == 2
     assert a.count_syllables("petite") == 2
     assert a.count_syllables("le") == 1
@@ -66,9 +66,9 @@ def test_final_mute_e_silent() -> None:
 
 
 def test_rhyme_key_nasal_merge() -> None:
-    """验证 rhyme key nasal merge."""
+    """Verify nasal vowels merge in rhyme keys."""
     a = FrenchAnalyzer()
-    # FR-3：鼻化元音归并 + 丢弃词尾静音辅音
+    # FR-3: nasal vowels are merged and final silent consonants are dropped.
     assert a.rhyme_key("an") == a.rhyme_key("en")
     assert a.rhyme_key("mai") == a.rhyme_key("mais")
     assert a.rhyme_key("lit") == a.rhyme_key("li")
@@ -76,24 +76,24 @@ def test_rhyme_key_nasal_merge() -> None:
 
 
 def test_syllabify_line_no_cross_word_elision() -> None:
-    """验证 syllabify line no cross word elision."""
+    """Verify syllabify_line does not elide across words."""
     a = FrenchAnalyzer()
-    # 撇号省音仍计 1 音节（l'eau 为同一词形）
+    # An apostrophe elision still counts as 1 syllable (l'eau is one word form).
     assert a.count_syllables("l'eau") == 1
-    # 跨词元音相遇不省音：la + eau = 2 音节
+    # Vowels meeting across word boundaries are not elided: la + eau = 2 syllables.
     assert a.count_syllables("la eau") == 2
 
 
 def test_rondeau_accepts_uniform_10() -> None:
-    """验证 rondeau accepts uniform 10."""
+    """Verify a rondeau accepts a uniform line length of 10."""
     from src.prosody.meter_validator import MeterValidator
 
     template = RondeauTemplate()
-    # 每行 10 个 "la"（各 1 音节），共 15 行
+    # Each line has 10 "la" (1 syllable each), for 15 lines total.
     line = " ".join(["la"] * 10)
     poem = [line for _ in range(15)]
     validator = MeterValidator()
     result = validator.validate_count_only(poem, template.to_dict())
     assert not result.errors
-    # 区间应允许 8 或 10 音节
+    # The range should allow 8 or 10 syllables.
     assert template.syllables_per_line[0] == (8, 10)

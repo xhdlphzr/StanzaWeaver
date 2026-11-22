@@ -1,3 +1,3 @@
-"""测试包."""
+"""Test package."""
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT

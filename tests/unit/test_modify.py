@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""modify 工具执行单元测试（符号层，纯格律校验）."""
+"""Unit tests for the modify tool execution (symbol layer, pure meter validation)."""
 
 from typing import Any
 
@@ -27,7 +27,7 @@ POEM = ["床前明月光", "疑是地上霜", "举头望明月", "低头思故�
 
 
 def test_modify_line_valid() -> None:
-    """Line 类型：合法新行原位替换."""
+    """Line type: replace a valid new line in place."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "line", "line": 0, "content": "窗前明月光"}
     )
@@ -37,74 +37,74 @@ def test_modify_line_valid() -> None:
 
 
 def test_modify_line_wrong_syllable_count() -> None:
-    """Line 类型：音节数不符返回错误."""
+    """Line type: return an error when the syllable count does not match."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "line", "line": 0, "content": "窗前明月"}
     )
     assert "error" in result
-    assert any("音节数" in e for e in result["error"])
+    assert any("Syllable count mismatch" in e for e in result["error"])
 
 
 def test_modify_line_out_of_range() -> None:
-    """Line 类型：行号越界返回错误."""
+    """Line type: return an error when the line number is out of range."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "line", "line": 10, "content": "窗前明月光"}
     )
     assert "error" in result
-    assert "越界" in result["error"]
+    assert "out of range" in result["error"]
 
 
 def test_modify_line_constraints_mismatch() -> None:
-    """Line 类型：逐位约束不符返回错误."""
+    """Line type: return an error when a per-position constraint fails."""
     result = modify_module.execute_modify(
         list(POEM),
         ZH_TPL_CONSTRAINT,
         {"modify_type": "line", "line": 0, "content": "望前明月光"},
     )
     assert "error" in result
-    assert any("第1音节" in e for e in result["error"])
+    assert any("Syllable 1" in e for e in result["error"])
 
 
 def test_modify_line_missing_line_param() -> None:
-    """Line 类型：缺少 line 参数时提示需提供行数."""
+    """Line type: report the missing line argument."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "line", "content": "窗前明月光"}
     )
     assert "error" in result
-    assert "行数" in result["error"]
+    assert "line argument" in result["error"]
 
 
 def test_modify_line_non_int_line() -> None:
-    """Line 类型：line 无法转 int 时返回错误."""
+    """Line type: return an error when line cannot be converted to int."""
     result = modify_module.execute_modify(
         list(POEM),
         ZH_TPL,
         {"modify_type": "line", "line": "abc", "content": "窗前明月光"},
     )
     assert "error" in result
-    assert "整数" in result["error"]
+    assert "integer" in result["error"]
 
 
 def test_modify_line_content_not_str() -> None:
-    """Line 类型：content 非字符串时返回错误."""
+    """Line type: return an error when content is not a string."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "line", "line": 0, "content": ["x"]}
     )
     assert "error" in result
-    assert "字符串" in result["error"]
+    assert "must be a string" in result["error"]
 
 
 def test_modify_unknown_type() -> None:
-    """未知 modify_type 返回错误."""
+    """Return an error for an unknown modify_type."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "unknown", "content": "x"}
     )
     assert "error" in result
-    assert "未知修改类型" in result["error"]
+    assert "Unknown modify type" in result["error"]
 
 
 def test_modify_title_valid() -> None:
-    """Title 类型：替换标题."""
+    """Title type: replace the title."""
     result = modify_module.execute_modify(
         list(POEM),
         ZH_TPL,
@@ -116,7 +116,7 @@ def test_modify_title_valid() -> None:
 
 
 def test_modify_title_not_str() -> None:
-    """Title 类型：content 非字符串返回错误."""
+    """Title type: return an error when content is not a string."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "title", "content": ["x"]}
     )
@@ -124,16 +124,16 @@ def test_modify_title_not_str() -> None:
 
 
 def test_modify_title_empty() -> None:
-    """Title 类型：空标题返回错误."""
+    """Title type: return an error for an empty title."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "title", "content": "   "}
     )
     assert "error" in result
-    assert "标题不能为空" in result["error"]
+    assert "Title cannot be empty" in result["error"]
 
 
 def test_modify_punctuation_valid() -> None:
-    """Punctuation 类型：合法标点列表."""
+    """Punctuation type: accept a valid punctuation list."""
     marks = ["，", "。", "，", "。"]
     result = modify_module.execute_modify(
         list(POEM),
@@ -146,7 +146,7 @@ def test_modify_punctuation_valid() -> None:
 
 
 def test_modify_punctuation_not_list() -> None:
-    """Punctuation 类型：content 非列表返回错误."""
+    """Punctuation type: return an error when content is not a list."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "punctuation", "content": "，"}
     )
@@ -154,7 +154,7 @@ def test_modify_punctuation_not_list() -> None:
 
 
 def test_modify_punctuation_non_str_items() -> None:
-    """Punctuation 类型：列表元素非字符串返回错误."""
+    """Punctuation type: return an error when list items are not strings."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "punctuation", "content": [1, 2, 3, 4]}
     )
@@ -162,16 +162,16 @@ def test_modify_punctuation_non_str_items() -> None:
 
 
 def test_modify_punctuation_wrong_length() -> None:
-    """Punctuation 类型：数量与格律行数不符返回错误."""
+    """Punctuation type: return an error when the count differs from the line count."""
     result = modify_module.execute_modify(
         list(POEM), ZH_TPL, {"modify_type": "punctuation", "content": ["，", "。"]}
     )
     assert "error" in result
-    assert "标点数量" in result["error"]
+    assert "punctuation items" in result["error"]
 
 
 def test_modify_punctuation_ci_length() -> None:
-    """词牌（7 句）标点长度须等于格律行数."""
+    """For ci templates (7 lines), the punctuation count must equal the line count."""
     tpl: dict[str, Any] = {
         "language": "zh",
         "lines": 7,
@@ -185,4 +185,4 @@ def test_modify_punctuation_ci_length() -> None:
     bad = modify_module.execute_modify(
         poem, tpl, {"modify_type": "punctuation", "content": ["，"] * 6}
     )
-    assert "标点数量应为 7 个" in bad["error"]
+    assert "Expected 7 punctuation items" in bad["error"]

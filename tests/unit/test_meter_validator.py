@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""MeterValidator 单元测试（符号层）."""
+"""Unit tests for MeterValidator (symbol layer)."""
 
 from src.models.syllable import Syllable
 from src.prosody.meter_validator import (
@@ -14,19 +14,19 @@ GOOD_POEM = ["床前明月光", "疑是地上霜", "举头望明月", "低头思
 
 
 def test_count_matches_exact() -> None:
-    """验证 count matches exact."""
+    """Verify _count_matches for exact counts."""
     assert _count_matches(5, 5) is True
     assert _count_matches(4, 5) is False
 
 
 def test_count_matches_interval() -> None:
-    """验证 count matches interval."""
+    """Verify _count_matches for an interval."""
     assert _count_matches(15, (15, 17)) is True
     assert _count_matches(18, (15, 17)) is False
 
 
 def test_validate_good_poem_passes() -> None:
-    """验证 validate good poem passes."""
+    """Verify a well-formed poem passes validation."""
     v = MeterValidator()
     tpl = {
         "name": "五绝",
@@ -42,7 +42,7 @@ def test_validate_good_poem_passes() -> None:
 
 
 def test_validate_wrong_line_count() -> None:
-    """验证 validate wrong line count."""
+    """Verify validation fails on a wrong line count."""
     v = MeterValidator()
     tpl = {
         "name": "五绝",
@@ -53,11 +53,11 @@ def test_validate_wrong_line_count() -> None:
     }
     res = v.validate(GOOD_POEM[:3], tpl)
     assert res.passed is False
-    assert any("行数不匹配" in e for e in res.errors)
+    assert any("line count mismatch" in e.lower() for e in res.errors)
 
 
 def test_validate_wrong_syllable_count() -> None:
-    """验证 validate wrong syllable count."""
+    """Verify validation fails on a wrong syllable count."""
     v = MeterValidator()
     tpl = {
         "name": "五绝",
@@ -67,14 +67,14 @@ def test_validate_wrong_syllable_count() -> None:
         "syllable_constraints": None,
     }
     bad = list(GOOD_POEM)
-    bad[0] = "床前明月"  # 4 字
+    bad[0] = "床前明月"  # 4 characters.
     res = v.validate(bad, tpl)
     assert res.passed is False
-    assert any("第1行音节数不匹配" in e for e in res.errors)
+    assert any("Line 1 syllable count mismatch" in e for e in res.errors)
 
 
 def test_validate_count_only() -> None:
-    """验证 validate count only."""
+    """Verify validate_count_only ignores constraints."""
     v = MeterValidator()
     tpl = {
         "name": "五绝",
@@ -88,7 +88,7 @@ def test_validate_count_only() -> None:
 
 
 def test_validate_line_good_and_bad() -> None:
-    """验证 validate line good and bad."""
+    """Verify validate_line for a good and a bad line."""
     v = MeterValidator()
     tpl = {
         "name": "五绝",
@@ -102,7 +102,7 @@ def test_validate_line_good_and_bad() -> None:
 
 
 def test_validate_empty_line_no_crash() -> None:
-    """含空行时不应抛 IndexError，应报该行音节数不匹配."""
+    """Verify an empty line reports a count mismatch instead of raising IndexError."""
     v = MeterValidator()
     tpl = {
         "name": "五绝",
@@ -113,11 +113,11 @@ def test_validate_empty_line_no_crash() -> None:
     }
     res = v.validate(["床前明月光", "", "举头望明月", "低头思故乡"], tpl)
     assert res.passed is False
-    assert any("第2行" in e for e in res.errors)
+    assert any("Line 2" in e for e in res.errors)
 
 
 def test_validate_empty_line_with_constraints_no_crash() -> None:
-    """空行 + 逐位约束时同样不应崩溃，应报告缺行."""
+    """Verify an empty line with position constraints also reports instead of crashing."""
     v = MeterValidator()
     tpl = {
         "name": "五绝",
@@ -131,25 +131,25 @@ def test_validate_empty_line_with_constraints_no_crash() -> None:
 
 
 def test_validate_constraints_mismatch() -> None:
-    """验证 validate constraints mismatch."""
+    """Verify validation fails on a constraint mismatch."""
     v = MeterValidator()
     tpl = {
         "name": "五绝",
         "language": "zh",
         "lines": 4,
         "syllables_per_line": [5, 5, 5, 5],
-        # 仅第 1 行第 1 音节要求平声
+        # Only line 1, syllable 1 requires the level tone.
         "syllable_constraints": [[{"attributes": {"tone": "平"}}]],
     }
-    # 望 (wàng, 仄；无平声异读) 不满足平声约束
+    # 望 (wàng, oblique; no level-tone reading) does not satisfy the level-tone constraint.
     bad = ["望前明月光", "疑是地上霜", "举头望明月", "低头思故乡"]
     res = v.validate(bad, tpl)
     assert res.passed is False
-    assert any("第1行第1音节不匹配" in e for e in res.errors)
+    assert any("Line 1 syllable 1 mismatch" in e for e in res.errors)
 
 
 def test_validate_constraints_pass() -> None:
-    """验证 validate constraints pass."""
+    """Verify validation passes when constraints are satisfied."""
     v = MeterValidator()
     tpl = {
         "name": "五绝",
@@ -158,13 +158,13 @@ def test_validate_constraints_pass() -> None:
         "syllables_per_line": [5, 5, 5, 5],
         "syllable_constraints": [[{"attributes": {"tone": "平"}}]],
     }
-    # 床 (chuáng, 平) 满足
+    # 床 (chuáng, level tone) satisfies it.
     res = v.validate(GOOD_POEM, tpl)
     assert res.passed is True
 
 
 def test_validate_english_count_variant() -> None:
-    """验证 validate english count variant."""
+    """Verify the English syllable-count variant."""
     v = MeterValidator()
     tpl = {
         "name": "en-test",
@@ -178,7 +178,10 @@ def test_validate_english_count_variant() -> None:
 
 
 def test_validate_full_tries_all_variants() -> None:
-    """组合搜索应尝试每行全部变体，任一组合合律即通过（不再只取主变体）."""
+    """Verify the combined search tries every per-line variant.
+
+    Any metrical combination passes (no longer using only the primary variant).
+    """
 
     class StubTemplate:
         """StubTemplate."""
@@ -202,7 +205,7 @@ def test_validate_full_tries_all_variants() -> None:
 
 
 def test_validate_full_falls_back_to_best_variant() -> None:
-    """若无任何组合合律，应回退到错误数最少的组合（不崩溃）."""
+    """Verify fallback to the best variant when no combination is metrical."""
 
     class StubTemplate:
         """StubTemplate."""

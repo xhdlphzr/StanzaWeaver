@@ -1,11 +1,13 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""诗组规划工具（OpenAI Function Calling）与执行.
+"""Sequence planning tools (OpenAI Function Calling) and execution.
 
-架构师 AI 通过三个工具规划诗组：先 set_sequence_title 设定总标题，再用
-add_poem 逐首添加诗题与格律模板，最后用 set_poem_prompt 为每首写入自足的
-详细创作要求（不得使用“参见第 N 首”这类跨首指代）。
+The architect AI plans a sequence with three tools: set_sequence_title first
+sets the overall title, add_poem then adds each poem's title and meter
+template, and set_poem_prompt finally writes self-contained detailed creative
+requirements for each poem (cross-poem references such as "see poem N" are not
+allowed).
 """
 
 from dataclasses import dataclass, field
@@ -15,11 +17,11 @@ SET_SEQUENCE_TITLE_TOOL: dict[str, Any] = {
     "type": "function",
     "function": {
         "name": "set_sequence_title",
-        "description": "设置诗组的总标题，简短精炼。",
+        "description": "Set the overall sequence title; keep it short and refined.",
         "parameters": {
             "type": "object",
             "properties": {
-                "title": {"type": "string", "description": "诗组总标题"},
+                "title": {"type": "string", "description": "Overall sequence title"},
             },
             "required": ["title"],
         },
@@ -30,14 +32,17 @@ ADD_POEM_TOOL: dict[str, Any] = {
     "type": "function",
     "function": {
         "name": "add_poem",
-        "description": "向诗组添加一首诗，指定诗题与格律模板 key（必须来自给定模板清单）。",
+        "description": (
+            "Add a poem to the sequence with its title and a meter template key "
+            "(the key must come from the provided template list)."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
-                "title": {"type": "string", "description": "本首诗题"},
+                "title": {"type": "string", "description": "Title of this poem"},
                 "template_key": {
                     "type": "string",
-                    "description": "格律模板 key（来自模板清单）",
+                    "description": "Meter template key (from the template list)",
                 },
             },
             "required": ["title", "template_key"],
@@ -50,14 +55,19 @@ SET_POEM_PROMPT_TOOL: dict[str, Any] = {
     "function": {
         "name": "set_poem_prompt",
         "description": (
-            "为已添加的某首诗写入自足的详细创作要求（主题、意象、情感、结构要点等）。"
-            "不得使用“参见第N首”这类跨首指代，应把所需内容直接写入本首。"
+            "Write self-contained detailed creative requirements for an added "
+            "poem (theme, imagery, emotion, structural points, etc.). Do not use "
+            'cross-poem references such as "see poem N"; write everything needed '
+            "directly into this poem."
         ),
         "parameters": {
             "type": "object",
             "properties": {
-                "index": {"type": "integer", "description": "诗序号（从0开始）"},
-                "prompt": {"type": "string", "description": "本首的详细创作要求"},
+                "index": {"type": "integer", "description": "Poem index (0-based)"},
+                "prompt": {
+                    "type": "string",
+                    "description": "Detailed creative requirements for this poem",
+                },
             },
             "required": ["index", "prompt"],
         },
@@ -73,7 +83,7 @@ PLANNING_TOOLS: list[dict[str, Any]] = [
 
 @dataclass
 class SequencePoemPlan:
-    """诗组中单首诗的规划."""
+    """Plan of one poem in the sequence."""
 
     title: str
     template_key: str
@@ -82,7 +92,7 @@ class SequencePoemPlan:
 
 @dataclass
 class PlanState:
-    """规划过程中的可变状态."""
+    """Mutable state during planning."""
 
     title: str = ""
     poems: list[SequencePoemPlan] = field(default_factory=list)
@@ -91,19 +101,19 @@ class PlanState:
 def execute_set_sequence_title(
     state: PlanState, arguments: dict[str, Any]
 ) -> dict[str, Any]:
-    """执行 set_sequence_title.
+    """Execute set_sequence_title.
 
     Args:
-        state: 规划状态。
-        arguments: 工具参数（title）。
+        state: Planning state.
+        arguments: Tool arguments (title).
 
     Returns:
-        ok 或 error 结果字典。
+        ok or error result dictionary.
 
     """
     title = str(arguments.get("title", "")).strip()
     if not title:
-        return {"error": "诗组标题不能为空"}
+        return {"error": "Sequence title cannot be empty"}
     state.title = title
     return {"status": "ok", "title": title}
 
@@ -111,23 +121,23 @@ def execute_set_sequence_title(
 def execute_add_poem(
     state: PlanState, arguments: dict[str, Any], valid_keys: set[str]
 ) -> dict[str, Any]:
-    """执行 add_poem.
+    """Execute add_poem.
 
     Args:
-        state: 规划状态。
-        arguments: 工具参数（title / template_key）。
-        valid_keys: 可用的格律模板 key 集合。
+        state: Planning state.
+        arguments: Tool arguments (title / template_key).
+        valid_keys: Set of available meter template keys.
 
     Returns:
-        ok（含 index）或 error 结果字典。
+        ok result (with index) or error result dictionary.
 
     """
     title = str(arguments.get("title", "")).strip()
     template_key = str(arguments.get("template_key", "")).strip()
     if not title:
-        return {"error": "诗题不能为空"}
+        return {"error": "Poem title cannot be empty"}
     if template_key not in valid_keys:
-        return {"error": f"未知格律模板 key: {template_key!r}"}
+        return {"error": f"Unknown meter template key: {template_key!r}"}
     state.poems.append(SequencePoemPlan(title=title, template_key=template_key))
     return {"status": "ok", "index": len(state.poems) - 1, "title": title}
 
@@ -135,57 +145,62 @@ def execute_add_poem(
 def execute_set_poem_prompt(
     state: PlanState, arguments: dict[str, Any]
 ) -> dict[str, Any]:
-    """执行 set_poem_prompt.
+    """Execute set_poem_prompt.
 
     Args:
-        state: 规划状态。
-        arguments: 工具参数（index / prompt）。
+        state: Planning state.
+        arguments: Tool arguments (index / prompt).
 
     Returns:
-        ok 或 error 结果字典。
+        ok or error result dictionary.
 
     """
     try:
         index = int(arguments.get("index", -1))
     except TypeError, ValueError:
-        return {"error": "诗序号 index 必须是整数"}
+        return {"error": "Poem index must be an integer"}
     if index < 0 or index >= len(state.poems):
-        return {"error": f"诗序号 {index} 越界，当前共 {len(state.poems)} 首"}
+        return {
+            "error": (
+                f"Poem index {index} is out of range; there are "
+                f"{len(state.poems)} poems"
+            )
+        }
     prompt = str(arguments.get("prompt", "")).strip()
     if not prompt:
-        return {"error": "创作要求不能为空"}
+        return {"error": "Creative requirements cannot be empty"}
     state.poems[index].prompt = prompt
     return {"status": "ok", "index": index}
 
 
 def missing_prompt_indices(state: PlanState) -> list[int]:
-    """返回尚未设置创作要求的诗序号.
+    """Return the poem indices that have no creative requirements yet.
 
     Args:
-        state: 规划状态。
+        state: Planning state.
 
     Returns:
-        缺少 prompt 的 0-based 序号列表。
+        List of 0-based indices whose prompt is missing.
 
     """
     return [i for i, poem in enumerate(state.poems) if not poem.prompt.strip()]
 
 
 def render_plan(state: PlanState, names: dict[str, str] | None = None) -> str:
-    """把规划状态渲染为可读文本.
+    """Render the planning state as readable text.
 
     Args:
-        state: 规划状态。
-        names: 模板 key -> 显示名映射。
+        state: Planning state.
+        names: Mapping from template key to display name.
 
     Returns:
-        多行计划文本。
+        Multi-line plan text.
 
     """
     names = names or {}
-    lines = [f"诗组《{state.title or '未命名'}》（共 {len(state.poems)} 首）"]
+    lines = [f'Sequence "{state.title or "Untitled"}" ({len(state.poems)} poems)']
     for i, poem in enumerate(state.poems, 1):
         label = names.get(poem.template_key, poem.template_key)
-        lines.append(f"  {i}. 《{poem.title}》[{label}]")
-        lines.append(f"     {poem.prompt or '（未设置创作要求）'}")
+        lines.append(f'  {i}. "{poem.title}" [{label}]')
+        lines.append(f"     {poem.prompt or '(no creative requirements set)'}")
     return "\n".join(lines)

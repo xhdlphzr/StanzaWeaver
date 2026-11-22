@@ -1,3 +1,3 @@
-"""智能体（agents）子包：写作与校验智能体."""
+"""Agent subpackage: writing and checking agents."""
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT

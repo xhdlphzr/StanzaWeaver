@@ -1,3 +1,3 @@
-"""集成测试包."""
+"""Integration test package."""
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT

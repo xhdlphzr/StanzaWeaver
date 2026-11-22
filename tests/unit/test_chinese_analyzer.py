@@ -1,7 +1,7 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""中文音节分析器单元测试（符号层）."""
+"""Unit tests for the Chinese syllable analyzer (symbol layer)."""
 
 from typing import Any
 
@@ -11,13 +11,14 @@ from src.templates.zh import QijueTemplate, WujueTemplate
 
 
 def _mk_line(pairs: list[tuple[str, str]]) -> list[Syllable]:
-    """由 (平仄, 韵母) 列表构造一行 Syllable.
+    """Build one line of Syllables from a list of (tone, final) pairs.
 
     Args:
-        pairs: 每元素为 (tone, final)，final 直接作为韵腹（无韵尾）。
+        pairs: Each element is (tone, final); final is used directly as the
+            nucleus (no coda).
 
     Returns:
-        Syllable 列表。
+        List of Syllables.
 
     """
     return [
@@ -32,7 +33,7 @@ def _mk_line(pairs: list[tuple[str, str]]) -> list[Syllable]:
 
 
 def test_count_syllables_counts_cjk_chars() -> None:
-    """验证 count syllables counts cjk chars."""
+    """Verify count_syllables counts CJK characters."""
     a = ChineseAnalyzer()
     assert a.count_syllables("床前明月光") == 5
     assert a.count_syllables("  静夜思  ") == 3
@@ -40,9 +41,9 @@ def test_count_syllables_counts_cjk_chars() -> None:
 
 
 def test_analyze_word_single_char_parts() -> None:
-    """验证 analyze word single char parts."""
+    """Verify analyze_word handles single-character parts."""
     a = ChineseAnalyzer()
-    # 光 guāng: 声母 g, 韵腹 a, 韵尾 ng, 一声(平)
+    # guāng: onset g, nucleus a, coda ng, first tone (level)
     syls = a.analyze_word("光")
     assert len(syls) == 1
     s = syls[0]
@@ -53,53 +54,59 @@ def test_analyze_word_single_char_parts() -> None:
 
 
 def test_analyze_word_tone_ping_ze() -> None:
-    """验证 analyze word tone ping ze."""
+    """Verify analyze_word maps tones to ping/ze."""
     a = ChineseAnalyzer()
-    # 去 (qù, 4声) -> 仄
+    # qù (4th tone) -> oblique
     assert a.analyze_word("去")[0].attributes["tone"] == "仄"
-    # 床 (chuáng, 2声) -> 平
+    # chuáng (2nd tone) -> level
     assert a.analyze_word("床")[0].attributes["tone"] == "平"
 
 
 def test_tokenize_line_keeps_only_cjk() -> None:
-    """验证 tokenize line keeps only cjk."""
+    """Verify tokenize_line keeps only CJK characters."""
     a = ChineseAnalyzer()
     assert a.tokenize_line("床前，明月光！") == ["床", "前", "明", "月", "光"]
 
 
 def test_analyze_word_variants_polyphonic() -> None:
-    """验证 analyze word variants polyphonic."""
+    """Verify analyze_word_variants returns polyphonic variants."""
     a = ChineseAnalyzer()
-    # 中 为多音字：zhōng(平) / zhòng(仄)
+    # zhōng (level) / zhòng (oblique): polyphonic character
     variants = a.analyze_word_variants("中")
     tones = {s.attributes["tone"] for v in variants for s in v}
     assert "平" in tones
     assert "仄" in tones
-    # 返回的是整词读音列表，每个元素为整词 Syllable 序列
+    # Returns whole-word readings; each item is the word's Syllable sequence
     assert all(isinstance(v, list) for v in variants)
     assert all(len(v) == 1 for v in variants)
 
 
 def test_neutral_tone_maps_to_ping() -> None:
-    """验证 neutral tone maps to ping."""
+    """Verify the neutral tone maps to ping."""
     a = ChineseAnalyzer()
-    # 的 为轻声，应归为平声
+    # de is a neutral tone and should map to level
     assert a.analyze_word("的")[0].attributes["tone"] == "平"
 
 
 def test_heteronym_no_invalid_mix() -> None:
-    """多音字只保留真实读音，不产生声母×韵母的非法混读."""
+    """Verify polyphonic chars keep only real readings.
+
+    No illegal onset/nucleus mixed readings are produced.
+    """
     a = ChineseAnalyzer()
     variants = a.analyze_word_variants("长")
     readings = {
         (s.onset, s.nucleus, s.coda, s.attributes["tone"]) for v in variants for s in v
     }
-    # 长只有 zhǎng(仄) 与 cháng(平) 两种真实读音
+    # zhǎng (oblique) / cháng (level): only two real readings
     assert readings == {("zh", "a", "ng", "仄"), ("ch", "a", "ng", "平")}
 
 
 def test_heteronym_no_false_accept_in_meter() -> None:
-    """声母+声调组合不存在的读音不应被误判合律（回归：长 的 zh+平）."""
+    """Do not accept non-existent onset+tone readings as metrically valid.
+
+    Regression: a character with onset zh and level tone.
+    """
     from src.prosody.meter_validator import MeterValidator
     from src.templates import _make_syl
 
@@ -114,9 +121,9 @@ def test_heteronym_no_false_accept_in_meter() -> None:
 
 
 def test_sanpingwei_flagged_sanzewei_removed() -> None:
-    """验证 sanpingwei flagged sanzewei removed."""
+    """Verify three-level tails are flagged and three-oblique tails removed."""
     tpl = WujueTemplate()
-    # 第2行为三平尾；末三字全平应被标记
+    # Line 2 ends with three level tones; it should be flagged
     poem = ["", "", "", ""]
     syllables = [
         _mk_line([("仄", "a"), ("仄", "a"), ("平", "a"), ("平", "a"), ("仄", "a")]),
@@ -125,15 +132,15 @@ def test_sanpingwei_flagged_sanzewei_removed() -> None:
         _mk_line([("仄", "a"), ("仄", "a"), ("仄", "a"), ("平", "a"), ("平", "ang")]),
     ]
     errors = tpl.validate_full(poem, syllables)
-    assert any("三平尾" in e for e in errors)
-    # 三仄尾已不再是禁忌，不应报告
-    assert not any("三仄尾" in e for e in errors)
+    assert any("Three level-tone tail" in e for e in errors)
+    # Three-oblique tails are no longer forbidden and should not be reported
+    assert not any("three-oblique-tone tail" in e for e in errors)
 
 
 def test_sanzewei_no_longer_error() -> None:
-    """验证 sanzewei no longer error."""
+    """Verify three-oblique tails are no longer reported as errors."""
     tpl = WujueTemplate()
-    # 末三字全仄的合法五言绝句：不应报三仄尾
+    # A valid five-character quatrain ending in three oblique tones must not report it
     poem = ["", "", "", ""]
     syllables = [
         _mk_line([("仄", "a"), ("仄", "a"), ("平", "a"), ("平", "a"), ("仄", "a")]),
@@ -142,15 +149,15 @@ def test_sanzewei_no_longer_error() -> None:
         _mk_line([("仄", "a"), ("仄", "a"), ("仄", "a"), ("平", "a"), ("平", "ang")]),
     ]
     errors = tpl.validate_full(poem, syllables)
-    assert not any("三仄尾" in e for e in errors)
-    # 该诗整体合律（无其他错误）
+    assert not any("three-oblique-tone tail" in e for e in errors)
+    # The poem is fully compliant (no other errors)
     assert errors == []
 
 
 def test_guping_still_reported() -> None:
-    """验证 guping still reported."""
+    """Verify isolated-level violations are still reported."""
     tpl = QijueTemplate()
-    # 孤平保留判定：第4句为孤平句（仄仄仄仄平，全句仅韵脚一平），应仍报告孤平
+    # Isolated-level check stays: line 4 has only the rhyme foot level, so report it
     poem = ["", "", "", ""]
     syllables = [
         _mk_line(
@@ -199,13 +206,13 @@ def test_guping_still_reported() -> None:
         ),
     ]
     errors = tpl.validate_full(poem, syllables)
-    assert any("孤平" in e for e in errors)
+    assert any("Isolated level" in e for e in errors)
 
 
 def test_rhyme_tongyun_ing_ong_fail() -> None:
-    """验证 rhyme tongyun ing ong fail."""
+    """Verify ing and ong belong to different rhyme groups."""
     tpl = WujueTemplate()
-    # ing(庚) 与 ong(东) 不同部，应判不押韵
+    # ing and ong are in different rhyme groups, so they should not rhyme
     poem = ["", "", "", ""]
     syllables = [
         _mk_line([("仄", "a"), ("仄", "a"), ("平", "a"), ("平", "a"), ("仄", "a")]),
@@ -214,13 +221,13 @@ def test_rhyme_tongyun_ing_ong_fail() -> None:
         _mk_line([("仄", "a"), ("仄", "a"), ("仄", "a"), ("平", "a"), ("平", "ong")]),
     ]
     errors = tpl.validate_full(poem, syllables)
-    assert errors, "ing(庚) 与 ong(东) 不同部，应报押韵错误"
+    assert errors, "ing (庚) and ong (东) do not share a rhyme group"
 
 
 def test_rhyme_tongyun_i_u_fail() -> None:
-    """验证 rhyme tongyun i u fail."""
+    """Verify i and u belong to different rhyme groups."""
     tpl = WujueTemplate()
-    # i(齐) 与 u(姑) 不同部，应判不押韵
+    # i and u are in different rhyme groups, so they should not rhyme
     poem = ["", "", "", ""]
     syllables = [
         _mk_line([("仄", "a"), ("仄", "a"), ("平", "a"), ("平", "a"), ("仄", "a")]),
@@ -229,4 +236,4 @@ def test_rhyme_tongyun_i_u_fail() -> None:
         _mk_line([("仄", "a"), ("仄", "a"), ("仄", "a"), ("平", "a"), ("平", "u")]),
     ]
     errors = tpl.validate_full(poem, syllables)
-    assert any("押韵" in e for e in errors)
+    assert any("Rhyme (lines 2 and 4)" in e for e in errors)

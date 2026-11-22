@@ -1,16 +1,19 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""编写 AI：描述生成、初稿生成、ReAct 炼句循环.
+"""Writer AI: description generation, first draft, and ReAct line-polishing loop.
 
-炼句循环无轮数上限：AI 反复调用 search_words/modify
-修改诗句、标题或标点（每次修改后自动跑全部格律校验），直到调用 submit
-提交；submit 可通过 poem 整首替换、通过 punctuation 设置标点，提交时
-同样先做全量格律校验，通过后才接受定稿（拒绝则把错误返回模型继续修改）。
-连续多轮无进展时注入引导提示（不中断循环）。
+The polishing loop has no round limit: the AI repeatedly calls
+search_words/modify to revise lines, the title, or punctuation (a full meter
+validation runs after every change) until it calls submit; submit can replace
+the whole poem via poem and set punctuation via punctuation, and it is also
+validated in full before being accepted (a rejection returns the errors to the
+model for further edits). After several rounds without progress, a guiding hint
+is injected without interrupting the loop.
 
-当对话 token 数超过 COMPRESS_THRESHOLD 时自动压缩历史并重开新对话，
-保留结构化摘要（目标/重要细节/工作状态/下一步行动）与当前诗稿。
+When the conversation token count exceeds COMPRESS_THRESHOLD, the history is
+compressed automatically and a new conversation is started, keeping a structured
+summary (goal / key details / working state / next action) and the current draft.
 """
 
 import json
@@ -33,51 +36,52 @@ RefineResult = tuple[list[str], list[dict[str, Any]], str, int, str, list[str]]
 
 
 def _parse_punctuation(raw: Any, lines: int) -> tuple[list[str] | None, str | None]:
-    """解析并校验标点列表.
+    """Parse and validate the punctuation list.
 
     Args:
-        raw: 原始标点参数（None / list[str]）。
-        lines: 格律行数。
+        raw: Raw punctuation argument (None / list[str]).
+        lines: Number of metrical lines.
 
     Returns:
-        (标点列表, 错误)；留空返回 (None, None)，非法返回 (None, 错误)。
+        (punctuation list, error); (None, None) when left empty, (None, error)
+        when invalid.
 
     """
     if raw is None or raw == []:
         return None, None
     if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
-        return None, "标点必须是字符串列表"
+        return None, "Punctuation must be a list of strings"
     if len(raw) != lines:
-        return None, f"标点数量应为 {lines} 个，实际 {len(raw)} 个"
+        return None, f"Expected {lines} punctuation marks, got {len(raw)}"
     return list(raw), None
 
 
 def _fire_stream(cb: ChunkCallback, text: str) -> None:
-    """安全触发流式回调（吞掉回调内部异常）.
+    """Safely fire the streaming callback (swallow internal exceptions).
 
-    前端流回调失败不应中断生成流程。
+    A frontend stream-callback failure must not interrupt generation.
 
     Args:
-        cb: 回调函数。
-        text: 回调文本。
+        cb: Callback function.
+        text: Callback text.
 
     """
     if cb:
         try:
             cb(text)
-        except Exception:  # noqa: S110, BLE001 - 有意吞掉回调异常，仅保证生成不中断
+        except Exception:  # noqa: S110, BLE001 - swallow callback errors
             pass
 
 
 def _get_constraints_desc(template: dict[str, Any], template_obj: object = None) -> str:
-    """获取格律约束描述文本.
+    """Return the meter-constraint description text.
 
     Args:
-        template: 模板字典。
-        template_obj: 模板对象。
+        template: Template dictionary.
+        template_obj: Template object.
 
     Returns:
-        格律描述文本。
+        Meter description text.
 
     """
     if template_obj is not None and hasattr(template_obj, "describe"):
@@ -92,14 +96,14 @@ def _get_constraints_desc(template: dict[str, Any], template_obj: object = None)
 
 
 def _build_draft_system(language: str, constraints_desc: str) -> str:
-    """构造 Step 2 初稿生成的系统提示.
+    """Build the Step 2 first-draft system prompt.
 
     Args:
-        language: 语言代码。
-        constraints_desc: 格律约束描述。
+        language: Language code.
+        constraints_desc: Meter-constraint description.
 
     Returns:
-        系统提示文本。
+        System prompt text.
 
     """
     return (
@@ -117,14 +121,14 @@ def _build_draft_system(language: str, constraints_desc: str) -> str:
 
 
 def _build_refine_system(constraints_desc: str, feedback: str = "") -> str:
-    """构造 Step 3 炼句循环的系统提示.
+    """Build the Step 3 polishing-loop system prompt.
 
     Args:
-        constraints_desc: 格律约束描述。
-        feedback: 用户/检查 AI 反馈。
+        constraints_desc: Meter-constraint description.
+        feedback: User / checker AI feedback.
 
     Returns:
-        系统提示文本。
+        System prompt text.
 
     """
     parts = [
@@ -155,15 +159,16 @@ def _build_refine_system(constraints_desc: str, feedback: str = "") -> str:
 
 
 def _extract_poem_from_messages(messages: list[Message]) -> list[str]:
-    """从对话历史中提取最近的诗稿行.
+    """Extract the latest poem lines from the conversation history.
 
-    在 assistant 消息的 content 中查找连续的非空行作为诗稿。
+    Scans the content of assistant messages for consecutive non-empty lines
+    that form the poem.
 
     Args:
-        messages: 对话消息列表。
+        messages: Conversation message list.
 
     Returns:
-        提取的诗行列表。
+        Extracted poem lines.
 
     """
     for msg in reversed(messages):
@@ -176,13 +181,13 @@ def _extract_poem_from_messages(messages: list[Message]) -> list[str]:
 
 
 class WriterAI:
-    """编写 AI：四步流水线的神经层（描述/初稿/炼句）."""
+    """Writer AI: neural layer of the four-step pipeline (desc/draft/polish)."""
 
     def __init__(self, config: dict[str, Any]):
-        """初始化编写 AI.
+        """Initialize the writer AI.
 
         Args:
-            config: {"base_url", "api_key", "model"}。
+            config: {"base_url", "api_key", "model"}.
 
         """
         self.client = LLMClient(
@@ -200,16 +205,17 @@ class WriterAI:
         template: dict[str, Any],
         template_obj: object = None,
     ) -> None:
-        """压缩对话历史：用 LLM 生成结构化摘要，替换当前消息列表.
+        """Compress the conversation history into a structured LLM summary.
 
-        摘要包含：目标、重要细节、工作状态、下一步行动，以及当前诗稿。
+        The summary contains the goal, key details, working state, next action,
+        and the current poem.
 
         Args:
-            messages: 要压缩的消息列表（就地修改）。
-            description: 主题描述。
-            poem: 当前诗稿。
-            template: 模板字典。
-            template_obj: 模板对象。
+            messages: Message list to compress (modified in place).
+            description: Topic description.
+            poem: Current poem.
+            template: Template dictionary.
+            template_obj: Template object.
 
         """
         constraints_desc = _get_constraints_desc(template, template_obj)
@@ -260,14 +266,14 @@ class WriterAI:
         template: dict[str, Any],
         template_obj: object = None,
     ) -> None:
-        """检查 token 数，超过阈值时自动压缩对话历史.
+        """Check the token count and compress the history once above the threshold.
 
         Args:
-            messages: 消息列表。
-            description: 主题描述。
-            poem: 当前诗稿。
-            template: 模板字典。
-            template_obj: 模板对象。
+            messages: Message list.
+            description: Topic description.
+            poem: Current poem.
+            template: Template dictionary.
+            template_obj: Template object.
 
         """
         token_count = self.client.count_tokens(messages)
@@ -280,15 +286,15 @@ class WriterAI:
         messages: list[Message],
         on_stream: ChunkCallback = None,
     ) -> str:
-        """生成主题的现代文描述（Step 1）.
+        """Generate a modern-prose description of the topic (Step 1).
 
         Args:
-            topic: 用户主题。
-            messages: 共享对话消息列表（会被追加）。
-            on_stream: 流式回调。
+            topic: User topic.
+            messages: Shared conversation message list (appended to).
+            on_stream: Streaming callback.
 
         Returns:
-            描述文本。
+            Description text.
 
         """
         messages.append(
@@ -317,17 +323,17 @@ class WriterAI:
         template_obj: object = None,
         on_stream: ChunkCallback = None,
     ) -> DraftResult:
-        """生成初稿（Step 2，通过 submit 工具提交，无尝试次数上限）.
+        """Generate the first draft (Step 2, via submit tool, no attempt cap).
 
         Args:
-            description: 主题描述。
-            template: 模板字典。
-            messages: 共享对话消息列表（会被追加）。
-            template_obj: 模板对象。
-            on_stream: 流式回调。
+            description: Topic description.
+            template: Template dictionary.
+            messages: Shared conversation message list (appended to).
+            template_obj: Template object.
+            on_stream: Streaming callback.
 
         Returns:
-            (诗稿, 标题, 标点列表, 日志文本)。
+            (poem, title, punctuation list, log text).
 
         """
         language = str(template.get("language", "zh"))
@@ -350,7 +356,7 @@ class WriterAI:
         while True:
             attempt += 1
             if on_stream and attempt == 1:
-                _fire_stream(on_stream, "[初稿] 思考中...")
+                _fire_stream(on_stream, "[draft] thinking...")
             self._check_and_compress(
                 messages, description, poem, template, template_obj
             )
@@ -371,7 +377,7 @@ class WriterAI:
                                     ln.strip() for ln in text.split("\n") if ln.strip()
                                 ]
                             else:
-                                # AI 没有在 content 中输出诗稿，从历史中解析
+                                # The AI left the poem out of content; parse history
                                 poem = _extract_poem_from_messages(messages)
                         punct, punct_err = _parse_punctuation(
                             args.get("punctuation"), lines
@@ -379,12 +385,16 @@ class WriterAI:
 
                         if not title:
                             result: dict[str, Any] = {
-                                "error": "标题不能为空，请提供诗稿标题"
+                                "error": "Title must not be empty; provide a poem title"
                             }
                         elif punct_err:
                             result = {"error": punct_err}
                         elif len(poem) != lines:
-                            result = {"error": f"输出行数为{len(poem)}，期望{lines}行"}
+                            result = {
+                                "error": (
+                                    f"Output has {len(poem)} lines, expected {lines}"
+                                )
+                            }
                         else:
                             count_result = self.validator.validate_count_only(
                                 poem, template
@@ -412,15 +422,15 @@ class WriterAI:
 
                         if result.get("status") == "passed":
                             if on_stream:
-                                _fire_stream(on_stream, "[初稿] 完成")
+                                _fire_stream(on_stream, "[draft] done")
                             return poem, title, punctuation, "\n\n".join(detail_parts)
                         continue
 
                 continue
 
-            # AI 没调 submit，解析文本内容
+            # The AI did not call submit; parse the text content
             text = str(response["content"]).strip()
-            detail_parts.append(f"生成:\n{text}")
+            detail_parts.append(f"generated:\n{text}")
             poem = [ln.strip() for ln in text.split("\n") if ln.strip()]
             messages.append(LLMClient.assistant_to_message(response))
 
@@ -465,27 +475,29 @@ class WriterAI:
         title: str = "",
         punctuation: list[str] | None = None,
     ) -> RefineResult:
-        """ReAct 炼句循环（Step 3，无轮数上限，直到格律校验通过）.
+        """ReAct polishing loop (Step 3, no round limit, until meter checks pass).
 
-        每次 modify 修改诗句后都会立即执行全量格律校验；调用 submit 时
-        同样先做全量校验，通过才接受定稿，否则把错误返回给模型继续修改。
-        submit 可通过 poem 整首替换、通过 punctuation 设置标点。
+        A full meter validation runs immediately after every modify; submit is
+        likewise validated in full first and the draft is accepted only when it
+        passes, otherwise the errors are returned to the model for further edits.
+        submit can replace the whole poem via poem and set punctuation via
+        punctuation.
 
         Args:
-            description: 主题描述。
-            poem: 当前诗稿。
-            template: 模板字典。
-            messages: 共享对话消息列表（会被追加）。
-            template_obj: 模板对象。
-            feedback: 用户/检查 AI 反馈。
-            on_step: 每次工具执行后的回调。
-            on_stream: 流式回调。
-            start_round: 起始轮号（打回续轮用）。
-            title: 当前标题。
-            punctuation: 当前标点。
+            description: Topic description.
+            poem: Current poem.
+            template: Template dictionary.
+            messages: Shared conversation message list (appended to).
+            template_obj: Template object.
+            feedback: User / checker AI feedback.
+            on_step: Callback after each tool execution.
+            on_stream: Streaming callback.
+            start_round: Starting round number (for resumed runs).
+            title: Current title.
+            punctuation: Current punctuation.
 
         Returns:
-            (诗稿, 工具历史, 日志, 执行轮数, 标题, 标点)。
+            (poem, tool history, log, executed rounds, title, punctuation).
 
         """
         current_poem = list(poem)
@@ -521,7 +533,7 @@ class WriterAI:
             round_num = start_round + round_idx
             if on_stream:
                 on_stream("")
-                _fire_stream(on_stream, f"[第{round_num}轮] 思考中...")
+                _fire_stream(on_stream, f"[round {round_num}] thinking...")
 
             self._check_and_compress(
                 messages, description, current_poem, template, template_obj
@@ -542,9 +554,9 @@ class WriterAI:
             if on_stream:
                 _fire_stream(
                     on_stream,
-                    f"[第{round_num}轮] 思考完成"
+                    f"[round {round_num}] thinking done"
                     + (
-                        f" → 调用工具: {response['tool_calls'][0]['name']}"
+                        f" → tool call: {response['tool_calls'][0]['name']}"
                         if response.get("tool_calls")
                         else ""
                     ),
@@ -559,7 +571,7 @@ class WriterAI:
 
                 result: dict[str, Any] | None = None
                 if name == "submit":
-                    # 可选整首替换（全量修改用 submit 即可）。
+                    # Optional whole-poem replacement (use submit for full edits).
                     provided = args.get("poem")
                     if isinstance(provided, list) and provided:
                         current_poem = [str(ln).strip() for ln in provided]
@@ -572,13 +584,14 @@ class WriterAI:
                     if punct_err:
                         result = {"error": punct_err}
                         detail_parts.append(
-                            f"[第{round_num}轮] submit: 拒绝提交 - {punct_err}"
+                            f"[round {round_num}] submit: rejected - {punct_err}"
                         )
                     else:
                         if punct is not None:
                             current_punctuation = punct
-                        # 提交前必须通过全量格律校验（与每次修改后的全量审查一致），
-                        # 否则拒绝并把具体错误返回给模型继续修改。
+                        # submit must pass full meter validation (same as the
+                        # review after every change), otherwise reject and return
+                        # the concrete errors to the model for more edits.
                         submit_result = self.validator.validate(
                             current_poem, template, template_obj
                         )
@@ -591,19 +604,23 @@ class WriterAI:
                                 }
                             )
                             detail_parts.append(
-                                f"[第{round_num}轮] submit: 提交定稿 (全量格律校验通过)"
+                                f"[round {round_num}] submit: final draft accepted "
+                                "(full meter validation passed)"
                             )
                             submit_called = True
                             break
                         result = {"error": submit_result.errors}
                         detail_parts.append(
-                            f"[第{round_num}轮] submit: 全量格律校验未通过，拒绝提交 - {submit_result.errors}"
+                            f"[round {round_num}] submit: full meter validation "
+                            f"failed, rejected - {submit_result.errors}"
                         )
                 elif name == "search_words":
                     result = execute_search_words(template, args)
                     word_count_result = len(result.get("words", []))
                     detail_parts.append(
-                        f"[第{round_num}轮] search_words({args.get('query', '')}): 找到{word_count_result}个候选词"
+                        f"[round {round_num}] search_words("
+                        f"{args.get('query', '')}): found "
+                        f"{word_count_result} candidate words"
                     )
                 elif name == "modify":
                     result = execute_modify(
@@ -626,20 +643,20 @@ class WriterAI:
                     elif "punctuation" in result:
                         current_punctuation = result["punctuation"]
                     detail = (
-                        f"[第{round_num}轮] modify({args.get('modify_type')}"
+                        f"[round {round_num}] modify({args.get('modify_type')}"
                         + (
-                            f", 行{args.get('line')}"
+                            f", line {args.get('line')}"
                             if args.get("modify_type") == "line"
                             else ""
                         )
                         + ")"
                     )
                     if "error" in result:
-                        detail += f": 失败 - {result['error']}"
+                        detail += f": failed - {result['error']}"
                     else:
-                        detail += ": 成功"
+                        detail += ": succeeded"
                         if "validation_errors" in result:
-                            detail += f" (格律问题: {result['validation_errors']})"
+                            detail += f" (meter issues: {result['validation_errors']})"
                     detail_parts.append(detail)
 
                 if result is not None:
@@ -647,7 +664,7 @@ class WriterAI:
                     history.append({"tool": name, "arguments": args, "result": result})
 
                     if "poem" in result:
-                        detail_parts.append("当前诗稿:\n" + "\n".join(current_poem))
+                        detail_parts.append("current poem:\n" + "\n".join(current_poem))
 
                     if on_step:
                         on_step(
@@ -670,7 +687,9 @@ class WriterAI:
             if poem_changed:
                 check = self.validator.validate(current_poem, template, template_obj)
                 if check.passed:
-                    detail_parts.append(f"[第{round_num}轮] 格律校验通过，优化结束")
+                    detail_parts.append(
+                        f"[round {round_num}] meter validation passed; polishing done"
+                    )
                     break
 
             messages.append(LLMClient.assistant_to_message(response))
@@ -679,14 +698,15 @@ class WriterAI:
                     "role": "tool",
                     "tool_call_id": tc["id"],
                     "content": json.dumps(
-                        results_by_id.get(tc["id"], {"error": "工具未执行"}),
+                        results_by_id.get(tc["id"], {"error": "Tool was not executed"}),
                         ensure_ascii=False,
                     ),
                 }
                 for tc in response["tool_calls"]
             )
 
-            # 空转引导: 连续多轮未成功修改也未提交时，提示 AI 继续推进(不中断循环)
+            # Idle-loop nudge: after several rounds without a successful edit or
+            # submit, prompt the AI to keep going (without breaking the loop)
             changed = tuple(current_poem) != last_poem_key
             last_poem_key = tuple(current_poem)
             no_progress_streak = no_progress_streak + 1 if not changed else 0

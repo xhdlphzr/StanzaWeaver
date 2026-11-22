@@ -1,26 +1,32 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""格律总校验器（MeterValidator）.
+"""Overall meter validator (MeterValidator).
 
-对整首诗执行三层校验：
-1. 行数匹配；
-2. 每行音节数（任一切分变体满足即通过）；
-3. 逐位音节约束（平仄/重音/长短），任一切分变体满足即通过；
-   多份约束表（syllable_constraint_alternatives）之间为“或”关系：
-   满足任意一份约束表即可；
-4. 模板自定义完整规则（validate_full：押韵、三平尾、孤平等）。
+Runs a layered validation over a whole poem:
+1. Line-count match;
+2. Syllable count per line (passes when any division variant matches);
+3. Per-position syllable constraints (tone/stress/length), passing when any
+   division variant matches; multiple constraint tables
+   (syllable_constraint_alternatives) are in an "OR" relation: satisfying any
+   one table suffices;
+4. Template-specific full rules (validate_full: rhyme, three-level tail,
+   solitary level, etc.).
 
-第 4 层不再仅取主变体，而是把每行全部发音/切分变体逐一带入审查：
-对每行变体做组合搜索，存在任一组合使全部规则通过即视为合律。
+Layer 4 no longer uses only the primary variant; it feeds every pronunciation
+/ division variant of each line into the review, doing a combinatorial search
+over line variants and accepting the poem when any combination passes all
+rules.
 """
 
 import itertools
 from dataclasses import dataclass, field
 from typing import Any
 
-# 组合搜索逐行变体时的最大组合数，超出则截断（避免意大利语 sinalefe /
-# 英语多切分等导致组合数爆炸），截断后返回错误数最少的组合。
+# Maximum number of combinations when searching line variants; excess is
+# truncated (avoids combinatorial explosion from Italian sinalefe / English
+# multiple divisions), returning the combination with the fewest errors after
+# truncation.
 MAX_FULL_COMBOS = 20000
 
 from ..models.syllable import Syllable
@@ -36,14 +42,16 @@ VariantList = list[list[Syllable]]
 
 
 def _count_matches(actual: int, expected: SyllableCount) -> bool:
-    """判断实际音节数是否落在期望（定值或区间）.
+    """Check whether the actual syllable count matches the expectation.
+
+    The expectation may be a fixed value or a range.
 
     Args:
-        actual: 实际音节数。
-        expected: int 定值或 (min, max) 区间。
+        actual: Actual syllable count.
+        expected: int fixed value or (min, max) range.
 
     Returns:
-        匹配返回 True。
+        True when it matches.
 
     """
     if isinstance(expected, (tuple, list)) and len(expected) == 2:
@@ -53,11 +61,12 @@ def _count_matches(actual: int, expected: SyllableCount) -> bool:
 
 @dataclass
 class ValidationResult:
-    """一次格律校验的结果.
+    """Result of one meter validation.
 
     Attributes:
-        passed: 是否全部通过。
-        errors: 错误信息列表（人类可读，供 LLM 修正提示与前端展示）。
+        passed: Whether everything passed.
+        errors: List of error messages (human-readable, used for LLM
+            correction prompts and frontend display).
 
     """
 
@@ -65,10 +74,10 @@ class ValidationResult:
     errors: list[str] = field(default_factory=list)
 
     def add_error(self, msg: str) -> None:
-        """追加一条错误并使结果不通过.
+        """Append an error and mark the result as failed.
 
         Args:
-            msg: 错误描述。
+            msg: Error description.
 
         """
         self.passed = False
@@ -76,7 +85,7 @@ class ValidationResult:
 
 
 class MeterValidator:
-    """多语言格律总校验器（符号层，零 AI 开销）."""
+    """Multi-language overall meter validator (symbolic layer, zero AI cost)."""
 
     def validate(
         self,
@@ -84,15 +93,16 @@ class MeterValidator:
         template: TemplateDict,
         template_obj: object = None,
     ) -> ValidationResult:
-        """校验整首诗.
+        """Validate a whole poem.
 
         Args:
-            poem: 诗行列表。
-            template: 模板字典（to_dict() 结果）。
-            template_obj: 模板对象（含 validate_full 时执行完整规则检查）。
+            poem: List of poem lines.
+            template: Template dictionary (output of to_dict()).
+            template_obj: Template object (full rule checks run when it has
+                validate_full).
 
         Returns:
-            校验结果（含全部错误）。
+            Validation result (with all errors).
 
         """
         language = str(template.get("language", "zh"))
@@ -108,7 +118,8 @@ class MeterValidator:
 
         if len(poem) != lines_expected:
             result.add_error(
-                f"行数不匹配: 期望 {lines_expected} 行, 实际 {len(poem)} 行"
+                f"Line count mismatch: expected {lines_expected} lines, "
+                f"actual {len(poem)} lines"
             )
 
         all_syllables: list[VariantList] = []
@@ -121,13 +132,16 @@ class MeterValidator:
             variants = all_syllables[i]
             if not variants:
                 result.add_error(
-                    f"第{i + 1}行音节数不匹配: 期望 {format_count(expected_count)}, 实际 0"
+                    f"Line {i + 1} syllable count mismatch: "
+                    f"expected {format_count(expected_count)}, actual 0"
                 )
                 continue
             if not any(_count_matches(len(v), expected_count) for v in variants):
                 actual_count = len(variants[0])
                 result.add_error(
-                    f"第{i + 1}行音节数不匹配: 期望 {format_count(expected_count)}, 实际 {actual_count}"
+                    f"Line {i + 1} syllable count mismatch: "
+                    f"expected {format_count(expected_count)}, "
+                    f"actual {actual_count}"
                 )
 
         if alternatives:
@@ -148,13 +162,14 @@ class MeterValidator:
 
     @staticmethod
     def _constraint_alternatives(template: TemplateDict) -> list[ConstraintTable]:
-        """读取模板的多份逐位约束表（“或”关系）.
+        """Read the template's multiple per-position constraint tables (OR).
 
         Args:
-            template: 模板字典。
+            template: Template dictionary.
 
         Returns:
-            约束表列表；未配置多重约束时返回空列表。
+            List of constraint tables; empty when no multiple constraints are
+            configured.
 
         """
         raw = template.get("syllable_constraint_alternatives")
@@ -167,14 +182,16 @@ class MeterValidator:
         all_syllables: list[VariantList],
         alternatives: list[ConstraintTable],
     ) -> list[str]:
-        """检查多份逐位约束表：任一满足即通过，否则返回错误最少的一份的错误.
+        """Check multiple per-position tables: pass if any matches.
+
+        Otherwise return the errors of the table with the fewest errors.
 
         Args:
-            all_syllables: 每行一个变体列表。
-            alternatives: 多份约束表。
+            all_syllables: One variant list per line.
+            alternatives: Multiple constraint tables.
 
         Returns:
-            错误列表；存在满足的约束表时返回空列表。
+            Error list; empty when a satisfying table exists.
 
         """
         best: list[str] | None = None
@@ -191,14 +208,14 @@ class MeterValidator:
         all_syllables: list[VariantList],
         constraints: ConstraintTable,
     ) -> list[str]:
-        """检查一份逐位约束表，收集全部不匹配项.
+        """Check one per-position constraint table and collect all mismatches.
 
         Args:
-            all_syllables: 每行一个变体列表。
-            constraints: 逐位约束表。
+            all_syllables: One variant list per line.
+            constraints: Per-position constraint table.
 
         Returns:
-            错误信息列表。
+            List of error messages.
 
         """
         errors: list[str] = []
@@ -207,7 +224,10 @@ class MeterValidator:
             line_constraints = constraints[i]
             variants = all_syllables[i]
             if not variants:
-                errors.append(f"第{i + 1}行无音节，无法满足逐位约束")
+                errors.append(
+                    f"Line {i + 1} has no syllables; "
+                    "cannot satisfy per-position constraints"
+                )
                 continue
             if any(
                 MeterValidator._line_matches_variant(v, line_constraints)
@@ -219,9 +239,10 @@ class MeterValidator:
             for j in range(min_syl):
                 if not syllables[j].match_constraint(line_constraints[j]):
                     errors.append(
-                        f"第{i + 1}行第{j + 1}音节不匹配: "
-                        f"要求{MeterValidator._describe_constraint(line_constraints[j])}, "
-                        f"实际{MeterValidator._describe_syllable(syllables[j])}"
+                        f"Line {i + 1} syllable {j + 1} mismatch: required "
+                        f"{MeterValidator._describe_constraint(line_constraints[j])}"
+                        f", actual "
+                        f"{MeterValidator._describe_syllable(syllables[j])}"
                     )
         return errors
 
@@ -229,14 +250,14 @@ class MeterValidator:
     def _line_matches_variant(
         variant: list[Syllable], line_constraints: ConstraintLine
     ) -> bool:
-        """判断一行音节是否满足整行逐位约束.
+        """Check whether a line's syllables satisfy all per-position constraints.
 
         Args:
-            variant: 一行的一个音节切分变体。
-            line_constraints: 该行的逐位约束。
+            variant: One syllable division variant of a line.
+            line_constraints: Per-position constraints for that line.
 
         Returns:
-            全部约束满足返回 True。
+            True when all constraints are satisfied.
 
         """
         min_syl = min(len(variant), len(line_constraints))
@@ -249,14 +270,16 @@ class MeterValidator:
     def _order_variants(
         language: str, variants: list[list[Syllable]]
     ) -> list[list[Syllable]]:
-        """为组合搜索排序每行变体（主变体优先，作为首个被尝试的组合）.
+        """Sort the variants of a line for the combination search.
+
+        The primary variant goes first, so it is the first combination tried.
 
         Args:
-            language: 语言代码。
-            variants: 该行的候选切分列表。
+            language: Language code.
+            variants: Candidate divisions for the line.
 
         Returns:
-            排序后的变体列表（主变体在前）。
+            Sorted variant list (primary variant first).
 
         """
         if language == "en":
@@ -276,21 +299,26 @@ class MeterValidator:
         all_syllables: list[list[list[Syllable]]],
         language: str,
     ) -> list[str]:
-        """对每行全部发音/切分变体做组合搜索，任一组合通过即视为合律.
+        """Search combinations of all pronunciation/division variants per line.
 
-        不再仅取主变体：把每个变体逐一带入 validate_full 审查。若存在一个
-        逐行变体组合使全部格律规则通过，则返回空错误；否则返回错误数最少的
-        组合对应的错误（兜底为各语言主变体）。组合数过大时截断于
-        ``MAX_FULL_COMBOS``，避免意大利语 sinalefe / 英语多切分导致的爆炸。
+        Accepts the poem when any combination passes every rule. Instead of
+        using only the primary variant, each variant is fed into validate_full.
+        If some per-line variant combination passes all meter rules, returns no
+        errors; otherwise returns the errors of the combination with the fewest
+        errors (falling back to each language's primary variant). When the
+        number of combinations is too large it is truncated at
+        ``MAX_FULL_COMBOS`` to avoid the explosion caused by Italian sinalefe /
+        English multiple divisions.
 
         Args:
-            template_obj: 模板对象（含 validate_full）。
-            poem: 诗行文本（押韵/叠句等文本级规则使用）。
-            all_syllables: 每行一个变体列表（VariantList）。
-            language: 语言代码。
+            template_obj: Template object (has validate_full).
+            poem: Poem line text (used by text-level rules such as rhyme /
+                refrain).
+            all_syllables: One variant list per line (VariantList).
+            language: Language code.
 
         Returns:
-            错误列表；存在合律组合时返回空列表。
+            Error list; empty when a valid combination exists.
 
         """
         line_variants: list[list[list[Syllable]]] = []
@@ -317,14 +345,16 @@ class MeterValidator:
         poem: list[str],
         template: TemplateDict,
     ) -> ValidationResult:
-        """仅校验行数与每行音节数（初稿阶段的快速检查）.
+        """Validate only the line count and syllables per line (quick check).
+
+        Used for the early draft stage.
 
         Args:
-            poem: 诗行列表。
-            template: 模板字典。
+            poem: List of poem lines.
+            template: Template dictionary.
 
         Returns:
-            校验结果。
+            Validation result.
 
         """
         language = str(template.get("language", "zh"))
@@ -337,21 +367,25 @@ class MeterValidator:
 
         if len(poem) != lines_expected:
             result.add_error(
-                f"行数不匹配: 期望 {lines_expected} 行, 实际 {len(poem)} 行"
+                f"Line count mismatch: expected {lines_expected} lines, "
+                f"actual {len(poem)} lines"
             )
 
         min_lines = min(len(poem), len(syllables_expected))
         for i in range(min_lines):
             line = poem[i]
             expected_count = syllables_expected[i]
-            # 与完整校验一致：取该行全部发音/切分变体，任一变体满足音节数即通过。
+            # Same as full validation: take all pronunciation/division variants
+            # of the line; any variant matching the syllable count passes.
             variants = get_analyzer(language).analyze_line_variants(line)
             ok = any(_count_matches(len(v), expected_count) for v in variants)
             actual_count = len(variants[0]) if variants else 0
 
             if not ok:
                 result.add_error(
-                    f"第{i + 1}行音节数不匹配: 期望 {format_count(expected_count)}, 实际 {actual_count}"
+                    f"Line {i + 1} syllable count mismatch: "
+                    f"expected {format_count(expected_count)}, "
+                    f"actual {actual_count}"
                 )
 
         return result
@@ -362,15 +396,15 @@ class MeterValidator:
         line_index: int,
         template: TemplateDict,
     ) -> ValidationResult:
-        """校验单行（modify 工具 line 类型的前置检查）.
+        """Validate a single line (pre-check for the modify tool's line type).
 
         Args:
-            line_text: 新行文本。
-            line_index: 行号（0-based）。
-            template: 模板字典。
+            line_text: New line text.
+            line_index: Line index (0-based).
+            template: Template dictionary.
 
         Returns:
-            校验结果。
+            Validation result.
 
         """
         language = str(template.get("language", "zh"))
@@ -390,7 +424,9 @@ class MeterValidator:
             actual_count = len(variants[0]) if variants else 0
             if not ok:
                 result.add_error(
-                    f"音节数不匹配: 期望 {format_count(expected_count)}, 实际 {actual_count}"
+                    f"Syllable count mismatch: "
+                    f"expected {format_count(expected_count)}, "
+                    f"actual {actual_count}"
                 )
 
         if alternatives:
@@ -414,7 +450,8 @@ class MeterValidator:
                     constraint_desc = self._describe_constraint(line_constraints[j])
                     actual_desc = self._describe_syllable(syllables[j])
                     result.add_error(
-                        f"第{j + 1}音节: 要求{constraint_desc}, 实际{actual_desc}"
+                        f"Syllable {j + 1}: required {constraint_desc}, "
+                        f"actual {actual_desc}"
                     )
 
         return result
@@ -426,17 +463,18 @@ class MeterValidator:
         line_index: int,
         alternatives: list[ConstraintTable],
     ) -> list[str] | None:
-        """检查单行对多份约束表的匹配（任一满足即通过）.
+        """Check how a single line matches multiple constraint tables (OR).
 
         Args:
-            language: 语言代码。
-            line_text: 行文本。
-            line_index: 行号（0-based）。
-            alternatives: 多份约束表。
+            language: Language code.
+            line_text: Line text.
+            line_index: Line index (0-based).
+            alternatives: Multiple constraint tables.
 
         Returns:
-            全部约束表都不满足时，错误最少的一份的错误；存在满足的约束表
-            （或该行不受约束）时返回 None。
+            When no table matches, the errors of the table with the fewest
+            errors; None when a matching table exists (or the line is
+            unconstrained).
 
         """
         variants = get_analyzer(language).analyze_line_variants(line_text)
@@ -455,8 +493,9 @@ class MeterValidator:
             for j in range(min_syl):
                 if not syllables[j].match_constraint(line_constraints[j]):
                     errors.append(
-                        f"第{j + 1}音节: 要求{self._describe_constraint(line_constraints[j])}, "
-                        f"实际{self._describe_syllable(syllables[j])}"
+                        f"Syllable {j + 1}: required "
+                        f"{self._describe_constraint(line_constraints[j])}, "
+                        f"actual {self._describe_syllable(syllables[j])}"
                     )
             if best is None or len(errors) < len(best):
                 best = errors
@@ -464,46 +503,46 @@ class MeterValidator:
 
     @staticmethod
     def _describe_constraint(c: Constraint) -> str:
-        """约束的人类可读描述.
+        """Return a human-readable description of a constraint.
 
         Args:
-            c: 约束字典。
+            c: Constraint dictionary.
 
         Returns:
-            如 "声母=zh,tone=平"；无约束返回 "无约束"。
+            For example "onset=zh,tone=平"; "no constraints" when empty.
 
         """
         parts = []
         if c.get("onset"):
-            parts.append(f"声母={c['onset']}")
+            parts.append(f"onset={c['onset']}")
         if c.get("nucleus"):
-            parts.append(f"韵母={c['nucleus']}")
+            parts.append(f"nucleus={c['nucleus']}")
         if c.get("coda"):
-            parts.append(f"韵尾={c['coda']}")
+            parts.append(f"coda={c['coda']}")
         for k, v in c.get("attributes", {}).items():
             if v:
                 parts.append(f"{k}={v}")
-        return ",".join(parts) if parts else "无约束"
+        return ",".join(parts) if parts else "no constraints"
 
     @staticmethod
     def _describe_syllable(s: Syllable) -> str:
-        """音节的人类可读描述.
+        """Return a human-readable description of a syllable.
 
         Args:
-            s: 音节。
+            s: Syllable.
 
         Returns:
-            如 "声母=zh,tone=仄"；全空返回 "空"。
+            For example "onset=zh,tone=仄"; "empty" when all fields are empty.
 
         """
         parts = []
         if s.onset:
-            parts.append(f"声母={s.onset}")
+            parts.append(f"onset={s.onset}")
         if s.nucleus:
-            parts.append(f"韵母={s.nucleus}")
+            parts.append(f"nucleus={s.nucleus}")
         if s.coda:
-            parts.append(f"韵尾={s.coda}")
+            parts.append(f"coda={s.coda}")
         for k, v in s.attributes.items():
             if v:
                 parts.append(f"{k}={v}")
-        return ",".join(parts) if parts else "空"
+        return ",".join(parts) if parts else "empty"

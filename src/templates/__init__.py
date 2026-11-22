@@ -1,13 +1,15 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""格律模板基类与注册表.
+"""Metrical template base class and registry.
 
-模板（PoetryTemplate）定义一种诗体的全部格律规则：
-- syllables_per_line: 每行音节数（int 或 (min, max) 区间）；
-- get_syllable_constraints(): 逐位约束（供 modify 单行校验与 LLM 提示）；
-- validate_full(): 完整规则检查（押韵、三平尾等跨行规则）；
-- describe(): 给 LLM 的人类可读格律描述。
+A template (``PoetryTemplate``) defines all metrical rules of a poetic form:
+- syllables_per_line: syllables per line (int or a (min, max) range);
+- get_syllable_constraints(): per-position constraints (for single-line modify
+  validation and LLM prompts);
+- validate_full(): full rule checking (cross-line rules such as rhyme and
+  three-level-tail);
+- describe(): human-readable metrical description for the LLM.
 """
 
 import re
@@ -24,13 +26,13 @@ ConstraintTable = list[ConstraintLine]
 
 
 def _make_syl(**kwargs: Any) -> dict[str, Any]:
-    """构造逐位约束字典.
+    """Build a per-position constraint dict.
 
     Args:
-        **kwargs: 可含 onset/nucleus/coda 及 attributes 子字典。
+        **kwargs: May contain onset/nucleus/coda and an attributes sub-dict.
 
     Returns:
-        约束字典（含完整 attributes 三键）。
+        Constraint dict (with all three attributes keys).
 
     """
     attrs = kwargs.pop("attributes", {})
@@ -49,14 +51,15 @@ def _make_syl(**kwargs: Any) -> dict[str, Any]:
 
 
 def _last_word(line: str, allowed_chars: str) -> str:
-    """取行末词（去标点、小写）.
+    """Get the last word of a line (punctuation stripped, lowercased).
 
     Args:
-        line: 一行诗。
-        allowed_chars: 正则字符类中允许的字符集（不含方括号）。
+        line: One line of poetry.
+        allowed_chars: Characters allowed in the regex character class
+            (without brackets).
 
     Returns:
-        行末词；空行返回空串。
+        Last word of the line; empty string for an empty line.
 
     """
     if not line.strip():
@@ -67,35 +70,35 @@ def _last_word(line: str, allowed_chars: str) -> str:
 def _describe_constraint_table(
     lines_spec: Sequence[SyllableCount], constraints: ConstraintTable
 ) -> str:
-    """把一份逐位约束表渲染为多行描述.
+    """Render one per-position constraint table as a multi-line description.
 
     Args:
-        lines_spec: 每行音节数。
-        constraints: 逐位约束表。
+        lines_spec: Syllable count per line.
+        constraints: Per-position constraint table.
 
     Returns:
-        多行描述文本。
+        Multi-line description text.
 
     """
     lines_desc = ""
     for i, cnt in enumerate(lines_spec):
         line_constraints = constraints[i] if i < len(constraints) else []
-        line_info = f"  第{i + 1}行: {format_count(cnt)}音节"
+        line_info = f"  Line {i + 1}: {format_count(cnt)} syllables"
         if line_constraints:
             parts = []
             for j, c in enumerate(line_constraints):
                 desc_parts = []
                 if c.get("onset"):
-                    desc_parts.append(f"声母={c['onset']}")
+                    desc_parts.append(f"onset={c['onset']}")
                 if c.get("nucleus"):
-                    desc_parts.append(f"韵母={c['nucleus']}")
+                    desc_parts.append(f"nucleus={c['nucleus']}")
                 if c.get("coda"):
-                    desc_parts.append(f"韵尾={c['coda']}")
+                    desc_parts.append(f"coda={c['coda']}")
                 for k, v in c.get("attributes", {}).items():
                     if v:
                         desc_parts.append(f"{k}={v}")
                 if desc_parts:
-                    parts.append(f"    第{j + 1}位: {','.join(desc_parts)}")
+                    parts.append(f"    position {j + 1}: {','.join(desc_parts)}")
             if parts:
                 line_info += "\n" + "\n".join(parts)
         lines_desc += "\n" + line_info
@@ -103,23 +106,25 @@ def _describe_constraint_table(
 
 
 def describe_template_from_dict(template_dict: dict[str, Any]) -> str:
-    """从模板字典生成格律描述（无模板对象时的降级方案）.
+    """Build a metrical description from a template dict (fallback without an object).
 
     Args:
-        template_dict: 含 lines/syllables_per_line/syllable_constraints
-            与可选的 syllable_constraint_alternatives 的字典。
+        template_dict: Dict containing lines/syllables_per_line/
+            syllable_constraints and optional syllable_constraint_alternatives.
 
     Returns:
-        多行格律描述文本。
+        Multi-line metrical description text.
 
     """
     lines_spec = template_dict.get("syllables_per_line", [])
-    lines_desc = f"共 {template_dict.get('lines', len(lines_spec))} 行"
+    lines_desc = f"{template_dict.get('lines', len(lines_spec))} lines in total"
     alternatives = template_dict.get("syllable_constraint_alternatives") or []
     if alternatives:
-        lines_desc += f"（{len(alternatives)} 种音节约束，满足任意一种即可）"
+        lines_desc += (
+            f" ({len(alternatives)} syllable constraint variants; any one suffices)"
+        )
         for k, table in enumerate(alternatives, start=1):
-            lines_desc += f"\n【约束种类 {k}】"
+            lines_desc += f"\n[Constraint variant {k}]"
             lines_desc += _describe_constraint_table(lines_spec, list(table or []))
         return lines_desc
     constraints = template_dict.get("syllable_constraints") or []
@@ -129,13 +134,15 @@ def describe_template_from_dict(template_dict: dict[str, Any]) -> str:
 def _copy_structural_rules(
     rules: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    """复制结构规则字典（列表字段做浅拷贝，避免调用方误改模板常量）.
+    """Copy a structural-rules dict (list fields are shallow-copied).
+
+    This prevents callers from accidentally mutating template constants.
 
     Args:
-        rules: 结构规则字典或 None。
+        rules: Structural-rules dict or None.
 
     Returns:
-        复制后的字典或 None。
+        Copied dict, or None.
 
     """
     if not rules:
@@ -149,43 +156,51 @@ def _copy_structural_rules(
 
 
 class PoetryTemplate(ABC):
-    """格律模板基类（每种诗体一个子类）."""
+    """Metrical template base class (one subclass per poetic form)."""
 
     name: ClassVar[str] = ""
     language: ClassVar[str] = ""
     lines: ClassVar[int] = 0
-    # Sequence（协变）允许子类覆盖为 list[int] 或 list[tuple[int, int]]
+    # Sequence (covariant) lets subclasses override with list[int] or
+    # list[tuple[int, int]].
     syllables_per_line: ClassVar[Sequence[SyllableCount]] = []
     rule_description: ClassVar[str] = ""
-    #: 押韵韵式（如 "ABAB CDCD EFEF GG"；空串表示该模板无可转化的显式韵式）。
+    #: Rhyme scheme (e.g. "ABAB CDCD EFEF GG"; empty means the template has no
+    #: explicit convertible scheme).
     rhyme_scheme: ClassVar[str] = ""
-    #: 不同韵组是否须互不相同。
+    #: Whether different rhyme groups must be distinct.
     rhyme_distinct: ClassVar[bool] = False
-    #: 用户自定义整体校验代码（自定义模板用；内置模板为空）。
+    #: User-defined whole-poem validation code (for custom templates; empty for
+    #: built-in templates).
     custom_code: ClassVar[str] = ""
-    #: 用户填写的模板规则描述（会作为 prompt 提供给写作 AI）。
+    #: User-entered template rule description (passed as prompt to the writing AI).
     rule_note: ClassVar[str] = ""
-    #: 已数据化的结构规则（如近体诗的平仄骨架/三平尾/孤平），供跨语言转化复制。
+    #: Data-driven structural rules (e.g. the regulated-verse tone skeleton,
+    #: three-level tail, isolated level), copied during cross-language conversion.
     structural_rules: ClassVar[dict[str, Any] | None] = None
-    #: 仅实现于代码、无法随转化携带的语言专属特殊规则说明（供前端提示）。
+    #: Language-specific rules implemented only in code and not carried by
+    #: conversion (shown as frontend hints).
     special_rules: ClassVar[tuple[str, ...]] = ()
-    #: 展示时是否居中（诗居中；词等长句体裁可覆写为 False 左对齐）。
+    #: Whether to center when displaying (poems are centered; long-line forms
+    #: such as ci may override to False for left alignment).
     centered: ClassVar[bool] = True
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
-        """返回逐位音节约束表（每行一个约束列表）.
+        """Return the per-position syllable constraint table (one list per line).
 
         Returns:
-            约束表；不限定时返回 None。
+            Constraint table; None when unconstrained.
 
         """
         return None
 
     def get_syllable_constraint_alternatives(self) -> list[ConstraintTable] | None:
-        """返回多份逐位音节约束表（满足任意一份即可，即“或”关系）.
+        """Return multiple per-position constraint tables (OR relationship).
+
+        Satisfying any one table suffices.
 
         Returns:
-            约束表列表；未配置多重约束时返回 None。
+            List of constraint tables; None when multiple constraints are not configured.
 
         """
         return None
@@ -193,25 +208,25 @@ class PoetryTemplate(ABC):
     def validate_full(
         self, poem: list[str], syllables: list[list[Syllable]]
     ) -> list[str]:
-        """执行模板专属的完整规则检查.
+        """Run the template-specific full rule check.
 
         Args:
-            poem: 诗行列表。
-            syllables: 各行音节列表（analyze_line 结果）。
+            poem: List of poem lines.
+            syllables: Syllables per line (``analyze_line`` result).
 
         Returns:
-            错误信息列表（空列表表示通过）。
+            List of error messages (empty means pass).
 
         """
         return []
 
     def to_dict(self) -> dict[str, Any]:
-        """序列化为字典（供校验器与前端使用）.
+        """Serialize to a dict (for validators and the frontend).
 
         Returns:
             {"name", "language", "lines", "syllables_per_line",
              "syllable_constraints", "syllable_constraint_alternatives",
-             "rhyme_scheme", "rhyme_distinct", "custom_code", "centered"}。
+             "rhyme_scheme", "rhyme_distinct", "custom_code", "centered"}.
 
         """
         return {
@@ -234,11 +249,13 @@ class PoetryTemplate(ABC):
         }
 
     def describe(self) -> str:
-        """生成给 AI 提示的人类可读格律描述.
+        """Build the human-readable metrical description for the AI prompt.
 
         Returns:
-            多行文本：行数、每行音节数、逐位约束、自然语言规则。
-            用户填写的模板规则描述（rule_note）会作为 prompt 正文一并返回。
+            Multi-line text: line count, syllables per line, per-position
+            constraints, and natural-language rules.
+            A user-entered rule description (rule_note) is appended to the
+            prompt body.
 
         """
         lines_desc = describe_template_from_dict(
@@ -260,14 +277,14 @@ class PoetryTemplate(ABC):
     def _punctuated_content(
         self, poem: list[str], punctuation: list[str]
     ) -> tuple[str, list[str]]:
-        """给正文行逐行加标点（标题不加标点）.
+        """Punctuate body lines one by one (the title gets no punctuation).
 
         Args:
-            poem: 诗行列表（首元素为标题）。
-            punctuation: 标点列表（与正文行一一对应）。
+            poem: List of poem lines (first element is the title).
+            punctuation: Punctuation list (one entry per body line).
 
         Returns:
-            (标题, 已加标点的正文行列表)。
+            (Title, punctuated body lines).
 
         """
         title = poem[0] if poem else ""
@@ -279,18 +296,20 @@ class PoetryTemplate(ABC):
         return title, marked
 
     def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
-        """将无标点诗行格式化为可展示文本.
+        """Format unpunctuated poem lines into displayable text.
 
-        子类可覆写以实现诗体专属格式（如标点、缩进、分段）。
-        AI 生成的原始诗稿无标点、句间换行，本方法负责加上标点与排版。
-        punctuation 为空时使用诗体默认排版；提供时逐行套用给定标点。
+        Subclasses may override this for form-specific formatting (punctuation,
+        indentation, stanza breaks). AI drafts come without punctuation and line
+        breaks; this method adds punctuation and layout. When ``punctuation``
+        is empty the form's default layout is used; when provided, it is applied
+        line by line.
 
         Args:
-            poem: 无标点的诗行列表（首元素为标题）。
-            punctuation: 逐行标点列表；空/None 使用默认。
+            poem: Unpunctuated poem lines (first element is the title).
+            punctuation: Per-line punctuation list; empty/None uses defaults.
 
         Returns:
-            格式化后的展示文本。
+            Formatted display text.
 
         """
         if punctuation:
@@ -304,24 +323,24 @@ _registry: dict[str, PoetryTemplate] = {}
 
 
 def register(key: str, template: PoetryTemplate) -> None:
-    """注册模板到全局注册表.
+    """Register a template in the global registry.
 
     Args:
-        key: 模板键（如 "zh_wujue"）。
-        template: 模板实例。
+        key: Template key (e.g. "zh_wujue").
+        template: Template instance.
 
     """
     _registry[key] = template
 
 
 def format_count(cnt: SyllableCount) -> str:
-    """格式化音节数供提示/报错使用.
+    """Format a syllable count for prompts/errors.
 
     Args:
-        cnt: int 定值或 (min, max) 区间。
+        cnt: Fixed int or a (min, max) range.
 
     Returns:
-        "5" 或 "15-17"。
+        "5" or "15-17".
 
     """
     if isinstance(cnt, (tuple, list)) and len(cnt) == 2:
@@ -330,26 +349,26 @@ def format_count(cnt: SyllableCount) -> str:
 
 
 def get(key: str) -> PoetryTemplate:
-    """按键获取模板.
+    """Get a template by key.
 
     Args:
-        key: 模板键。
+        key: Template key.
 
     Returns:
-        模板实例。
+        Template instance.
 
     Raises:
-        KeyError: 键未注册。
+        KeyError: The key is not registered.
 
     """
     return _registry[key]
 
 
 def list_all() -> list[PoetryTemplate]:
-    """返回全部已注册模板.
+    """Return all registered templates.
 
     Returns:
-        模板实例列表。
+        List of template instances.
 
     """
     return list(_registry.values())
@@ -363,9 +382,12 @@ _LANGUAGE_LABELS: dict[str, str] = {
     "la": "古典拉丁语",
 }
 
-#: 自定义模板编辑器支持的逐位约束方案：语言 -> (属性维度键, 可选值元组)。
-#: 维度键即写入 attributes 的真实取值字段；空维度（""）表示该语言无语位约束，
-#: 只能通过 validate_full 整体规则（押韵/行级条件）来限定。
+#: Per-position constraint schemes supported by the custom-template editor:
+#: language -> (attribute dimension key, allowed values tuple).
+#: The dimension key is the real field written into ``attributes``; an empty
+#: dimension ("") means the language has no syllable-attribute constraints and
+#: can only be limited by validate_full's whole-poem rules (rhyme/line-level
+#: conditions).
 _CUSTOM_SCHEMES: dict[str, tuple[str, tuple[str, ...]]] = {
     "zh": ("tone", ("平", "仄")),
     "en": ("stress", ("light", "heavy")),
@@ -376,27 +398,31 @@ _CUSTOM_SCHEMES: dict[str, tuple[str, tuple[str, ...]]] = {
 
 
 def custom_template_schemes() -> dict[str, tuple[str, tuple[str, ...]]]:
-    """返回自定义模板各语言的逐位约束方案（含受支持语言清单）.
+    """Return per-position constraint schemes for custom templates.
+
+    The result also lists the supported languages.
 
     Returns:
-        {"zh": ("tone", ("平", "仄")), ...}；键即受支持语言，
-        值为 (属性维度键, 可选值元组)。
+        {"zh": ("tone", ("平", "仄")), ...}; keys are the supported languages,
+        values are (attribute dimension key, allowed values tuple).
 
     """
     return dict(_CUSTOM_SCHEMES)
 
 
 def template_helpers(language: str) -> tuple[str, ...]:
-    """列出某语言模板模块中可复用的 ``_check_*`` 辅助函数名.
+    """List reusable ``_check_*`` helper names in a language template module.
 
-    用于自定义代码编辑器的提示：生成的模板会以 ``rules`` 别名导入对应
-    语言模块，自定义代码可通过 ``rules.<函数名>`` 复用这些整体规则函数。
+    Used as hints for the custom-code editor: generated templates import the
+    language module under the ``rules`` alias, so custom code can reuse these
+    whole-poem rule functions via ``rules.<function name>``.
 
     Args:
-        language: 语言代码（zh/en/it/fr/la）。
+        language: Language code (zh/en/it/fr/la).
 
     Returns:
-        按字母排序的辅助函数名元组；语言模块不存在时抛出 ModuleNotFoundError。
+        Alphabetically sorted tuple of helper names; raises ModuleNotFoundError
+        when the language module does not exist.
 
     """
     import importlib
@@ -406,12 +432,12 @@ def template_helpers(language: str) -> tuple[str, ...]:
 
 
 def list_dicts() -> list[dict[str, Any]]:
-    """返回全部模板的字典形式（含显示名），供前端下拉列表使用.
+    """Return all templates as dicts (with display name) for frontend dropdowns.
 
     Returns:
         [{"key", "name", "language", "lines", "syllables_per_line",
-          "syllable_constraints", "display_name", "deletable"}, ...]；
-        顺序即注册表当前顺序（可由用户自定义排序）。
+          "syllable_constraints", "display_name", "deletable"}, ...];
+        the order is the registry's current order (user-customizable).
 
     """
     return [
@@ -426,14 +452,15 @@ def list_dicts() -> list[dict[str, Any]]:
 
 
 def set_order(keys: Sequence[str]) -> list[str]:
-    """按给定 key 顺序重排模板注册表.
+    """Reorder the template registry according to the given key order.
 
     Args:
-        keys: 期望的模板 key 顺序；未知/重复 key 会被忽略，未列出的已注册
-            模板按原顺序追加到末尾。
+        keys: Desired template key order; unknown/duplicate keys are ignored,
+            and registered templates not listed are appended in their original
+            order.
 
     Returns:
-        重排后的完整 key 顺序。
+        The complete reordered key list.
 
     """
     items = dict(_registry)
@@ -453,13 +480,13 @@ def set_order(keys: Sequence[str]) -> list[str]:
 
 
 def unregister(key: str) -> bool:
-    """从注册表移除一个模板（不删除源码文件）.
+    """Remove a template from the registry (does not delete source files).
 
     Args:
-        key: 模板 key。
+        key: Template key.
 
     Returns:
-        存在并移除返回 True，否则 False。
+        True if it existed and was removed, else False.
 
     """
     if key in _registry:

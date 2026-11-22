@@ -1,12 +1,14 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""模板编辑 AI：通过工具对话式配置自定义模板.
+"""Template editor AI: configure custom templates conversationally via tools.
 
-用户在自定义模板弹窗底部描述想要的模板，本代理循环调用工具（设置模板
-信息、音节数、约束种类、逐位约束、韵式、自定义代码），把每次思考、
-回答与工具调用通过回调实时推给前端；AI 满足条件后可调用 submit_template
-交由服务端落盘注册。
+The user describes the desired template at the bottom of the custom-template
+dialog. This agent repeatedly calls tools (set template info, syllable counts,
+constraint kinds, per-position constraints, rhyme scheme, custom code) and
+pushes each thought, answer, and tool call to the frontend in real time through
+a callback; once done, the AI can call submit_template to have the server
+register it.
 """
 
 import json
@@ -22,7 +24,7 @@ from ..tools.template_tools import (
 )
 from .base import LLMClient, Message
 
-#: 模板编辑 AI 的最大工具轮数。
+#: Maximum number of tool rounds for the template editor AI.
 MAX_EDITOR_ROUNDS = 12
 
 EditorEvent = dict[str, Any]
@@ -30,13 +32,13 @@ EmitCallback = Callable[[EditorEvent], None] | None
 
 
 def _build_editor_system(draft: TemplateDraft) -> str:
-    """构造模板编辑 AI 的系统提示.
+    """Build the template editor AI system prompt.
 
     Args:
-        draft: 当前模板草稿。
+        draft: Current template draft.
 
     Returns:
-        系统提示文本。
+        System prompt text.
 
     """
     draft_json = json.dumps(draft.to_payload(), ensure_ascii=False, indent=2)
@@ -71,7 +73,7 @@ def _build_editor_system(draft: TemplateDraft) -> str:
 
 @dataclass
 class EditorResult:
-    """一次模板编辑会话的结果."""
+    """Result of one template editing session."""
 
     draft: TemplateDraft
     submitted: bool
@@ -79,13 +81,13 @@ class EditorResult:
 
 
 class TemplateEditorAI:
-    """模板编辑 AI 代理（独立 LLM 端点/模型）."""
+    """Template editor AI agent (dedicated LLM endpoint/model)."""
 
     def __init__(self, config: dict[str, Any]):
-        """初始化模板编辑 AI.
+        """Initialize the template editor AI.
 
         Args:
-            config: {"base_url", "api_key", "model"}。
+            config: {"base_url", "api_key", "model"}.
 
         """
         self.client = LLMClient(
@@ -101,24 +103,24 @@ class TemplateEditorAI:
         emit: EmitCallback = None,
         max_rounds: int = MAX_EDITOR_ROUNDS,
     ) -> EditorResult:
-        """执行模板编辑对话（循环调用工具，直到提交或无工具调用）.
+        """Run the template editing conversation (loop until submit or no tool call).
 
         Args:
-            prompt: 用户对模板的自然语言描述。
-            payload: 当前模板草稿（前端表单状态）。
-            emit: 事件回调（thinking/message/tool/info）。
-            max_rounds: 最大工具轮数。
+            prompt: The user's natural-language description of the template.
+            payload: Current template draft (frontend form state).
+            emit: Event callback (thinking/message/tool/info).
+            max_rounds: Maximum number of tool rounds.
 
         Returns:
-            EditorResult(draft, submitted, message)。
+            EditorResult(draft, submitted, message).
 
         """
 
         def push(event: EditorEvent) -> None:
-            """安全推送一条编辑事件到前端.
+            """Safely push one editing event to the frontend.
 
             Args:
-                event: 事件字典。
+                event: Event dictionary.
 
             """
             if emit:
@@ -133,15 +135,15 @@ class TemplateEditorAI:
         for round_idx in range(1, max_rounds + 1):
             try:
                 response = self.client.chat(messages, tools=TEMPLATE_TOOLS)
-            except Exception as e:  # noqa: BLE001 - 模板AI兜底：调用失败回报给前端
+            except Exception as e:  # noqa: BLE001 - template AI fallback: report error
                 push(
                     {
                         "type": "error",
                         "round": round_idx,
-                        "content": f"模板AI调用失败: {e}",
+                        "content": f"Template AI call failed: {e}",
                     }
                 )
-                return EditorResult(draft, False, f"模板AI调用失败: {e}")
+                return EditorResult(draft, False, f"Template AI call failed: {e}")
 
             reasoning = response.get("reasoning_content")
             if reasoning:
@@ -171,7 +173,9 @@ class TemplateEditorAI:
                         }
                     )
                     continue
-                return EditorResult(draft, False, content or "已根据描述更新模板配置")
+                return EditorResult(
+                    draft, False, content or "Template config updated from description"
+                )
 
             results_by_id: dict[str, dict[str, Any]] = {}
             submitted = False
@@ -195,7 +199,9 @@ class TemplateEditorAI:
                     submitted = True
 
             if submitted:
-                return EditorResult(draft, True, content or "模板已提交，正在创建...")
+                return EditorResult(
+                    draft, True, content or "Template submitted, creating..."
+                )
 
             messages.append(LLMClient.assistant_to_message(response))
             messages.extend(
@@ -203,19 +209,28 @@ class TemplateEditorAI:
                     "role": "tool",
                     "tool_call_id": str(tc["id"]),
                     "content": json.dumps(
-                        results_by_id.get(str(tc["id"]), {"error": "工具未执行"}),
+                        results_by_id.get(
+                            str(tc["id"]), {"error": "Tool was not executed"}
+                        ),
                         ensure_ascii=False,
                     ),
                 }
                 for tc in tool_calls
             )
 
-        push({"type": "info", "content": f"已达到最大轮数（{max_rounds}），停止编辑"})
-        return EditorResult(draft, False, last_message or "已达到最大轮数，停止编辑")
+        push(
+            {
+                "type": "info",
+                "content": f"Stopping after reaching the maximum rounds ({max_rounds})",
+            }
+        )
+        return EditorResult(
+            draft, False, last_message or "Reached the maximum rounds; editing stopped"
+        )
 
 
 # --------------------------------------------------------------------------- #
-# 模板代码 AI 转写（跨语言转化时可选）
+# Template code AI rewriting (optional for cross-language conversion)
 # --------------------------------------------------------------------------- #
 
 _SUBMIT_CODE_TOOL: dict[str, Any] = {
@@ -262,15 +277,15 @@ _VALUE_LABELS: dict[str, str] = {
 def format_value_mapping(
     source_language: str, target_language: str, mapping: dict[str, str]
 ) -> str:
-    """把属性值映射格式化为给 AI 的人类可读说明.
+    """Format the attribute-value mapping as human-readable notes for the AI.
 
     Args:
-        source_language: 源语言代码。
-        target_language: 目标语言代码。
-        mapping: 源属性值 → 目标属性值的映射。
+        source_language: Source language code.
+        target_language: Target language code.
+        mapping: Mapping from source attribute values to target attribute values.
 
     Returns:
-        多行说明文本（含属性维度与每个值的对应关系）。
+        Multi-line description text (attribute dimensions and per-value pairs).
 
     """
     from ..templates.convert import constraint_scheme
@@ -307,18 +322,18 @@ def _build_rewrite_system(
     target_spec: dict[str, Any],
     rule_note: str = "",
 ) -> str:
-    """构造模板代码转写的系统提示.
+    """Build the template-code rewrite system prompt.
 
     Args:
-        source_language: 源语言代码。
-        target_language: 目标语言代码。
-        mapping: 源属性值 → 目标属性值的映射。
-        source_code: 源模板代码。
-        target_spec: 确定性转化得到的目标模板规格。
-        rule_note: 模板规则描述。
+        source_language: Source language code.
+        target_language: Target language code.
+        mapping: Mapping from source attribute values to target attribute values.
+        source_code: Source template code.
+        target_spec: Target template spec produced by deterministic conversion.
+        rule_note: Template rule description.
 
     Returns:
-        系统提示文本。
+        System prompt text.
 
     """
     spec = {
@@ -359,13 +374,16 @@ def _build_rewrite_system(
 
 
 class TemplateCodeRewriter:
-    """用模板 AI 把源模板校验代码转写为目标语言版本."""
+    """Rewrite source template validation code into the target language.
+
+    The rewrite is performed by the template AI.
+    """
 
     def __init__(self, config: dict[str, Any]):
-        """初始化代码转写器.
+        """Initialize the code rewriter.
 
         Args:
-            config: {"base_url", "api_key", "model"}。
+            config: {"base_url", "api_key", "model"}.
 
         """
         self.client = LLMClient(
@@ -384,19 +402,19 @@ class TemplateCodeRewriter:
         rule_note: str = "",
         max_rounds: int = 2,
     ) -> dict[str, Any]:
-        """把源模板代码转写为目标语言代码（调用工具输出，带语法校验）.
+        """Rewrite source template code into the target language (tool + syntax check).
 
         Args:
-            source_language: 源语言代码。
-            target_language: 目标语言代码。
-            mapping: 源属性值 → 目标属性值的映射。
-            source_code: 源模板代码。
-            target_spec: 确定性转化得到的目标模板规格。
-            rule_note: 模板规则描述。
-            max_rounds: 最大尝试轮数。
+            source_language: Source language code.
+            target_language: Target language code.
+            mapping: Mapping from source attribute values to target attribute values.
+            source_code: Source template code.
+            target_spec: Target template spec produced by deterministic conversion.
+            rule_note: Template rule description.
+            max_rounds: Maximum number of attempts.
 
         Returns:
-            {"status": "ok", "code", "notes"} 或 {"status": "error", "message"}。
+            {"status": "ok", "code", "notes"} or {"status": "error", "message"}.
         """
         messages: list[Message] = [
             {
@@ -418,8 +436,11 @@ class TemplateCodeRewriter:
         for _ in range(max_rounds):
             try:
                 response = self.client.chat(messages, tools=[_SUBMIT_CODE_TOOL])
-            except Exception as e:  # noqa: BLE001 - 代码转写兜底：调用失败回报给前端
-                return {"status": "error", "message": f"模板代码 AI 转写失败: {e}"}
+            except Exception as e:  # noqa: BLE001 - code rewrite fallback: report error
+                return {
+                    "status": "error",
+                    "message": f"Template code AI rewrite failed: {e}",
+                }
             arguments: dict[str, Any] | None = None
             for tool_call in response.get("tool_calls") or []:
                 if str(tool_call.get("name")) == "submit_code":
@@ -461,5 +482,8 @@ class TemplateCodeRewriter:
             )
         return {
             "status": "error",
-            "message": "模板代码 AI 转写未能在限定轮数内给出合法代码",
+            "message": (
+                "Template code AI rewrite did not produce valid code within the "
+                "allowed rounds"
+            ),
         }

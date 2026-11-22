@@ -1,10 +1,10 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""app.py 补齐覆盖：后台线程/连通性探测/自定义模板落盘/配置写回/反馈续跑等.
+"""Extra app.py coverage: background threads, probes, custom templates, and more.
 
-目标：pytest 覆盖率覆盖 ``src`` + ``app.py``（根目录模块）达到 100%。
-所有 SocketIO 流程使用桩 LLM / 假 Pipeline，绝不发起真实网络请求。
+Goal: pytest coverage reaches 100% for ``src`` + ``app.py`` (root module).
+All SocketIO flows use stub LLMs / fake pipelines; no real network calls.
 """
 
 import runpy
@@ -23,34 +23,34 @@ from src.config import Config
 from tests.helpers import make_stub, tool_call
 
 DESC = "SocketIO 测试主题"
-# 五言绝句（合律）：初稿与修改后首行均通过全量格律校验。
+# Five-character quatrain: draft and revised first line both pass full meter checks.
 DRAFT = "远岫依烟岭\n溪流伴月明\n桃红迷柳岸\n古道远山风"
 REVISED_LINE = "远岸栖云树"
 
 
 # --------------------------------------------------------------------------- #
-# 通用工具
+# Shared helpers
 # --------------------------------------------------------------------------- #
 @pytest.fixture()
 def client() -> Any:
-    """提供 Flask 测试客户端."""
+    """Provide a Flask test client."""
     app_module.app.testing = True
     with app_module.app.test_client() as c:
         yield c
 
 
 def _csrf() -> dict[str, str]:
-    """返回 CSRF 请求头."""
+    """Return CSRF request headers."""
     return {"X-CSRF-Token": app_module._CSRF_TOKEN}
 
 
 def _csrf_headers() -> dict[str, str]:
-    """返回含 CSRF 与 JSON 类型的请求头."""
+    """Return request headers with CSRF and JSON content type."""
     return {**_csrf(), "Content-Type": "application/json"}
 
 
 def _wait_event(sio: Any, name: str, timeout: float = 8.0) -> dict[str, Any]:
-    """轮询等待某个 socket 事件."""
+    """Poll until a socket event arrives."""
     deadline = time.time() + timeout
     while time.time() < deadline:
         for ev in sio.get_received():
@@ -61,12 +61,12 @@ def _wait_event(sio: Any, name: str, timeout: float = 8.0) -> dict[str, Any]:
 
 
 def _sio_client() -> Any:
-    """创建 socketio 测试客户端."""
+    """Create a SocketIO test client."""
     return app_module.socketio.test_client(app_module.app)
 
 
 class _FakeThread:
-    """记录 start/join 的假线程（不真正运行 target）."""
+    """Fake thread that records start/join (never runs the target)."""
 
     instances: ClassVar[list[_FakeThread]] = []
 
@@ -87,10 +87,10 @@ class _FakeThread:
 
 
 # --------------------------------------------------------------------------- #
-# 后台线程与连通性探测
+# Background threads and connectivity probes
 # --------------------------------------------------------------------------- #
 def test_auto_import_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    """_auto_import 成功路径：置 importing=False 并触发 ping 事件."""
+    """_auto_import success path: clear importing and trigger the ping event."""
     from src.knowledge import importer, vocabulary
 
     monkeypatch.setattr(vocabulary, "init_db", lambda: None)
@@ -105,7 +105,7 @@ def test_auto_import_success(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_auto_import_exception_logs(
     monkeypatch: pytest.MonkeyPatch, caplog: Any
 ) -> None:
-    """_auto_import 异常被记录且 finally 仍执行."""
+    """_auto_import logs exceptions and still runs the finally block."""
     from src.knowledge import vocabulary
 
     def _boom() -> None:
@@ -116,11 +116,11 @@ def test_auto_import_exception_logs(
     with caplog.at_level("ERROR"):
         app_module._auto_import()
     assert app_module._vocab_importing is False
-    assert "词库导入失败" in caplog.text
+    assert "Vocabulary import failed" in caplog.text
 
 
 def test_ping_no_api_key_sets_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
-    """缺少 api_key 的端点直接置 unknown."""
+    """An endpoint without api_key is marked unknown immediately."""
     cfg = SimpleNamespace(
         writer={"base_url": "http://x", "api_key": "", "model": "m"},
         checker={"base_url": "http://x", "api_key": "", "model": "m"},
@@ -134,7 +134,7 @@ def test_ping_no_api_key_sets_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_ping_endpoint_error_sets_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """端点探测异常时置 error."""
+    """Mark the endpoint as error when the probe raises."""
     cfg = SimpleNamespace(
         writer={"base_url": "http://x", "api_key": "k", "model": "m"},
         checker={"base_url": "http://x", "api_key": "k", "model": "m"},
@@ -157,7 +157,7 @@ def test_ping_endpoint_error_sets_error(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 def test_ping_endpoint_ok_sets_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    """端点探测成功时置 ok（不依赖真实配置/网络）."""
+    """Mark the endpoint ok on a successful probe (no real config/network)."""
     cfg = SimpleNamespace(
         writer={"base_url": "http://x", "api_key": "k", "model": "m"},
         checker={"base_url": "http://x", "api_key": "k", "model": "m"},
@@ -180,7 +180,7 @@ def test_ping_endpoint_ok_sets_ok(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_auto_ping_loop_runs_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    """_auto_ping 执行一轮后阻塞等待事件（不再定时轮询），由 wait 异常退出."""
+    """_auto_ping runs one round then blocks on the event (no timed polling)."""
     emitted: list[tuple[str, Any]] = []
     monkeypatch.setattr(app_module.socketio, "emit", lambda *a, **k: emitted.append(a))
     monkeypatch.setattr(app_module, "_ping_one_endpoint", lambda name: None)
@@ -207,12 +207,12 @@ def test_auto_ping_loop_runs_once(monkeypatch: pytest.MonkeyPatch) -> None:
         app_module._auto_ping()
     assert event.cleared == 1
     assert any("llm_status" in e[0] for e in emitted)
-    # 关键：不再带 timeout 定时轮询（取消设置不会触发重探）
+    # Key point: no timed polling with timeout (clearing it will not re-probe).
     assert waits and all(w is None for w in waits)
 
 
 def test_start_background_threads_runs(monkeypatch: pytest.MonkeyPatch) -> None:
-    """非测试环境下启动两条后台线程."""
+    """Start two background threads outside the test environment."""
     _FakeThread.instances = []
     monkeypatch.setattr("threading.Thread", _FakeThread)
     monkeypatch.setenv("STANZA_WEAVER_TEST", "0")
@@ -227,7 +227,7 @@ def test_start_background_threads_runs(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_start_background_threads_skipped_in_test_env(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """测试环境下不启动后台线程."""
+    """Do not start background threads in the test environment."""
     _FakeThread.instances = []
     monkeypatch.setattr("threading.Thread", _FakeThread)
     monkeypatch.setenv("STANZA_WEAVER_TEST", "1")
@@ -236,10 +236,10 @@ def test_start_background_threads_skipped_in_test_env(
 
 
 # --------------------------------------------------------------------------- #
-# 自定义模板自动注册
+# Automatic custom-template registration
 # --------------------------------------------------------------------------- #
 def test_register_custom_templates_dir_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Templates 目录不存在时提前返回."""
+    """Return early when the templates directory does not exist."""
     monkeypatch.setattr(Path, "exists", lambda self: False)
     app_module._register_custom_templates()
 
@@ -247,7 +247,7 @@ def test_register_custom_templates_dir_missing(monkeypatch: pytest.MonkeyPatch) 
 def test_register_custom_templates_import_error(
     monkeypatch: pytest.MonkeyPatch, caplog: Any
 ) -> None:
-    """自定义模板加载失败仅记录日志."""
+    """A failed custom-template load is only logged."""
     fake = Path("src/templates/custom_nope.py")
     monkeypatch.setattr(Path, "glob", lambda self, pat: iter([fake]))
     monkeypatch.setattr(
@@ -257,13 +257,13 @@ def test_register_custom_templates_import_error(
     )
     with caplog.at_level("ERROR"):
         app_module._register_custom_templates()
-    assert "自定义模板注册失败" in caplog.text
+    assert "Failed to register custom template" in caplog.text
 
 
 def test_custom_templates_dir_source_override_and_legacy(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """源码模式使用 src/templates；环境变量可覆盖；源码模式无旧目录."""
+    """Source mode uses src/templates; the env var overrides it; no legacy dir."""
     monkeypatch.delenv("STANZAWEAVER_TEMPLATES_DIR", raising=False)
     assert (
         app_module._custom_templates_dir()
@@ -278,7 +278,7 @@ def test_custom_templates_dir_source_override_and_legacy(
 def test_custom_templates_dir_frozen(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """编译版使用用户数据目录，旧目录为安装目录；二者相同时返回 None."""
+    """Frozen build uses the user data dir; legacy is install dir (None if same)."""
     monkeypatch.delenv("STANZAWEAVER_TEMPLATES_DIR", raising=False)
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(app_module, "__file__", str(tmp_path / "app" / "app.py"))
@@ -300,7 +300,7 @@ def test_custom_templates_dir_frozen(
 def test_legacy_custom_templates_dir_resolve_oserror(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """解析路径失败时仍返回旧目录（覆盖 OSError 兜底）."""
+    """Return the legacy dir even when resolve fails (OSError fallback)."""
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(app_module, "__file__", str(tmp_path / "app" / "app.py"))
     monkeypatch.setattr(
@@ -314,7 +314,7 @@ def test_legacy_custom_templates_dir_resolve_oserror(
 def test_migrate_legacy_custom_templates(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """旧目录模板复制到新目录：跳过已存在/缺失/失败场景."""
+    """Copy legacy templates: skip existing, missing, and failing cases."""
     legacy = tmp_path / "legacy"
     legacy.mkdir()
     (legacy / "custom_a.py").write_text("A", encoding="utf-8")
@@ -346,7 +346,7 @@ def test_migrate_legacy_custom_templates(
 def test_load_custom_template_module(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """从任意目录加载模板模块；执行失败清理 sys.modules."""
+    """Load a template module from anywhere; clean sys.modules on failure."""
     good = tmp_path / "good_mod.py"
     good.write_text("VALUE = 7\n", encoding="utf-8")
     module = app_module._load_custom_template_module(good)
@@ -374,7 +374,7 @@ def test_load_custom_template_module(
 
 
 def _write_custom_module(path: Path, display_name: str) -> None:
-    """写一个最小可注册的自定义模板模块."""
+    """Write a minimal registerable custom-template module."""
     path.write_text(
         "from src.templates import PoetryTemplate, register\n\n"
         "class T(PoetryTemplate):\n"
@@ -391,7 +391,7 @@ def _write_custom_module(path: Path, display_name: str) -> None:
 def test_register_custom_templates_from_user_dir(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """编译版从用户数据目录加载自定义模板."""
+    """Frozen build loads custom templates from the user data dir."""
     from src.templates import _registry
 
     user_dir = tmp_path / "user_templates"
@@ -410,7 +410,7 @@ def test_register_custom_templates_from_user_dir(
 def test_register_custom_templates_migrates_legacy(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """编译版旧安装目录的模板迁移到用户目录并注册；用户目录版本优先."""
+    """Migrate legacy templates to the user dir and register them (user wins)."""
     from src.templates import _registry
 
     app_dir = tmp_path / "app"
@@ -426,7 +426,7 @@ def test_register_custom_templates_migrates_legacy(
         assert (user_dir / "custom_testmod.py").exists()
         assert _registry["custom_testmod"].name == "旧版模板"
 
-        # 用户目录中的同名模板优先于旧目录
+        # A same-named template in the user dir wins over the legacy directory.
         user_dir.mkdir(exist_ok=True)
         _write_custom_module(user_dir / "custom_testmod.py", "用户新版模板")
         app_module._register_custom_templates()
@@ -438,7 +438,7 @@ def test_register_custom_templates_migrates_legacy(
 def test_create_custom_template_in_user_dir_loads_generated_module(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """编译版目录下的生成模板可被加载（验证相对导入仍指向 src.templates）."""
+    """Generated templates in the app dir load (relative imports still resolve)."""
     from src.templates import _registry
 
     templates_dir = tmp_path / "user_templates"
@@ -471,7 +471,7 @@ def test_create_custom_template_in_user_dir_loads_generated_module(
 def test_create_custom_template_writes_user_dir(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """编译版创建模板时写入用户数据目录."""
+    """Frozen build writes created templates to the user data dir."""
     templates_dir = tmp_path / "user_templates"
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setenv("STANZAWEAVER_TEMPLATES_DIR", str(templates_dir))
@@ -500,7 +500,7 @@ def test_create_custom_template_writes_user_dir(
 
 
 def test_register_custom_templates_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    """自定义模板成功加载并执行注册函数."""
+    """A custom template loads and its register function runs."""
     calls: list[str] = []
     fake = Path("src/templates/custom_hit.py")
 
@@ -516,12 +516,12 @@ def test_register_custom_templates_success(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 # --------------------------------------------------------------------------- #
-# 模板顺序持久化 / 排序接口 / 删除接口
+# Template order persistence / reorder API / delete API
 # --------------------------------------------------------------------------- #
 def test_template_order_path_uses_home(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """顺序文件位于用户数据目录."""
+    """The order file lives in the user data dir."""
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     assert app_module._template_order_path() == (
         tmp_path / ".stanza_weaver" / "template_order.json"
@@ -531,7 +531,7 @@ def test_template_order_path_uses_home(
 def test_template_order_load_save_roundtrip(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """顺序文件读写与损坏兜底."""
+    """Order file read/write round-trip and corrupted-data fallback."""
     path = tmp_path / "order.json"
     monkeypatch.setattr(app_module, "_template_order_path", lambda: path)
     assert app_module._load_template_order() == []
@@ -546,7 +546,7 @@ def test_template_order_load_save_roundtrip(
 
 
 def test_apply_saved_template_order(monkeypatch: pytest.MonkeyPatch) -> None:
-    """测试环境跳过应用顺序；正式环境按文件应用；空顺序不调用."""
+    """Test env skips applying order; normal env applies it; empty order skips."""
     calls: list[list[str]] = []
     monkeypatch.setattr(app_module, "set_order", lambda keys: calls.append(list(keys)))
     monkeypatch.setenv("STANZA_WEAVER_TEST", "1")
@@ -562,21 +562,21 @@ def test_apply_saved_template_order(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _ordered_snapshot() -> list[str]:
-    """返回注册表当前 key 顺序."""
+    """Return the current registry key order."""
     from src.templates import _registry
 
     return list(_registry)
 
 
 def _restore_order(snapshot: list[str]) -> None:
-    """恢复注册表顺序."""
+    """Restore the registry order."""
     from src.templates import set_order
 
     set_order(snapshot)
 
 
 def test_default_template_order_keeps_custom_relative_order() -> None:
-    """默认顺序：内置用注册顺序，自定义保持相对顺序排在内置之后，其它追加."""
+    """Default order: built-ins by registration, custom after them, then others."""
     from src.templates import _registry
 
     snapshot = dict(_registry)
@@ -605,14 +605,14 @@ def test_default_template_order_keeps_custom_relative_order() -> None:
 
 
 def test_reset_template_order_requires_csrf(client: FlaskClient) -> None:
-    """重置顺序接口需要 CSRF."""
+    """The reset-order endpoint requires CSRF."""
     assert client.post("/api/templates/order/reset").status_code == 403
 
 
 def test_reset_template_order_success(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """重置顺序：内置回到默认顺序，自定义保持相对顺序排在后面并落盘."""
+    """Reset order: built-ins back to default, custom after them, then save."""
     import json as _json
 
     from src.templates import _registry
@@ -646,7 +646,7 @@ def test_reset_template_order_success(
 def test_reset_template_order_save_failure(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """顺序文件写入失败返回 500."""
+    """A failed order-file write returns 500."""
     monkeypatch.setattr(
         app_module,
         "_save_template_order",
@@ -657,12 +657,12 @@ def test_reset_template_order_save_failure(
 
 
 def test_reorder_templates_requires_csrf(client: FlaskClient) -> None:
-    """排序接口需要 CSRF."""
+    """The reorder endpoint requires CSRF."""
     assert client.post("/api/templates/order", json={"order": []}).status_code == 403
 
 
 def test_reorder_templates_invalid_body(client: FlaskClient) -> None:
-    """排序接口请求体非法返回 400."""
+    """The reorder endpoint returns 400 for an invalid body."""
     client.post("/api/templates/order", data="x", headers=_csrf_headers())
     assert (
         client.post(
@@ -687,7 +687,7 @@ def test_reorder_templates_invalid_body(client: FlaskClient) -> None:
 def test_reorder_templates_success(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """排序接口重排注册表并持久化；未列出的模板追加在末尾."""
+    """Reorder the registry and persist it; unlisted templates go last."""
     import json as _json
 
     from src.templates import list_dicts
@@ -718,7 +718,7 @@ def test_reorder_templates_success(
 def test_reorder_templates_save_failure(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """顺序文件写入失败返回 500."""
+    """A failed order-file write returns 500."""
     monkeypatch.setattr(
         app_module,
         "_save_template_order",
@@ -737,12 +737,12 @@ def test_reorder_templates_save_failure(
 
 
 def test_delete_template_requires_csrf(client: FlaskClient) -> None:
-    """删除接口需要 CSRF."""
+    """The delete endpoint requires CSRF."""
     assert client.post("/api/templates/delete", json={"key": "x"}).status_code == 403
 
 
 def test_delete_template_invalid_body(client: FlaskClient) -> None:
-    """删除接口请求体非法/缺少 key 返回 400."""
+    """The delete endpoint returns 400 for a bad body or a missing key."""
     assert (
         client.post(
             "/api/templates/delete", data="x", headers=_csrf_headers()
@@ -758,7 +758,7 @@ def test_delete_template_invalid_body(client: FlaskClient) -> None:
 
 
 def test_delete_template_not_found(client: FlaskClient) -> None:
-    """删除不存在的模板返回 404."""
+    """Deleting a missing template returns 404."""
     resp = client.post(
         "/api/templates/delete",
         json={"key": "custom_nope"},
@@ -768,7 +768,7 @@ def test_delete_template_not_found(client: FlaskClient) -> None:
 
 
 def test_delete_template_builtin_rejected(client: FlaskClient) -> None:
-    """内置模板不可删除."""
+    """Built-in templates cannot be deleted."""
     resp = client.post(
         "/api/templates/delete",
         json={"key": "zh_wujue"},
@@ -778,11 +778,11 @@ def test_delete_template_builtin_rejected(client: FlaskClient) -> None:
 
 
 def _register_delete_dummy(key: str = "custom_delete_test") -> None:
-    """注册一个可删除的测试模板."""
+    """Register a deletable test template."""
     from src.templates import PoetryTemplate, register
 
     class _Tpl(PoetryTemplate):
-        """测试模板."""
+        """Test template."""
 
         name = "删除测试"
         language = "zh"
@@ -795,7 +795,7 @@ def _register_delete_dummy(key: str = "custom_delete_test") -> None:
 def test_delete_template_success(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """删除自定义模板：移除注册、删除源码并更新时间顺序文件."""
+    """Delete a custom template: unregister, remove the source, update the order."""
     from src.templates import _registry
 
     key = "custom_delete_test"
@@ -826,7 +826,7 @@ def test_delete_template_success(
 def test_delete_template_without_file_success(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """源码文件不存在时仍可移除注册（容错）."""
+    """Unregistering still works when the source file is missing."""
     from src.templates import _registry
 
     key = "custom_delete_nofile"
@@ -851,7 +851,7 @@ def test_delete_template_without_file_success(
 def test_delete_template_unlink_failure(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """删除源码失败返回 500 且保留注册."""
+    """A failed source deletion returns 500 and keeps the registration."""
     from src.templates import _registry
 
     key = "custom_delete_fail"
@@ -879,7 +879,7 @@ def test_delete_template_unlink_failure(
 def test_delete_template_order_save_failure_still_ok(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """删除成功但顺序保存失败时仍返回成功（仅告警）."""
+    """Deletion succeeds even if saving the order fails (warning only)."""
     from src.templates import _registry
 
     key = "custom_delete_ordersave"
@@ -904,10 +904,10 @@ def test_delete_template_order_save_failure_still_ok(
 
 
 # --------------------------------------------------------------------------- #
-# 本地访问守卫 / i18n 兜底 / 配置写回
+# Local access guard / i18n fallback / config write-back
 # --------------------------------------------------------------------------- #
 def test_guard_local_access_rejects_foreign_host() -> None:
-    """非本机 Host 返回 403."""
+    """A non-local Host returns 403."""
     with app_module.app.test_request_context("/", headers={"Host": "evil.example"}):
         resp = app_module._guard_local_access()
     assert resp is not None
@@ -917,7 +917,7 @@ def test_guard_local_access_rejects_foreign_host() -> None:
 def test_i18n_missing_language_falls_back(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """语言文件缺失时回退到 zh.yaml."""
+    """Fall back to zh.yaml when a language file is missing."""
     (tmp_path / "zh.yaml").write_text("html:\n  lang: zh-CN\n", encoding="utf-8")
     monkeypatch.setattr(app_module, "_I18N_DIR", tmp_path)
     resp = client.get("/api/i18n/en")
@@ -926,14 +926,14 @@ def test_i18n_missing_language_falls_back(
 
 
 def test_config_post_requires_csrf(client: FlaskClient) -> None:
-    """保存配置需要 CSRF."""
+    """Saving config requires CSRF."""
     assert client.post("/api/config", json={}).status_code == 403
 
 
 def test_config_post_success(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """合法配置写回成功."""
+    """A valid config write-back succeeds."""
     cfg = Config(tmp_path / "cfg.json")
     monkeypatch.setattr("src.config.get_config", lambda: cfg)
     resp = client.post(
@@ -954,7 +954,7 @@ def test_config_post_success(
 def test_config_post_not_dict(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """非对象请求体返回 400."""
+    """A non-object request body returns 400."""
     cfg = Config(tmp_path / "cfg.json")
     monkeypatch.setattr("src.config.get_config", lambda: cfg)
     resp = client.post("/api/config", data="not json", headers=_csrf_headers())
@@ -964,7 +964,7 @@ def test_config_post_not_dict(
 def test_config_post_writer_not_dict(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Writer 配置不是对象返回 400."""
+    """A non-object Writer config returns 400."""
     cfg = Config(tmp_path / "cfg.json")
     monkeypatch.setattr("src.config.get_config", lambda: cfg)
     resp = client.post("/api/config", json={"writer": "oops"}, headers=_csrf_headers())
@@ -972,10 +972,10 @@ def test_config_post_writer_not_dict(
 
 
 # --------------------------------------------------------------------------- #
-# SocketIO：generate 异常 / feedback / disconnect
+# SocketIO: generate errors / feedback / disconnect
 # --------------------------------------------------------------------------- #
 def test_generate_pipeline_error_emits_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Generate 线程中 pipeline 抛错时向前端推送 error."""
+    """Push an error when the generate thread's pipeline raises."""
 
     class _Boom:
         def __init__(self) -> None:
@@ -988,19 +988,19 @@ def test_generate_pipeline_error_emits_error(monkeypatch: pytest.MonkeyPatch) ->
     sio = _sio_client()
     sio.emit("generate", {"topic": "主题", "template_key": "zh_wujue"})
     ev = _wait_event(sio, "error")
-    assert "生成失败" in str(ev["args"])
+    assert "Generation failed" in str(ev["args"])
 
 
 def test_feedback_without_session_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    """无活跃会话时 feedback 返回错误."""
+    """Feedback returns an error when there is no active session."""
     sio = _sio_client()
     sio.emit("feedback", {"feedback": "再婉约一些"})
     ev = _wait_event(sio, "error")
-    assert "没有活跃的生成会话" in str(ev["args"])
+    assert "No active generation session" in str(ev["args"])
 
 
 def test_feedback_pipeline_error_emits_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Feedback 线程中续跑抛错时向前端推送 error."""
+    """Push an error when the feedback thread's continuation raises."""
     sio = _sio_client()
 
     class _BoomFeedback:
@@ -1018,11 +1018,11 @@ def test_feedback_pipeline_error_emits_error(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(app_module, "_active_states", _AlwaysSession())
     sio.emit("feedback", {"feedback": "再婉约一些"})
     ev = _wait_event(sio, "error")
-    assert "反馈处理失败" in str(ev["args"])
+    assert "Feedback processing failed" in str(ev["args"])
 
 
 def _patch_llm_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
-    """注入桩 LLM 客户端（可驱动 generate + feedback 两轮）."""
+    """Inject stub LLM clients (drives both generate and feedback rounds)."""
     from src.agents import checker_ai, writer_ai
 
     writer_stub = make_stub(
@@ -1051,7 +1051,7 @@ def _patch_llm_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_generate_then_feedback_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Generate 定稿后 feedback 续跑再次定稿（同一会话）."""
+    """Generate finalizes, then feedback continuation finalizes again (same session)."""
     _patch_llm_stubs(monkeypatch)
     sio = _sio_client()
 
@@ -1066,16 +1066,16 @@ def test_generate_then_feedback_success(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 def test_disconnect_cleans_state() -> None:
-    """断开连接时清理会话状态."""
+    """Disconnecting clears the session state."""
     sio = _sio_client()
     sio.disconnect()
 
 
 # --------------------------------------------------------------------------- #
-# 自定义模板：源码构建与路由分支
+# Custom templates: source building and route branches
 # --------------------------------------------------------------------------- #
 def test_build_custom_code_with_custom_code() -> None:
-    """custom_code 被逐行缩进写入生成源码."""
+    """custom_code is written into the generated source with per-line indent."""
     code = app_module._build_custom_template_code(
         name="带代码",
         language="zh",
@@ -1092,18 +1092,18 @@ def test_build_custom_code_with_custom_code() -> None:
 
 
 def test_custom_template_requires_csrf(client: FlaskClient) -> None:
-    """创建自定义模板需要 CSRF."""
+    """Creating a custom template requires CSRF."""
     assert client.post("/api/templates/custom", json={}).status_code == 403
 
 
 def test_custom_template_not_dict(client: FlaskClient) -> None:
-    """请求体非对象返回 400."""
+    """A non-object request body returns 400."""
     resp = client.post("/api/templates/custom", data="x", headers=_csrf_headers())
     assert resp.status_code == 400
 
 
 def test_custom_template_invalid_lines(client: FlaskClient) -> None:
-    """Lines 非数字且音节数与行数不符时返回 400."""
+    """Non-numeric lines and mismatched syllable counts return 400."""
     resp = client.post(
         "/api/templates/custom",
         json={
@@ -1120,7 +1120,7 @@ def test_custom_template_invalid_lines(client: FlaskClient) -> None:
 
 
 def test_custom_template_empty_name(client: FlaskClient) -> None:
-    """名称为空返回 400."""
+    """An empty name returns 400."""
     resp = client.post(
         "/api/templates/custom",
         json={"name": "", "language": "zh", "lines": 4, "syllables_per_line": [5] * 4},
@@ -1130,7 +1130,7 @@ def test_custom_template_empty_name(client: FlaskClient) -> None:
 
 
 def test_custom_template_bad_syllables(client: FlaskClient) -> None:
-    """音节数列表含非法元素返回 400."""
+    """An invalid syllable-count list returns 400."""
     resp = client.post(
         "/api/templates/custom",
         json={
@@ -1145,7 +1145,7 @@ def test_custom_template_bad_syllables(client: FlaskClient) -> None:
 
 
 def test_custom_template_safe_name_empty(client: FlaskClient) -> None:
-    """名称无法生成合法标识符时返回 400."""
+    """A name that cannot form a valid identifier returns 400."""
     resp = client.post(
         "/api/templates/custom",
         json={
@@ -1162,7 +1162,7 @@ def test_custom_template_safe_name_empty(client: FlaskClient) -> None:
 def test_custom_template_write_error(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """模板文件写入失败返回 500."""
+    """A failed template-file write returns 500."""
 
     def _raise_write(self: Any, *a: Any, **k: Any) -> None:
         raise OSError("disk full")
@@ -1181,13 +1181,13 @@ def test_custom_template_write_error(
         headers=_csrf_headers(),
     )
     assert resp.status_code == 500
-    assert "模板文件写入失败" in resp.get_json()["message"]
+    assert "Failed to write template file" in resp.get_json()["message"]
 
 
 def test_custom_template_registration_error(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """注册失败返回 500（写盘被 mock 为空操作，避免污染仓库）."""
+    """Registration failure returns 500 (writes mocked to keep the repo clean)."""
     monkeypatch.setattr(Path, "write_text", lambda self, *a, **k: None)
     monkeypatch.setattr(
         app_module,
@@ -1207,13 +1207,13 @@ def test_custom_template_registration_error(
         headers=_csrf_headers(),
     )
     assert resp.status_code == 500
-    assert "注册失败" in resp.get_json()["message"]
+    assert "Template registration failed" in resp.get_json()["message"]
 
 
 def test_custom_template_success(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """成功创建并注册模板（写盘与注册均被 mock，避免污染仓库）."""
+    """Create and register a template successfully (writes and load mocked)."""
     calls: list[str] = []
     emitted: list[Any] = []
     monkeypatch.setattr(Path, "write_text", lambda self, *a, **k: None)
@@ -1243,10 +1243,10 @@ def test_custom_template_success(
 
 
 # --------------------------------------------------------------------------- #
-# 历史记录：非对象请求体
+# History: non-object request bodies
 # --------------------------------------------------------------------------- #
 def test_history_post_not_dict(client: FlaskClient) -> None:
-    """保存历史记录时非对象请求体返回 400."""
+    """A non-object body when saving history returns 400."""
     resp = client.post("/api/history", data="x", headers=_csrf_headers())
     assert resp.status_code == 400
 
@@ -1254,7 +1254,7 @@ def test_history_post_not_dict(client: FlaskClient) -> None:
 def test_history_db_path_default_and_override(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """历史库路径：默认指向用户目录，set_history_db_path 可覆盖（供测试隔离）."""
+    """History DB path defaults to the user dir; set_history_db_path overrides."""
     monkeypatch.setattr(app_module, "_HISTORY_DB_PATH", None)
     assert (
         app_module.get_history_db_path()
@@ -1265,10 +1265,10 @@ def test_history_db_path_default_and_override(
 
 
 # --------------------------------------------------------------------------- #
-# 启动服务 / main / __main__
+# Server startup / main / __main__
 # --------------------------------------------------------------------------- #
 def test_start_server_default(monkeypatch: pytest.MonkeyPatch) -> None:
-    """默认监听 127.0.0.1:5000."""
+    """Listen on 127.0.0.1:5000 by default."""
     calls: list[Any] = []
     monkeypatch.setattr(
         app_module.socketio, "run", lambda *a, **k: calls.append((a, k))
@@ -1283,7 +1283,7 @@ def test_start_server_default(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_start_server_bad_port(monkeypatch: pytest.MonkeyPatch) -> None:
-    """端口环境变量非法时回退 5000."""
+    """Fall back to port 5000 when the port env var is invalid."""
     calls: list[Any] = []
     monkeypatch.setattr(
         app_module.socketio, "run", lambda *a, **k: calls.append((a, k))
@@ -1294,7 +1294,7 @@ def test_start_server_bad_port(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_main_import_webview_fails(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Webview 不可导入时回退到 HTTP 服务."""
+    """Fall back to the HTTP server when webview cannot be imported."""
     calls: list[Any] = []
     monkeypatch.setitem(sys.modules, "webview", None)
     monkeypatch.setattr(app_module, "start_server", lambda: calls.append("started"))
@@ -1303,7 +1303,7 @@ def test_main_import_webview_fails(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_main_webview_gui_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    """GUI 初始化失败时记录告警并等待后台服务线程."""
+    """On GUI init failure, log a warning and wait for the server thread."""
     _FakeThread.instances = []
     started: list[Any] = []
 
@@ -1315,14 +1315,15 @@ def test_main_webview_gui_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(sys.modules, "webview", _Gui())
     monkeypatch.setattr(app_module, "start_server", lambda: started.append("server"))
     app_module.main()
-    # HTTP 服务由后台线程承载（此处被假线程替换），失败路径仅等待该线程
+    # The HTTP server runs in a background thread (replaced by the fake here),
+    # so the failure path only waits on that thread.
     assert started == []
     assert len(_FakeThread.instances) == 1
     assert _FakeThread.instances[0].joined
 
 
 def test_main_webview_gui_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    """GUI 正常启动."""
+    """GUI starts normally."""
     _FakeThread.instances = []
 
     class _Gui:
@@ -1341,7 +1342,7 @@ def test_main_webview_gui_ok(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_module_runs_as_main(monkeypatch: pytest.MonkeyPatch) -> None:
-    """以 __main__ 方式执行 app.py 时覆盖入口守卫."""
+    """Running app.py as __main__ covers the entry-point guard."""
     monkeypatch.setitem(sys.modules, "webview", None)
     monkeypatch.setattr(SocketIO, "run", lambda self, *a, **k: None)
     runpy.run_path(str(Path(app_module.__file__)), run_name="__main__")

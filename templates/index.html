@@ -906,7 +906,7 @@
           });
       }
 
-      // ---- 应用内确认弹窗（替代 window.confirm） ----
+      // ---- In-app confirm dialog (replaces window.confirm) ----
 
       var confirmState = null;
 
@@ -935,7 +935,7 @@
         if (state && typeof state.onConfirm === "function") state.onConfirm();
       }
 
-      // ---- 模板管理：拖动排序 / 删除自定义模板 ----
+      // ---- Template management: drag to reorder / delete custom templates ----
 
       function openTemplateManage() {
         document
@@ -991,7 +991,7 @@
         });
       }
 
-      // FLIP 动画：移动拖动行时让其它行平滑上/下移动，避免瞬间跳变。
+      // FLIP animation: rows above/below glide smoothly as the dragged row moves.
       function moveManageItem(list, dragging, target, insertBefore) {
         var siblings = Array.prototype.filter.call(
           list.children,
@@ -1160,7 +1160,7 @@
         var text = document.getElementById("llm-status-text");
         var checking =
           data.writer === "checking" || data.checker === "checking";
-        // 已连接成功时，重新检测不退回灰色，保持绿色直到结果覆盖
+        // Once connected, a re-check stays green until a new result overrides it.
         if (checking && llmConnected) {
           return;
         }
@@ -1532,9 +1532,10 @@
         return wrapper;
       }
 
-      // ---- 统一的诗稿渲染（诗稿进行中 / 最终展示 / 诗组共用） ----
+      // ---- Shared poem rendering (in progress / final display / sequences) ----
 
-      // 格式化文本首行通常就是标题；把它拆出来单独用标题样式渲染。
+      // The first line of formatted text is usually the title; split it out and
+      // render it with the title style.
       function splitFormattedTitle(text, title) {
         var content = typeof text === "string" ? text : "";
         var expected = typeof title === "string" ? title.trim() : "";
@@ -1574,8 +1575,9 @@
         return pre;
       }
 
-      // 把“加粗放大的标题 + 诗体正文”渲染进容器；相同内容不重复渲染以免闪动。
-      // force=true 用于最终定稿（即使内容相同也强制刷新一次）。
+      // Render the bold, larger title plus the poem body into the container; skip
+      // identical content to avoid flicker.
+      // force=true is used for finalizing (force one refresh even if unchanged).
       function renderPoemContent(
         container,
         title,
@@ -1619,7 +1621,7 @@
         const display = document.getElementById("poem-display");
         lastPoem = [...poem];
         lastFormatted = data.formatted_poem || "";
-        // 最终展示与诗稿进行中完全同一套渲染（标题加粗放大）。
+        // The final display uses exactly the same rendering as in-progress poems.
         renderPoemContent(
           display,
           data.title,
@@ -1817,7 +1819,7 @@
               cfg.checker.api_key;
             document.getElementById("cfg-checker-model").value =
               cfg.checker.model;
-            // 后端旧版本可能没有 editor 配置，缺失时按空值处理。
+            // Older backends may lack an editor config; treat missing as empty.
             var editor = cfg.editor || {};
             document.getElementById("cfg-editor-url").value =
               editor.base_url || "";
@@ -1870,7 +1872,7 @@
               location.reload();
             } else {
               showToast(t("toast.config_saved"), "success");
-              // 保存后重新检测连通性（取消设置不会触发）
+              // Re-check connectivity after saving (canceling does not trigger).
               updateLLMStatus({ writer: "checking", checker: "checking" });
             }
           });
@@ -2019,16 +2021,19 @@
         return hint;
       }
 
-      // ---- 自定义模板编辑器状态 ----
-      // DOM 只是渲染结果；真实选择保存在 TPL_STATE 中，重建表格时据此恢复。
+      // ---- Custom template editor state ----
+      // The DOM is just rendered output; real selections live in TPL_STATE and
+      // are rebuilt from it when the tables are re-rendered.
       var TPL_STATE = {
-        // 每种约束（或）一张表：alternatives[种类][行][音节] = canonical 值或 ""
+        // One table per kind: alternatives[kind][line][syllable] = canonical value
+        // or "".
         alternatives: [],
         rhymeScheme: "",
         rhymeDistinct: false,
         baseTemplateKey: "",
         mapping: {},
-        // 转化携带的数据化结构规则（如近体诗平仄骨架/三平尾/孤平）。
+        // Data-driven structural rules carried by conversion (e.g. regulated-verse
+        // tonal skeleton, triple-level-tone ending, isolated level tone).
         structuralRules: null,
         aiBusy: false,
       };
@@ -2100,7 +2105,8 @@
         syncSylInput(currentSylCounts(lines), lines);
       }
 
-      // 按当前输入框的行数/每行音节/约束种类规整状态（保留已有选择、截断多余部分）。
+      // Reconcile state with the current line count / syllables / kind count
+      // (keep existing selections, truncate anything extra).
       function ensureTplState() {
         var lines = clampTplLines(document.getElementById("tmpl-lines").value);
         var counts = currentSylCounts(lines);
@@ -2195,7 +2201,7 @@
         TPL_STATE.alternatives[kind][line][pos] = sel.value || "";
       }
 
-      // 状态 -> 后端 constraints/alternatives 的 dict 单元格表。
+      // Convert state into the dict cell tables for backend constraints/alternatives.
       function collectAlternatives() {
         ensureTplState();
         var scheme = tplScheme(document.getElementById("tmpl-language").value);
@@ -2217,7 +2223,7 @@
         });
       }
 
-      // ---- 押韵 ----
+      // ---- Rhyme ----
 
       function parseRhymeScheme(text, lines) {
         var compact = String(text || "").replace(/\s+/g, "");
@@ -2308,7 +2314,7 @@
           TPL_STATE.rhymeScheme;
       }
 
-      // ---- 从其它模板转化 ----
+      // ---- Convert from another template ----
 
       function getBaseTemplate() {
         if (!TPL_STATE.baseTemplateKey) return null;
@@ -2478,7 +2484,8 @@
         renderSourceConvertReport(item);
       }
 
-      // 说明转化会一并复制韵式与自定义代码（仅逐位约束按映射转换）。
+      // Note that conversion also copies the rhyme scheme and custom code; only
+      // per-position constraints are translated through the mapping.
       function appendConvertCopiesHint(container) {
         var hint = document.createElement("div");
         hint.className = "convert-copies-hint";
@@ -2496,7 +2503,7 @@
         ai_code: "template_modal.convert_carried_ai_code",
       };
 
-      // 显示“会携带/不会携带哪些规则”，明确转化范围。
+      // Show which rules are carried or dropped to clarify the conversion scope.
       function renderConvertReport(carried, dropped) {
         var box = document.getElementById("tmpl-convert-report");
         if (!box) return;
@@ -2560,8 +2567,9 @@
         TPL_STATE.mapping[select.dataset.source] = select.value;
       }
 
-      // 把后端转化接口返回的完整规格回填到表单：
-      // 行数/音节数/约束表/韵式/自定义代码一并落地，约束值取目标语言属性。
+      // Fill the form with the full spec returned by the backend conversion API:
+      // line count, syllables, constraint tables, rhyme scheme and custom code;
+      // constraint values use the target language's attributes.
       function applyConvertedSpec(spec) {
         var lines = clampTplLines(spec.lines || 4);
         document.getElementById("tmpl-lines").value = lines;
@@ -2634,8 +2642,9 @@
         renderRhymeLines();
       }
 
-      // 统一转化接口：把“仅转换逐位约束、其余原样复制”的逻辑交给后端，
-      // 前端只负责提供源模板/目标语言/映射并回填结果。
+      // Unified conversion API: the backend handles "convert only per-position
+      // constraints, copy the rest as-is"; the frontend just sends the source
+      // template, target language and mapping, then fills in the result.
       function applyTemplateConversion() {
         var item = getBaseTemplate();
         if (!item) return;
@@ -2689,7 +2698,7 @@
           });
       }
 
-      // ---- 模板 AI 面板 ----
+      // ---- Template AI panel ----
 
       function setTemplateAiBusy(busy) {
         TPL_STATE.aiBusy = !!busy;
@@ -2717,7 +2726,8 @@
         return entry;
       }
 
-      // 工具参数/结果中的 canonical 约束值与属性名按界面语言本地化显示。
+      // Canonical constraint values and attribute names in tool args/results are
+      // localized to the UI language.
       function constraintDisplayPairs() {
         var pairs = [];
         var meta = TPL_META || TPL_META_DEFAULT;
@@ -2864,7 +2874,7 @@
         }
       }
 
-      // ---- 草稿收集 / 回填（与后端 edit_template 契约一致） ----
+      // ---- Draft collection / restore (matches backend edit_template contract) ----
 
       function collectDraftForAi() {
         var info = ensureTplState();
@@ -2982,7 +2992,8 @@
       }
 
       function handleTplLanguageChange() {
-        // 切换语言后 canonical 值集合改变，清空已选约束（保持原有行为）。
+        // Switching language changes the canonical value set, so clear selected
+        // constraints (keeps the existing behavior).
         TPL_STATE.alternatives = [];
         TPL_STATE.mapping = {};
         TPL_STATE.structuralRules = null;

@@ -1,17 +1,24 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""法语音节分析器.
+"""French syllable analyzer.
 
-- 按正字法切分音节：二合/三合元音（ou/eau/ain 等）、鼻化元音、静音 e。
-- 撇号仅作分隔符移除，不剥离词首字母前缀：aujourd'hui / quelqu'un /
-  presqu'île 等内嵌撇号词仍按完整词形切分。
-- qu 后的 u 恒静音、gu 后接 e/i/y 时 u 静音（quel/guerre 不计 u 音节）。
-- 词尾静音 e 规则：词尾 e muet（后仅接静音辅音 s/t/x/p 或为空）在词中
-  还有其它元音核时省略；唯一元音时保留（如 le/de/que）。
-- 跨词仅处理联诵（liaison）：前词尾辅音并入后词首 onset，不改变音节数；
-  跨词元音相遇不省音（法语省音仅由撇号在同一词形内体现，如 l'eau）。
-- 韵脚 key 为词末发音元音核（鼻化归并），并丢弃词尾静音辅音。
+- Orthographic syllable division: digraphs/trigraphs (ou/eau/ain etc.), nasal
+  vowels, silent e.
+- Apostrophes are removed as separators only; word-initial letter prefixes are
+  not stripped, so words with embedded apostrophes such as aujourd'hui /
+  quelqu'un / presqu'île are still divided using their full form.
+- u after qu is always silent; u after gu followed by e/i/y is silent
+  (quel/guerre do not count the u as a syllable).
+- Final silent e rule: a word-final e muet (followed only by the silent
+  consonants s/t/x/p or nothing) is dropped when the word has other vowel
+  nuclei; it is kept when it is the only vowel (e.g. le/de/que).
+- Across words only liaison is handled: a final consonant joins the next word's
+  initial onset without changing the syllable count; cross-word vowel contact
+  does not elide (French elision appears only inside a word form via the
+  apostrophe, e.g. l'eau).
+- The rhyme key is the final pronounced vowel nucleus (nasals merged), with
+  word-final silent consonants discarded.
 """
 
 import re
@@ -20,11 +27,11 @@ from ..models.syllable import Syllable
 from .base import SyllableAnalyzer
 
 _VOWELS: set[str] = set("aeiouyàâäéèêëîïôöùûüæœÿ")
-# 带分音符的元音不参与二合元音合并（如 naïf 的 ï）。
+# Vowels with a diaeresis do not take part in digraph merging (e.g. ï in naïf).
 _TREMA: set[str] = {"ï", "ÿ", "ü"}
 
 _FR_DIGRAPHS: set[str] = {
-    # 三合元音 / 三字母核
+    # Trigraphs / three-letter nuclei
     "eau",
     "yeu",
     "yen",
@@ -34,7 +41,7 @@ _FR_DIGRAPHS: set[str] = {
     "oin",
     "ain",
     "ein",
-    # 二合元音 / 鼻化元音
+    # Digraphs / nasal vowels
     "ou",
     "au",
     "an",
@@ -54,7 +61,7 @@ _FR_DIGRAPHS: set[str] = {
     "ua",
     "ue",
     "uo",
-    # 原实现保留项
+    # Items retained from the original implementation
     "ay",
     "ey",
     "œu",
@@ -66,10 +73,10 @@ _FR_DIGRAPHS: set[str] = {
     "um",
 }
 
-# 词尾静音辅音（法语韵脚中忽略，如 s/t/x/p）。
+# Word-final silent consonants (ignored in French rhyme, e.g. s/t/x/p).
 _MUTE_FINALS: set[str] = set("stxp")
 
-# 鼻化元音归并：前部鼻化 -> "an"，后部鼻化 -> "on"。
+# Nasal vowel merging: front nasals -> "an", back nasals -> "on".
 _NASAL_FRONT: set[str] = {
     "an",
     "en",
@@ -86,46 +93,50 @@ _NASAL_FRONT: set[str] = {
 }
 _NASAL_BACK: set[str] = {"on", "om"}
 
-# 撇号（l'、qu'il、aujourd'hui、quelqu'un 等）一律去除：省音撇号不构成音节，
-# 去掉后按相邻字母解析即可（qu 后的 u 由静音规则排除）。不得剥离词首的字母
-# 前缀，否则 aujourd'hui/quelqu'un/presqu'île 会被误删实义音节。
+# Apostrophes (l', qu'il, aujourd'hui, quelqu'un, etc.) are always removed:
+# elision apostrophes do not form syllables, and the remaining adjacent letters
+# can be parsed directly (u after qu is excluded by the silent-u rule). Do not
+# strip the word-initial letter prefix, or the real syllables of
+# aujourd'hui/quelqu'un/presqu'île would be lost.
 _PUNCT_RE = re.compile(r"[^a-zàâäéèêëîïôöùûüæœÿ]")
 
-# gu 后 u 的静音条件：后接 e/i/y（guerre、guide、langue）时 u 不构成音节；
-# gu 后接 a/o/u 或词尾（aigu、Guadeloupe）时 u 正常发音。qu 后的 u 恒静音。
+# Silent-u condition after gu: u forms no syllable when followed by e/i/y
+# (guerre, guide, langue); u is pronounced normally when followed by a/o/u or
+# at the word end (aigu, Guadeloupe). u after qu is always silent.
 _SILENT_GU_FOLLOW: set[str] = set("eéèêëiîïy")
 
 
 def _is_vowel(ch: str) -> bool:
-    """判断字符是否为法语元音（含重音与 œ/æ/y）.
+    """Return whether a character is a French vowel (with accents and œ/æ/y).
 
     Args:
-        ch: 单个字符。
+        ch: Single character.
 
     Returns:
-        是元音返回 True。
+        True if it is a vowel.
 
     """
     return ch in _VOWELS
 
 
 class FrenchAnalyzer(SyllableAnalyzer):
-    """法语音节分析器：真实音节结构（韵腹/韵尾）+ 韵脚 key."""
+    """French syllable analyzer: real syllable structure (nucleus/coda) + rhyme key."""
 
     language = "fr"
 
     def _is_silent_u(self, w: str, i: int) -> bool:
-        """判断位置 i 的 'u' 是否静音（不构成音节）.
+        """Return whether the 'u' at position i is silent (forms no syllable).
 
-        qu 后的 u 恒静音；gu 后接 e/i/y 时 u 静音。其余情况（gu 后接
-        a/o/u、独立元音、词首等）u 正常发音或参与二合元音。
+        u after qu is always silent; u after gu followed by e/i/y is silent.
+        Otherwise (u after gu followed by a/o/u, a standalone vowel,
+        word-initial, etc.) u is pronounced normally or forms part of a digraph.
 
         Args:
-            w: 已清洗的词。
-            i: 'u' 的索引。
+            w: Cleaned word.
+            i: Index of the 'u'.
 
         Returns:
-            静音返回 True。
+            True if silent.
 
         """
         if w[i] != "u" or i == 0:
@@ -136,16 +147,18 @@ class FrenchAnalyzer(SyllableAnalyzer):
         return prev == "g" and i + 1 < len(w) and w[i + 1] in _SILENT_GU_FOLLOW
 
     def _clean_word(self, word: str) -> str:
-        """去标点并转小写.
+        """Strip punctuation and lowercase the word.
 
-        省音撇号一并去除（l'amour → lamour），但不剥离词首字母前缀，
-        以免破坏 aujourd'hui / quelqu'un / presqu'île 等内嵌撇号词的切分。
+        Elision apostrophes are removed too (l'amour -> lamour), but the
+        word-initial letter prefix is not stripped so that words with embedded
+        apostrophes such as aujourd'hui / quelqu'un / presqu'île keep their
+        division.
 
         Args:
-            word: 法语单词（可含省音撇号与标点）。
+            word: French word (may contain elision apostrophes and punctuation).
 
         Returns:
-            清洗后的小写词；空串表示无实际内容。
+            Cleaned lowercase word; an empty string means no actual content.
 
         """
         w = word.lower().strip()
@@ -155,14 +168,17 @@ class FrenchAnalyzer(SyllableAnalyzer):
     def _build_syllables(
         self, w: str, nuclei: list[tuple[int, int, str]]
     ) -> list[Syllable]:
-        """根据元音核位置组装音节（辅音在核间归 onset，核后归 coda）.
+        """Assemble syllables from the vowel-nucleus positions.
+
+        Consonants before a nucleus become its onset; consonants after a nucleus
+        become its coda.
 
         Args:
-            w: 清洗后的词。
-            nuclei: 由 (起始, 结束, 核文本) 组成的元音核列表。
+            w: Cleaned word.
+            nuclei: Vowel nucleus list of (start, end, nucleus text) tuples.
 
         Returns:
-            音节列表。
+            List of syllables.
 
         """
         attrs: dict[str, str] = {"tone": "", "stress": "", "length": ""}
@@ -181,19 +197,20 @@ class FrenchAnalyzer(SyllableAnalyzer):
     def _apply_final_e(
         self, syls: list[Syllable], w: str, nuclei: list[tuple[int, int, str]]
     ) -> list[Syllable]:
-        """省略词尾静音 e（e muet）.
+        """Drop a word-final silent e (e muet).
 
-        省略条件：末元音核恰为单字母 "e"，且 e 之后（词尾）仅含静音辅音
-        （s/t/x/p）或为空；只要词中还有其它元音核即省略。唯一元音时保留
-        （如 le/de/que）。
+        Drop condition: the last vowel nucleus is exactly the single letter "e"
+        and the text after e (the word end) contains only silent consonants
+        (s/t/x/p) or is empty; it is dropped as long as the word has another
+        vowel nucleus. It is kept when it is the only vowel (e.g. le/de/que).
 
         Args:
-            syls: 初步切分出的音节。
-            w: 清洗后的词。
-            nuclei: 元音核列表。
+            syls: Initially divided syllables.
+            w: Cleaned word.
+            nuclei: Vowel nucleus list.
 
         Returns:
-            处理后的音节列表。
+            Processed syllable list.
 
         """
         if not syls:
@@ -209,13 +226,14 @@ class FrenchAnalyzer(SyllableAnalyzer):
         return syls[:-1]
 
     def _syllabify_word(self, word: str) -> list[Syllable]:
-        """按词切分音节（处理二/三合元音与词尾静音 e）.
+        """Divide a word into syllables (digraphs and final silent e handled).
 
         Args:
-            word: 法语单词（可含省音前缀与标点）。
+            word: French word (may contain elision prefixes and punctuation).
 
         Returns:
-            音节列表（nucleus 为真实元音核，coda 为尾辅音）。
+            Syllable list (nucleus is the real vowel nucleus, coda the trailing
+            consonants).
 
         """
         w = self._clean_word(word)
@@ -249,13 +267,13 @@ class FrenchAnalyzer(SyllableAnalyzer):
         return self._apply_final_e(syls, w, nuclei)
 
     def _normalize_nucleus(self, nuc: str) -> str:
-        """将元音核归并到押韵等价类（鼻化合并）.
+        """Merge a vowel nucleus into a rhyme equivalence class (nasal merging).
 
         Args:
-            nuc: 原始元音核（可能为二/三合元音或鼻化元音）。
+            nuc: Raw vowel nucleus (possibly a digraph/trigraph or nasal vowel).
 
         Returns:
-            归并后的韵脚核（前部鼻化 -> "an"，后部鼻化 -> "on"）。
+            Merged rhyme nucleus (front nasals -> "an", back nasals -> "on").
 
         """
         if nuc in _NASAL_FRONT:
@@ -265,13 +283,17 @@ class FrenchAnalyzer(SyllableAnalyzer):
         return nuc
 
     def rhyme_key(self, word: str) -> str:
-        """法语韵脚 key：词末发音元音核（鼻化归并），词尾静音辅音已丢弃.
+        """Return the French rhyme key: final pronounced vowel nucleus.
+
+        Nasals are merged and word-final silent consonants are already
+        discarded.
 
         Args:
-            word: 行末词。
+            word: Word at the end of a line.
 
         Returns:
-            韵脚串（如 parle -> "e"，an/en -> "an"）；无法切分时返回空串。
+            Rhyme string (e.g. parle -> "e", an/en -> "an"); empty when the
+            word cannot be divided.
 
         """
         syls = self._syllabify_word(word)
@@ -283,41 +305,45 @@ class FrenchAnalyzer(SyllableAnalyzer):
         return self._normalize_nucleus(last.nucleus)
 
     def count_syllables_in_word(self, word: str) -> int:
-        """单词语节数（含二/三合元音合并与词尾静音 e 规则）.
+        """Return the syllable count of a word.
+
+        Handles digraph/trigraph merging and the final silent e rule.
 
         Args:
-            word: 法语单词。
+            word: French word.
 
         Returns:
-            音节数。
+            Syllable count.
 
         """
         return len(self._syllabify_word(word))
 
     def analyze_word(self, word: str) -> list[Syllable]:
-        """分析单词的音节.
+        """Analyze the syllables of a word.
 
         Args:
-            word: 法语单词。
+            word: French word.
 
         Returns:
-            音节列表。
+            Syllable list.
 
         """
         return self._syllabify_word(word)
 
     def syllabify_line(self, text: str) -> list[Syllable]:
-        """整行切分：逐词切分并应用跨词联诵（liaison）.
+        """Divide a whole line word by word and apply cross-word liaison.
 
-        前词以辅音结尾、后词以元音开头时，该辅音作为联诵 onset 并入后词
-        首音节（不改变音节总数）。跨词元音相遇不省音（法语省音仅由撇号
-        在同一词形内体现，如 l'eau）。
+        When the preceding word ends in a consonant and the next word starts
+        with a vowel, that consonant joins the next word's first syllable as a
+        liaison onset (without changing the syllable count). Cross-word vowel
+        contact does not elide (French elision appears only inside a word form
+        via the apostrophe, e.g. l'eau).
 
         Args:
-            text: 一行法语诗。
+            text: One line of French verse.
 
         Returns:
-            整行音节列表。
+            Syllable list for the whole line.
 
         """
         words = text.split()
@@ -330,20 +356,22 @@ class FrenchAnalyzer(SyllableAnalyzer):
                 prev = all_syls[-1]
                 curr = syls[0]
                 if prev.coda != "" and curr.onset == "":
-                    # 联诵：前词尾辅音成为后词首音节 onset
+                    # Liaison: final consonant moves to the next word as onset.
                     curr.onset = prev.coda
                     prev.coda = ""
             all_syls.extend(syls)
         return all_syls
 
     def analyze_line_variants(self, line: str) -> list[list[Syllable]]:
-        """整行切分变体（法语标准音节划分下仅返回一种切分）.
+        """Return whole-line division variants (only one in standard French).
+
+        Standard French syllabification yields a single division.
 
         Args:
-            line: 一行法语诗。
+            line: One line of French verse.
 
         Returns:
-            仅含标准切分的变体列表。
+            Variant list containing only the standard division.
 
         """
         return [self.syllabify_line(line)]

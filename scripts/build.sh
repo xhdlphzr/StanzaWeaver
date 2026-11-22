@@ -3,18 +3,18 @@
 
 #!/usr/bin/env bash
 #
-# build.sh - 构建 StanzaWeaver Docker 镜像
+# build.sh - build the StanzaWeaver Docker image
 #
-# 用法:
-#   ./scripts/build.sh                     # 默认 tag=stanzaweaver:latest
-#   ./scripts/build.sh -b docker.m.daocloud.io/library/python:3.14-slim   # 国内加速器
-#   ./scripts/build.sh -t stanzaweaver:1.0.0 -n                            # 指定 tag + 无缓存
+# Usage:
+#   ./scripts/build.sh                     # default tag=stanzaweaver:latest
+#   ./scripts/build.sh -b docker.m.daocloud.io/library/python:3.14-slim   # regional mirror
+#   ./scripts/build.sh -t stanzaweaver:1.0.0 -n                            # custom tag + no cache
 #
-# 选项:
-#   -t, --tag <tag>        镜像标签 (默认 stanzaweaver:latest)
-#   -b, --base-image <img> 基础镜像 (默认 python:3.14-slim)
-#   -n, --no-cache         跳过 BuildKit 缓存彻底重建
-#   -h, --help             显示帮助
+# Options:
+#   -t, --tag <tag>        image tag (default stanzaweaver:latest)
+#   -b, --base-image <img> base image (default python:3.14-slim)
+#   -n, --no-cache         clean rebuild, skipping the BuildKit cache
+#   -h, --help             show help
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -35,16 +35,16 @@ while [[ $# -gt 0 ]]; do
         -b|--base-image)    BASE_IMAGE="$2"; shift 2 ;;
         -n|--no-cache)      NO_CACHE="--no-cache"; shift ;;
         -h|--help)          usage ;;
-        *) echo "未知参数: $1"; usage ;;
+        *) echo "Unknown argument: $1"; usage ;;
     esac
 done
 
 if [[ ! -f Dockerfile ]]; then
-    echo "[build] 错误: 项目根目录未找到 Dockerfile" >&2
+    echo "[build] Error: Dockerfile not found in the project root" >&2
     exit 1
 fi
 
-echo "[build] 构建 $TAG (基础镜像: $BASE_IMAGE${NO_CACHE:+，无缓存})"
+echo "[build] Building $TAG (base image: $BASE_IMAGE${NO_CACHE:+, no-cache})"
 
 BUILD_ARGS=(-t "$TAG")
 if [[ -n "$NO_CACHE" ]]; then
@@ -57,4 +57,4 @@ BUILD_ARGS+=(.)
 
 docker build "${BUILD_ARGS[@]}"
 
-echo "[build] 完成: $TAG"
+echo "[build] Done: $TAG"

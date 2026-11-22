@@ -1,13 +1,14 @@
 # Copyright (c) 2026 xhdlphzr
 # SPDX-License-Identifier: MIT
 
-"""LLM 调用封装（OpenAI 兼容接口）.
+"""LLM invocation wrapper (OpenAI-compatible API).
 
-- 回环地址（127.0.0.1/localhost）自动绕过 shell 代理（trust_env=False），
-  修复本地 Ollama 等服务的 502 Bad Gateway；
-- 适配 openai v3：其传输层已基于 ``httpx2``，故 http_client 也传 ``httpx2.Client``；
-- chat/chat_stream 支持工具调用（Function Calling）；
-- 失败时抛出带排查提示的 RuntimeError。
+- Loopback addresses (127.0.0.1/localhost) bypass shell proxies automatically
+  (trust_env=False), fixing 502 Bad Gateway from local services such as Ollama;
+- Compatible with openai v3: its transport layer is based on ``httpx2``, so
+  http_client is also passed an ``httpx2.Client``;
+- chat/chat_stream support tool calls (Function Calling);
+- Failures raise a RuntimeError that carries troubleshooting hints.
 """
 
 import json
@@ -20,8 +21,9 @@ import tiktoken
 from openai import OpenAI
 
 _LOCAL_HINTS = (
-    "请确认: 1) 本地服务(Ollama等)已启动; 2) Base URL 包含 /v1 "
-    "(如 http://127.0.0.1:11434/v1); 3) 模型名已安装(ollama list)。"
+    "Please check: 1) the local service (e.g. Ollama) is running; "
+    "2) Base URL includes /v1 (e.g. http://127.0.0.1:11434/v1); "
+    "3) the model is installed (ollama list)."
 )
 
 Message = dict[str, Any]
@@ -31,13 +33,13 @@ ChunkCallback = Callable[[str], None] | None
 
 
 def _is_loopback(base_url: str) -> bool:
-    """判断 URL 是否为回环地址.
+    """Check whether a URL is a loopback address.
 
     Args:
-        base_url: LLM 服务地址。
+        base_url: LLM service address.
 
     Returns:
-        回环地址返回 True。
+        True for a loopback address.
 
     """
     host = (urlparse(str(base_url)).hostname or "").lower()
@@ -45,15 +47,15 @@ def _is_loopback(base_url: str) -> bool:
 
 
 class LLMClient:
-    """OpenAI 兼容客户端（含代理绕过与错误提示）."""
+    """OpenAI-compatible client (with proxy bypass and error hints)."""
 
     def __init__(self, base_url: str, api_key: str, model: str):
-        """初始化客户端.
+        """Initialize the client.
 
         Args:
-            base_url: 服务地址（本地服务须含 /v1）。
-            api_key: API 密钥。
-            model: 模型名。
+            base_url: Service address (local services must include /v1).
+            api_key: API key.
+            model: Model name.
 
         """
         http_client: httpx2.Client | None = None
@@ -65,32 +67,32 @@ class LLMClient:
         self.model = model
 
     def _raise_with_hint(self, e: Exception) -> RuntimeError:
-        """构造带排查提示的异常.
+        """Build an exception carrying troubleshooting hints.
 
         Args:
-            e: 原始异常。
+            e: Original exception.
 
         Returns:
-            RuntimeError（本地服务附带排障提示）。
+            RuntimeError (with troubleshooting hints for local services).
 
         """
         hint = _LOCAL_HINTS if _is_loopback(str(self.client.base_url)) else ""
         return RuntimeError(
-            f"LLM 调用失败 (base_url={self.client.base_url}, model={self.model}): {e}"
-            + (f" {hint}" if hint else "")
+            f"LLM call failed (base_url={self.client.base_url}, "
+            f"model={self.model}): {e}" + (f" {hint}" if hint else "")
         )
 
     def chat(
         self, messages: list[Message], tools: list[dict[str, Any]] | None = None
     ) -> ChatResult:
-        """非流式对话（可带工具）.
+        """Run a non-streaming chat completion (optionally with tools).
 
         Args:
-            messages: 消息列表。
-            tools: OpenAI 工具 Schema 列表（可选）。
+            messages: Message list.
+            tools: OpenAI tool schema list (optional).
 
         Returns:
-            {"role", "content", "tool_calls": [...]}。
+            {"role", "content", "tool_calls": [...]}.
 
         """
         kwargs: dict[str, Any] = {
@@ -137,14 +139,14 @@ class LLMClient:
     def chat_stream(
         self, messages: list[Message], on_chunk: ChunkCallback = None
     ) -> ChatResult:
-        """流式对话：逐 token 累积并回调.
+        """Run a streaming chat completion: accumulate tokens and call back.
 
         Args:
-            messages: 消息列表。
-            on_chunk: 每次增量后回调（参数为完整累积文本）。
+            messages: Message list.
+            on_chunk: Callback after each delta (passed the full accumulated text).
 
         Returns:
-            {"role": "assistant", "content": 完整文本, "tool_calls": []}。
+            {"role": "assistant", "content": full text, "tool_calls": []}.
 
         """
         kwargs: dict[str, Any] = {
@@ -168,15 +170,15 @@ class LLMClient:
         return {"role": "assistant", "content": full_content, "tool_calls": []}
 
     def count_tokens(self, messages: list[Message]) -> int:
-        """估算消息列表的 token 数量.
+        """Estimate the token count of a message list.
 
-        使用 tiktoken 编码器统计所有消息内容的 token 数。
+        Uses a tiktoken encoder to count the tokens of all message contents.
 
         Args:
-            messages: 消息列表。
+            messages: Message list.
 
         Returns:
-            估算的 token 总数。
+            Estimated total token count.
 
         """
         try:
@@ -197,13 +199,13 @@ class LLMClient:
 
     @staticmethod
     def assistant_to_message(response: ChatResult) -> Message:
-        """把 ChatResult 转为可继续对话的 assistant 消息.
+        """Convert a ChatResult into a continuation assistant message.
 
         Args:
-            response: chat/chat_stream 的返回。
+            response: Return value of chat/chat_stream.
 
         Returns:
-            OpenAI 消息格式（含 tool_calls 时带 function 参数）。
+            OpenAI message format (with function arguments when tool calls exist).
 
         """
         msg: Message = {"role": "assistant"}
