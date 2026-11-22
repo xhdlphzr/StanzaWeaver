@@ -62,48 +62,68 @@ def _build_checker_system(
     dim_count = 5
     if template.get("name") in ("五言律诗", "七言律诗"):
         parallelism_note = """
-6. **对仗检查**: 检查颔联（第3-4行）和颈联（第5-6行）是否存在词性、结构上的对仗关系。句式结构应两两对应（如: 名词对名词、动词对动词、偏正对偏正）。若对仗明显不当或缺失，务必指出具体问题。"""
+6. **Antithesis check**: Check whether the jaw couplet (lines 3-4) and the neck
+couplet (lines 5-6) are antithetical in part of speech and structure. Sentence
+structures should correspond pairwise (e.g. noun to noun, verb to verb,
+modifier-head to modifier-head). If the antithesis is clearly improper or
+missing, be sure to point out the specific problem."""
         dim_count = 6
 
     user_section = ""
     if user_prompt.strip():
         user_section = f"""
-【用户原始要求（创作提示词）】
+[User's original request (writing prompt)]
 {user_prompt}
 """
     rule_text = _template_rule_text(template)
     rule_section = ""
     if rule_text:
         rule_section = f"""
-【模板规则描述】
+[Template rule description]
 {rule_text}
 """
     feedback_section = ""
     if user_feedback.strip():
         feedback_section = f"""
-【用户修改反馈（本轮必须落实）】
+[User revision feedback (must be applied this round)]
 {user_feedback}
 """
 
     return (
-        f"""你是一位严格的诗歌评审专家。请从以下{dim_count}个维度审阅诗歌，并给出结论。
+        f"""You are a strict poetry review expert. Review the poem across the
+following {dim_count} dimensions and give a verdict.
 {user_section}{rule_section}{feedback_section}
-【诗歌文本】
+[Poem text]
 """
         + "\n".join(f"  [{i}] {line}" for i, line in enumerate(poem))
         + f"""
 
-【评审维度】
-1. **句意通顺**: 每行诗文在语义上是否通顺、自然，有无语病、逻辑断裂或意象割裂。
-2. **意象与语言**: 全诗意象是否统一、用词是否恰当，有无前后矛盾、意象割裂或违和之处。
-3. **用户要求符合**: 逐条核对诗歌是否符合【用户原始要求（创作提示词）】中的具体诉求（主题、意象、情感、体裁、语言、必须保留或避开的词句、翻译忠实度等），以及【模板规则描述】中的额外规则；若给出了【用户修改反馈】，检查是否已落实。与用户要求明显不符必须判为不通过，并在 suggestions 中说明哪条要求未满足。
-4. **意境优美**: 全诗意境优美，不落俗套。
-5. **情感真挚**: 能表达出独特真挚的情感，切不能假大空。{parallelism_note}
+[Review dimensions]
+1. **Meaning fluency**: Each line should read smoothly and naturally in
+meaning, with no grammatical errors, logical breaks, or disjointed imagery.
+2. **Imagery and language**: The imagery should be consistent throughout and
+the wording appropriate, with no contradictions, disjointed imagery, or
+incongruities.
+3. **Compliance with user requirements**: Check item by item whether the poem
+meets the specific demands in [User's original request (writing prompt)]
+(theme, imagery, emotion, genre, language, words or expressions that must be
+kept or avoided, translation fidelity, etc.) as well as the additional rules in
+[Template rule description]; if [User revision feedback] is provided, check
+whether it has been applied. A clear mismatch with the user's requirements must
+be judged as not passed, and suggestions must state which requirement was not
+met.
+4. **Aesthetic imagery**: The whole poem should have beautiful, refined imagery
+and avoid clichés.
+5. **Sincere emotion**: It should express unique and sincere emotion and must
+not be hollow or pretentious.{parallelism_note}
 
-请确认没有遗漏用户明确提出的其它要求（如必须出现的词、不能出现的表达等）。
-请调用 submit 工具给出评审结论:
-- pass: true 表示所有{dim_count}个检查维度全部通过
-- pass: false 表示任一维度存在问题，必须在 suggestions 中按维度逐条说明具体问题和修改建议"""
+Also confirm that no other requirements explicitly stated by the user have been
+missed (such as words that must appear or expressions that must not appear).
+Call the submit tool to give the review verdict:
+- pass: true means all {dim_count} review dimensions pass
+- pass: false means at least one dimension has a problem; you must describe the
+specific problems and revision suggestions dimension by dimension in
+suggestions"""
     )
 
 
@@ -151,8 +171,10 @@ class CheckerAI:
             {
                 "role": "user",
                 "content": (
-                    "请对以上诗歌进行评审，逐条核对是否满足用户原始要求与模板规则，"
-                    "按维度逐一检查后调用 submit 工具给出结论。"
+                    "Review the poem above; check item by item whether it meets "
+                    "the user's original requirements and the template rules, "
+                    "examine each dimension, and then call the submit tool to "
+                    "give the verdict."
                 ),
             },
         ]
@@ -196,7 +218,10 @@ class CheckerAI:
                 messages.append(
                     {
                         "role": "user",
-                        "content": "请务必调用 submit 工具给出评审结论（pass和suggestions）。",
+                        "content": (
+                            "Be sure to call the submit tool to give the review "
+                            "verdict (pass and suggestions)."
+                        ),
                     }
                 )
         except Exception as e:  # noqa: BLE001 - checker fallback: failure -> fail

@@ -43,31 +43,46 @@ def _build_editor_system(draft: TemplateDraft) -> str:
     """
     draft_json = json.dumps(draft.to_payload(), ensure_ascii=False, indent=2)
     return (
-        "你是一位格律模板配置助手。用户会用自然语言描述想要的诗歌格律，"
-        "你需要调用工具把它配置为 StanzaWeaver 的自定义模板。\n\n"
-        "【工具说明】\n"
-        "- set_template_info：设置名称/语言/行数。语言决定逐位约束属性："
-        "zh 用平/仄；en、it 用 light/heavy；la 用 long/short；fr 无逐位属性。\n"
-        "- set_syllables_per_line：设置每行音节数（长度须等于行数）。\n"
-        "- set_constraint_kind_count：设置约束种类数量；多种约束之间是“或”"
-        "关系，生成时满足任意一种即可（例如绝句的仄起/平起四种格式）。\n"
-        "- set_syllable_constraints：按“第几种约束 → 每行 → 每音节”填写规范值，"
-        "空串表示该位自由；支持中文别名 重/轻/长/短。\n"
-        "- set_from_template：从已有模板转化语言——行数/音节数/约束种类/押韵韵式/"
-        "自定义代码原样复制，仅按 mapping（源属性值 → 目标属性值）转换逐位约束，"
-        '例如 {"平": "heavy"}。\n'
-        "- set_rule_description：填写模板规则描述（自然语言的体裁/句式/对仗/结构"
-        "要求等）；这段文字会作为 prompt 提供给生成诗歌的写作 AI。\n"
-        "- set_rhyme_scheme：设置韵式，例如 ABAB CDCD EFEF GG；相同字母的行押韵，"
-        "'-' 表示该行不押韵；distinct=true 表示不同韵组须互不相同。\n"
-        "- set_custom_code：写入额外的 Python 整体校验代码（可选）。\n"
-        "- get_template_draft：读取当前完整草稿。\n"
-        "- submit_template：提交，服务端会创建并注册模板。\n\n"
-        "【当前草稿】\n"
+        "You are a meter-template configuration assistant. The user describes "
+        "the poetic meter they want in natural language, and you must configure "
+        "it as a StanzaWeaver custom template by calling tools.\n\n"
+        "[Tool reference]\n"
+        "- set_template_info: set the name/language/line count. The language "
+        "determines the per-position constraint attribute: zh uses 平/仄; "
+        "en and it use light/heavy; la uses long/short; fr has no per-position "
+        "attribute.\n"
+        "- set_syllables_per_line: set the syllable count of each line (the "
+        "length must equal the line count).\n"
+        "- set_constraint_kind_count: set the number of constraint kinds; the "
+        "kinds are an OR relationship, so generation only needs to satisfy any "
+        "one of them (e.g. the four tone patterns of a quatrain).\n"
+        "- set_syllable_constraints: fill in canonical values as "
+        '"constraint kind → line → syllable"; an empty string means that '
+        "position is free; the Chinese aliases 重/轻/长/短 are also accepted.\n"
+        "- set_from_template: convert from an existing template language: the "
+        "line count/syllables per line/constraint kinds/rhyme scheme/custom "
+        "code are copied as-is; only the positional constraints are converted "
+        "through mapping (source attribute value → target attribute value), "
+        'e.g. {"平": "heavy"}.\n'
+        "- set_rule_description: fill in the template rule description "
+        "(natural-language requirements for genre/sentence pattern/"
+        "antithesis/structure, etc.); this text is provided as a prompt to "
+        "the writing AI that generates poems.\n"
+        "- set_rhyme_scheme: set the rhyme scheme, e.g. ABAB CDCD EFEF GG; "
+        "lines with the same letter rhyme, '-' means the line does not rhyme, "
+        "and distinct=true means different rhyme groups must differ.\n"
+        "- set_custom_code: write additional Python whole-poem validation code "
+        "(optional).\n"
+        "- get_template_draft: read the full current draft.\n"
+        "- submit_template: submit; the server creates and registers the "
+        "template.\n\n"
+        "[Current draft]\n"
         f"{draft_json}\n\n"
-        "请优先把用户描述完整转化为工具调用；信息不全时可做合理推断。"
-        "全部配置完成后调用 submit_template 提交。"
-        "如果用户只是闲聊或询问，请简要回答并说明下一步可以如何配置。"
+        "Please first convert the user's description completely into tool "
+        "calls; when information is incomplete, make reasonable inferences. "
+        "Call submit_template once everything is configured. If the user is "
+        "just chatting or asking questions, answer briefly and explain how to "
+        "configure the template next."
     )
 
 
@@ -167,8 +182,11 @@ class TemplateEditorAI:
                         {
                             "role": "user",
                             "content": (
-                                "请继续调用工具完成模板配置：先 set_template_info "
-                                "设置名称/语言/行数，再设置约束等；完成后调用 submit_template。"
+                                "Please keep calling tools to finish configuring "
+                                "the template: first use set_template_info to set "
+                                "the name/language/line count, then set the "
+                                "constraints, etc.; when done, call "
+                                "submit_template."
                             ),
                         }
                     )
@@ -238,19 +256,26 @@ _SUBMIT_CODE_TOOL: dict[str, Any] = {
     "function": {
         "name": "submit_code",
         "description": (
-            "提交改写后的模板校验 Python 代码。代码会被插入生成模板的 "
-            "validate_full 中（不要包含 def/class 定义）。"
+            "Submit the rewritten Python template validation code. The code is "
+            "inserted into the generated template's validate_full (do not "
+            "include def/class definitions)."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "code": {
                     "type": "string",
-                    "description": "改写后的 Python 代码（填充式，可操作 errors/poem/syllables）",
+                    "description": (
+                        "Rewritten Python code (filler-style; may operate on "
+                        "errors/poem/syllables)"
+                    ),
                 },
                 "notes": {
                     "type": "string",
-                    "description": "改写说明（哪些规则保留、哪些在目标语言中降级/舍弃）",
+                    "description": (
+                        "Rewrite notes (which rules are kept and which are "
+                        "downgraded/dropped in the target language)"
+                    ),
                 },
             },
             "required": ["code"],
@@ -259,18 +284,18 @@ _SUBMIT_CODE_TOOL: dict[str, Any] = {
 }
 
 _ATTRIBUTE_LABELS: dict[str, str] = {
-    "tone": "平仄（tone）",
-    "stress": "轻重（stress）",
-    "length": "长短（length）",
+    "tone": "tone (level/oblique)",
+    "stress": "stress (heavy/light)",
+    "length": "length (long/short)",
 }
 
 _VALUE_LABELS: dict[str, str] = {
-    "平": "平声",
-    "仄": "仄声",
-    "heavy": "重读",
-    "light": "轻读",
-    "long": "长音",
-    "short": "短音",
+    "平": "level tone",
+    "仄": "oblique tone",
+    "heavy": "stressed",
+    "light": "unstressed",
+    "long": "long syllable",
+    "short": "short syllable",
 }
 
 
@@ -295,21 +320,28 @@ def format_value_mapping(
     lines: list[str] = []
     if source_attribute or target_attribute:
         lines.append(
-            f"- 属性维度：{_ATTRIBUTE_LABELS.get(source_attribute, source_attribute or '无')}"
-            f" → {_ATTRIBUTE_LABELS.get(target_attribute, target_attribute or '无')}"
+            f"- Attribute dimension: "
+            f"{_ATTRIBUTE_LABELS.get(source_attribute, source_attribute or 'none')}"
+            f" → {_ATTRIBUTE_LABELS.get(target_attribute, target_attribute or 'none')}"
         )
     if not target_attribute:
-        lines.append("- 目标语言没有逐位音节属性；映射值仅用于理解源规则。")
+        lines.append(
+            "- The target language has no per-syllable attribute; mapping "
+            "values only help understand the source rules."
+        )
         return "\n".join(lines)
     if not mapping:
-        lines.append("- 未提供具体属性值映射；源语言属性值在目标语言中保持自由。")
+        lines.append(
+            "- No concrete attribute-value mapping was provided; source-language "
+            "attribute values stay free in the target language."
+        )
         return "\n".join(lines)
     for source_value in sorted(mapping):
         target_value = mapping[source_value]
         source_label = _VALUE_LABELS.get(source_value, source_value)
         target_label = _VALUE_LABELS.get(target_value, target_value)
         lines.append(
-            f"- {source_value}（{source_label}）→ {target_value}（{target_label}）"
+            f"- {source_value} ({source_label}) → {target_value} ({target_label})"
         )
     return "\n".join(lines)
 
@@ -344,32 +376,45 @@ def _build_rewrite_system(
         "rhyme_distinct": target_spec.get("rhyme_distinct"),
         "structural_rules": target_spec.get("structural_rules"),
     }
-    note_section = f"\n【模板规则描述】\n{rule_note}\n" if rule_note.strip() else ""
+    note_section = (
+        f"\n[Template rule description]\n{rule_note}\n" if rule_note.strip() else ""
+    )
     return (
-        "你是一位熟悉多语言诗歌格律的 Python 工程师。请把下面源语言模板的校验代码"
-        f"改写为目标语言的版本（{source_language} → {target_language}），使其在新语言的"
-        "音节属性与押韵体系下保持原有规则的意图。\n\n"
-        "【语言与属性值映射】\n"
+        "You are a Python engineer familiar with multilingual poetic meter. "
+        "Rewrite the validation code of the source-language template below "
+        f"into a version for the target language ({source_language} → "
+        f"{target_language}), preserving the intent of the original rules under "
+        "the target language's syllable attributes and rhyme system.\n\n"
+        "[Language and attribute-value mapping]\n"
         f"{format_value_mapping(source_language, target_language, mapping)}\n"
-        "注意：把代码中的源语言属性键与属性值按上面的映射替换为目标语言的属性键与值"
-        "（例如把“平”改成“轻/重”对应的目标值）；押韵逻辑如需重写，请使用目标语言的"
-        "通用押韵接口而不要沿用源语言的韵部常量/语音学函数。\n"
+        "Note: replace the source-language attribute keys and values in the "
+        "code with the target-language attribute keys and values according to "
+        'the mapping above (for example, map "平" to the target value '
+        "corresponding to light/heavy); if the rhyme logic needs rewriting, "
+        "use the target language's generic rhyme interface rather than the "
+        "source language's rhyme-group constants or phonetic functions.\n"
         f"{note_section}"
-        "【目标模板的声明式规格】\n"
+        "[Declarative spec of the target template]\n"
         f"{json.dumps(spec, ensure_ascii=False, indent=2)}\n\n"
-        "【代码运行环境】\n"
-        "改写后的代码会插入生成模板的 validate_full 中，可用以下名称：\n"
-        "- errors: list[str]，错误信息列表（追加错误）；\n"
-        "- poem: list[str]，诗行；\n"
-        "- syllables: list[list[Syllable]]，每行音节（含目标语言属性）；\n"
-        "- rules：目标语言模板模块别名，可调用其中的辅助函数（如有）；\n"
-        "- self.structural_rules：目标模板的数据化结构规则（如存在）。\n"
-        "不要使用 def/class、不要读写文件或访问网络；不要 import 源语言模块。\n\n"
-        "【源模板代码】\n"
+        "[Code runtime environment]\n"
+        "The rewritten code is inserted into the generated template's "
+        "validate_full and can use the following names:\n"
+        "- errors: list[str], error message list (append errors);\n"
+        "- poem: list[str], poem lines;\n"
+        "- syllables: list[list[Syllable]], syllables of each line (with "
+        "target-language attributes);\n"
+        "- rules: alias of the target-language template module; call its "
+        "helper functions if any;\n"
+        "- self.structural_rules: data-driven structural rules of the target "
+        "template (if present).\n"
+        "Do not use def/class, do not read or write files or access the "
+        "network; do not import source-language modules.\n\n"
+        "[Source template code]\n"
         "```python\n"
         f"{source_code}\n"
         "```\n\n"
-        "请调用 submit_code 工具提交改写后的填充式代码（code）与改写说明（notes）。"
+        "Call the submit_code tool to submit the rewritten filler code (code) "
+        "and rewrite notes (notes)."
     )
 
 
@@ -430,7 +475,11 @@ class TemplateCodeRewriter:
             },
             {
                 "role": "user",
-                "content": "请按映射与运行环境要求改写源模板代码，并调用 submit_code 提交。",
+                "content": (
+                    "Rewrite the source template code according to the mapping "
+                    "and runtime environment requirements, and call submit_code "
+                    "to submit it."
+                ),
             },
         ]
         for _ in range(max_rounds):
@@ -455,7 +504,9 @@ class TemplateCodeRewriter:
                     messages.append(
                         {
                             "role": "user",
-                            "content": "提交的代码为空，请重新调用 submit_code。",
+                            "content": (
+                                "The submitted code is empty; call submit_code again."
+                            ),
                         }
                     )
                     continue
@@ -467,7 +518,8 @@ class TemplateCodeRewriter:
                         {
                             "role": "user",
                             "content": (
-                                f"代码存在语法错误（{e}），请修正后重新调用 submit_code 提交。"
+                                f"The code has a syntax error ({e}); fix it and "
+                                "call submit_code again to submit."
                             ),
                         }
                     )
@@ -477,7 +529,10 @@ class TemplateCodeRewriter:
             messages.append(
                 {
                     "role": "user",
-                    "content": "请务必调用 submit_code 工具提交改写后的代码。",
+                    "content": (
+                        "Be sure to call the submit_code tool to submit the "
+                        "rewritten code."
+                    ),
                 }
             )
         return {

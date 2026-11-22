@@ -50,8 +50,9 @@ def _catalog_text(catalog: list[dict[str, Any]]) -> str:
     lines: list[str] = []
     for item in catalog:
         lines.append(
-            f"- {item['key']}：{item['display_name']}；"
-            f"{item.get('lines')} 行；每行音节 {item.get('syllables_per_line')}"
+            f"- {item['key']}: {item['display_name']}; "
+            f"{item.get('lines')} lines; syllables per line "
+            f"{item.get('syllables_per_line')}"
         )
     return "\n".join(lines)
 
@@ -68,19 +69,26 @@ def _build_architect_system(topic: str, catalog: list[dict[str, Any]]) -> str:
 
     """
     return (
-        "你是一位诗组架构师。请把用户的总体意图拆解为一组（建议 2-6 首）"
-        "彼此独立又整体呼应的诗，并为每首指定格律模板与自足的创作要求。\n\n"
-        f"【诗组总目标】\n{topic}\n\n"
-        "【可用格律模板】\n"
+        "You are a poem-sequence architect. Break the user's overall intent "
+        "into a group of poems (2-6 recommended) that are independent yet "
+        "echo one another as a whole, and specify a meter template and "
+        "self-contained creative requirements for each poem.\n\n"
+        f"[Sequence goal]\n{topic}\n\n"
+        "[Available meter templates]\n"
         f"{_catalog_text(catalog)}\n\n"
-        "请按以下步骤调用工具完成规划：\n"
-        "1. 先调用 set_sequence_title 设定诗组总标题；\n"
-        "2. 用 add_poem 逐首添加诗题与格律模板 key（必须来自上面的清单）；\n"
-        "3. 用 set_poem_prompt 为每首写入详细、自足的创作要求（主题、意象、"
-        "情感、结构要点等）。\n\n"
-        "注意：每首的创作要求必须自足，不得写“参见第 N 首”“沿用前首主题”"
-        "这类跨首指代；需要呼应的意象请直接写进本首要求。\n"
-        "当所有诗都已添加并写好创作要求后，停止调用工具即可。"
+        "Complete the plan by calling tools in the following steps:\n"
+        "1. First call set_sequence_title to set the overall sequence title;\n"
+        "2. Use add_poem to add each poem's title and meter template key (the "
+        "key must come from the list above);\n"
+        "3. Use set_poem_prompt to write detailed, self-contained creative "
+        "requirements for each poem (theme, imagery, emotion, structural "
+        "points, etc.).\n\n"
+        "Note: every poem's creative requirements must be self-contained; do "
+        'not use cross-poem references such as "see poem N" or "reuse the '
+        'theme of an earlier poem"; write any echoed imagery directly into '
+        "the requirements of that poem.\n"
+        "Once all poems have been added and their creative requirements "
+        "written, stop calling tools."
     )
 
 
@@ -100,22 +108,27 @@ def _build_fixed_architect_system(
     """
     names = {str(item["key"]): str(item["name"]) for item in catalog}
     listing = "\n".join(
-        f"- index {i}：第{i + 1}首，格律 {names.get(p.template_key, p.template_key)}"
+        f"- index {i}: poem {i + 1}, meter {names.get(p.template_key, p.template_key)}"
         for i, p in enumerate(poems)
     )
     return (
-        "你是一位诗组架构师。本次诗组的诗数与每首格律已由用户固定，"
-        "请不要再新增或删除诗。\n\n"
-        f"【诗组总目标】\n{topic}\n\n"
-        "【固定诗单】\n"
+        "You are a poem-sequence architect. For this sequence, the number of "
+        "poems and each poem's meter are fixed by the user; do not add or "
+        "remove poems.\n\n"
+        f"[Sequence goal]\n{topic}\n\n"
+        "[Fixed poem list]\n"
         f"{listing}\n\n"
-        "请按以下步骤调用工具：\n"
-        "1. 调用 set_sequence_title 设定诗组总标题；\n"
-        "2. 依次为每首调用 set_poem_prompt（index 从 0 开始），写入详细、"
-        "自足的创作要求（主题、意象、情感、结构要点等）。\n\n"
-        "注意：每首的创作要求必须自足，不得写“参见第 N 首”“沿用前首主题”"
-        "这类跨首指代；需要呼应的意象请直接写进本首要求。\n"
-        "当所有诗的创作要求都写好后，停止调用工具即可。"
+        "Call tools in the following steps:\n"
+        "1. Call set_sequence_title to set the overall sequence title;\n"
+        "2. For each poem in turn, call set_poem_prompt (index starts at 0) "
+        "and write detailed, self-contained creative requirements (theme, "
+        "imagery, emotion, structural points, etc.).\n\n"
+        "Note: every poem's creative requirements must be self-contained; do "
+        'not use cross-poem references such as "see poem N" or "reuse the '
+        'theme of an earlier poem"; write any echoed imagery directly into '
+        "the requirements of that poem.\n"
+        "Once every poem's creative requirements are written, stop calling "
+        "tools."
     )
 
 
@@ -174,7 +187,7 @@ class SequenceArchitect:
             system_prompt = _build_architect_system(topic, catalog)
         messages: list[Message] = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": "请开始规划诗组。"},
+            {"role": "user", "content": "Begin planning the poem sequence."},
         ]
         detail: list[str] = []
 
@@ -236,16 +249,19 @@ class SequenceArchitect:
 
         """
         if not state.title:
-            return "请先调用 set_sequence_title 设定诗组总标题。"
+            return "First call set_sequence_title to set the overall sequence title."
         if not state.poems:
-            return "请先调用 add_poem 至少添加一首诗（并指定格律模板 key）。"
+            return (
+                "First call add_poem to add at least one poem (and specify a "
+                "meter template key)."
+            )
         missing = missing_prompt_indices(state)
         if missing:
-            listing = "、".join(
-                f"第{i + 1}首《{state.poems[i].title}》" for i in missing
+            listing = ", ".join(
+                f'poem {i + 1} "{state.poems[i].title}"' for i in missing
             )
             return (
-                f"以下诗尚未设置创作要求：{listing}。"
-                "请调用 set_poem_prompt 补齐后停止调用工具。"
+                f"The following poems have no creative requirements yet: {listing}. "
+                "Call set_poem_prompt to complete them, then stop calling tools."
             )
         return None

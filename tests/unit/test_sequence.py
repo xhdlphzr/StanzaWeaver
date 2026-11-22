@@ -208,14 +208,14 @@ def test_architect_plan_missing_title_and_poems() -> None:
     architect = _make_architect([_no_tools(), _no_tools()])
     plan = architect.plan("x", max_rounds=2)
     assert plan.completed is False
-    assert "诗组总标题" in plan.log
+    assert "overall sequence title" in plan.log
 
     architect2 = _make_architect(
         [_tool("set_sequence_title", "1", title="题"), _no_tools()]
     )
     plan2 = architect2.plan("x", catalog=CATALOG, max_rounds=2)
     assert plan2.completed is False
-    assert "至少添加一首诗" in plan2.log
+    assert "add at least one poem" in plan2.log
 
 
 # --------------------------------------------------------------------------- #

@@ -90,8 +90,9 @@ def _get_constraints_desc(template: dict[str, Any], template_obj: object = None)
     lines = int(template.get("lines", 4))
     syllables_per_line = template.get("syllables_per_line", [5] * lines)
     return (
-        f"- 语言: {language}\n- 行数: {lines}\n"
-        f"- 每行音节数: {', '.join(format_count(c) for c in syllables_per_line)}"
+        f"- Language: {language}\n- Lines: {lines}\n"
+        "- Syllables per line: "
+        f"{', '.join(format_count(c) for c in syllables_per_line)}"
     )
 
 
@@ -107,16 +108,19 @@ def _build_draft_system(language: str, constraints_desc: str) -> str:
 
     """
     return (
-        f"你是一位精通{language}诗歌创作的AI诗人。\n"
-        "请根据上面的主题描述，按照以下格律要求创作一首诗。\n"
+        f"You are an AI poet skilled in {language} poetry.\n"
+        "Based on the topic description above, write a poem that follows the "
+        "meter requirements below.\n"
         "\n"
-        "【格律要求】\n"
+        "[Meter requirements]\n"
         f"{constraints_desc}\n"
         "\n"
-        "创作完成后，调用 submit 工具提交诗稿。系统会自动校验行数和音节数，\n"
-        "不通过会返回具体错误，你需要根据错误调整后重新提交。\n"
+        "When the poem is done, call the submit tool to submit the draft. The "
+        "system automatically checks the line and syllable counts; if the check "
+        "fails it returns the specific errors, and you must adjust the poem "
+        "accordingly and submit it again.\n"
         "\n"
-        "你有以下工具可用: submit(提交诗稿)。"
+        "You have the following tool available: submit (submit the poem draft)."
     )
 
 
@@ -132,27 +136,34 @@ def _build_refine_system(constraints_desc: str, feedback: str = "") -> str:
 
     """
     parts = [
-        "请对上面的诗稿进行炼句优化。",
+        "Polish the poem draft above line by line.",
         "",
-        "【格律要求】",
+        "[Meter requirements]",
         constraints_desc,
         "",
     ]
     if feedback:
-        parts.extend(["【反馈/建议】", feedback, ""])
+        parts.extend(["[Feedback / suggestions]", feedback, ""])
     parts.extend(
         [
             (
-                "你有以下工具可用: search_words(搜候选词), modify(修改诗稿："
-                "改某行/标题/标点), submit(提交定稿，可整首替换并设置标点)。"
+                "You have the following tools available: search_words (search "
+                "candidate words), modify (revise the poem draft: a line, the "
+                "title, or the punctuation), submit (submit the final draft; it "
+                "can replace the whole poem and set punctuation)."
             ),
             (
-                "modify 的 modify_type 取 line/title/punctuation：line 需给出"
-                "行号 line 与该行新文本 content；punctuation 的 content 为标点"
-                "列表，长度须等于格律行数。"
+                "The modify_type of modify is line/title/punctuation: for line, "
+                "provide the line number line and the new line text content; for "
+                "punctuation, content is a punctuation list whose length must "
+                "equal the meter line count."
             ),
-            ("每次调用 modify 修改诗句后，系统会自动校验格律，不通过会返回具体错误。"),
-            "当你对全诗满意时，调用 submit 提交。",
+            (
+                "After every modify call that revises a line, the system "
+                "automatically validates the meter and returns the specific "
+                "errors on failure."
+            ),
+            "When you are satisfied with the whole poem, call submit.",
         ]
     )
     return "\n".join(parts)
@@ -219,28 +230,36 @@ class WriterAI:
 
         """
         constraints_desc = _get_constraints_desc(template, template_obj)
-        poem_text = "\n".join(poem) if poem else "（无）"
+        poem_text = "\n".join(poem) if poem else "(none)"
         compress_prompt = (
-            "请将以下对话状态压缩为结构化摘要，保留所有关键信息以便继续工作。\n"
+            "Compress the conversation state below into a structured summary, "
+            "keeping all key information needed to continue the work.\n"
             "\n"
-            "【当前诗稿】\n"
+            "[Current poem draft]\n"
             f"{poem_text}\n"
             "\n"
-            "【格律约束】\n"
+            "[Meter constraints]\n"
             f"{constraints_desc}\n"
             "\n"
-            "请按以下格式输出摘要:\n"
-            "【目标】当前任务的核心目标\n"
-            "【重要细节】关键信息、格律约束、已做出的重要决策\n"
-            "【工作状态】\n"
-            "  已完成: ...\n"
-            "  进行中: ...\n"
-            "  被阻塞: ...\n"
-            "【下一步行动】建议的下一步具体操作"
+            "Output the summary in the following format:\n"
+            "[Goal] the core goal of the current task\n"
+            "[Key details] key information, meter constraints, important "
+            "decisions already made\n"
+            "[Working state]\n"
+            "  Done: ...\n"
+            "  In progress: ...\n"
+            "  Blocked: ...\n"
+            "[Next action] the concrete next step you suggest"
         )
         summary_response = self.client.chat(
             [
-                {"role": "system", "content": "你是一位诗歌创作助手，请压缩对话状态。"},
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a poetry-writing assistant; compress the "
+                        "conversation state."
+                    ),
+                },
                 {"role": "user", "content": compress_prompt},
             ]
         )
@@ -250,13 +269,17 @@ class WriterAI:
             {
                 "role": "system",
                 "content": (
-                    "以下是之前对话的压缩摘要，新对话从这里继续：\n\n"
+                    "Below is the compressed summary of the previous "
+                    "conversation; the new conversation continues from here:\n\n"
                     f"{summary_text}\n\n"
-                    "请根据以上摘要继续工作。当前诗稿如下："
+                    "Continue the work based on the summary above. The current "
+                    "poem draft is as follows:"
                 ),
             }
         )
-        messages.append({"role": "user", "content": f"当前诗稿:\n{poem_text}"})
+        messages.append(
+            {"role": "user", "content": f"Current poem draft:\n{poem_text}"}
+        )
 
     def _check_and_compress(
         self,
@@ -301,12 +324,15 @@ class WriterAI:
             {
                 "role": "system",
                 "content": (
-                    "你是一位诗歌创作助手。根据用户给出的主题，写一段100字以内的"
-                    "现代文描述，包含意象、情感、内容概要。直接输出描述文本，不要加任何前缀。"
+                    "You are a poetry-writing assistant. Given the user's topic, "
+                    "write a modern-prose description of no more than 100 "
+                    "characters, covering the imagery, emotion, and content "
+                    "outline. Output the description text directly, with no "
+                    "prefix."
                 ),
             }
         )
-        messages.append({"role": "user", "content": f"主题: {topic}"})
+        messages.append({"role": "user", "content": f"Topic: {topic}"})
         if on_stream:
             response = self.client.chat_stream(messages, on_chunk=on_stream)
         else:
@@ -346,7 +372,7 @@ class WriterAI:
                 "content": _build_draft_system(language, constraints_desc),
             }
         )
-        messages.append({"role": "user", "content": "请创作诗稿。"})
+        messages.append({"role": "user", "content": "Please write the poem draft."})
 
         detail_parts: list[str] = []
         poem: list[str] = []
@@ -438,7 +464,11 @@ class WriterAI:
                 messages.append(
                     {
                         "role": "user",
-                        "content": f"输出行数为{len(poem)}行，期望{lines}行。请重新输出并调用 submit 提交。",
+                        "content": (
+                            f"The output has {len(poem)} lines, but {lines} lines "
+                            "are expected. Please output the poem again and call "
+                            "submit."
+                        ),
                     }
                 )
                 continue
@@ -448,16 +478,19 @@ class WriterAI:
                 messages.append(
                     {
                         "role": "user",
-                        "content": "诗稿已通过校验，请调用 submit 工具提交。",
+                        "content": (
+                            "The poem draft passed validation; call the submit "
+                            "tool to submit it."
+                        ),
                     }
                 )
             else:
                 messages.append(
                     {
                         "role": "user",
-                        "content": "格律校验未通过:\n"
+                        "content": "Meter validation failed:\n"
                         + "\n".join(count_result.errors)
-                        + "\n请修正后重新输出并调用 submit 提交。",
+                        + "\nFix the poem, then output it again and call submit.",
                     }
                 )
 
@@ -515,8 +548,9 @@ class WriterAI:
             {
                 "role": "user",
                 "content": (
-                    "请开始炼句优化。先用 search_words 搜候选词，然后用"
-                    " modify 修改诗句、标题或标点，满意后调用 submit 提交。"
+                    "Begin the line-polishing pass. First use search_words to "
+                    "search for candidate words, then use modify to revise lines, "
+                    "the title, or the punctuation; when satisfied, call submit."
                 ),
             }
         )
@@ -545,7 +579,10 @@ class WriterAI:
                 messages.append(
                     {
                         "role": "user",
-                        "content": "请调用工具来优化诗句。你可以使用 search_words、modify 或 submit。",
+                        "content": (
+                            "Please call a tool to polish the poem. You can use "
+                            "search_words, modify, or submit."
+                        ),
                     }
                 )
                 continue
@@ -715,7 +752,12 @@ class WriterAI:
                 messages.append(
                     {
                         "role": "user",
-                        "content": "你已连续多轮未成功修改诗句或提交。请调用 modify 修改诗句；若对当前诗稿满意，请直接调用 submit 提交。",
+                        "content": (
+                            "You have gone several rounds without successfully "
+                            "revising the poem or submitting. Call modify to "
+                            "revise the poem; if you are satisfied with the "
+                            "current draft, call submit directly."
+                        ),
                     }
                 )
 

@@ -953,17 +953,17 @@ def test_format_value_mapping_branches() -> None:
     """Value mapping notes: normal / empty mapping / no target attribute."""
     text = editor_ai.format_value_mapping("zh", "en", {"平": "heavy", "仄": "light"})
     assert "tone" in text and "stress" in text
-    assert "平（平声）→ heavy（重读）" in text
-    assert "仄（仄声）→ light（轻读）" in text
+    assert "平 (level tone) → heavy (stressed)" in text
+    assert "仄 (oblique tone) → light (unstressed)" in text
 
     empty = editor_ai.format_value_mapping("zh", "en", {})
-    assert "未提供具体属性值映射" in empty
+    assert "No concrete attribute-value mapping was provided" in empty
 
     no_target = editor_ai.format_value_mapping("zh", "fr", {"平": "heavy"})
-    assert "目标语言没有逐位音节属性" in no_target
+    assert "The target language has no per-syllable attribute" in no_target
 
     unknown = editor_ai.format_value_mapping("xx", "yy", {})
-    assert "目标语言没有逐位音节属性" in unknown
+    assert "The target language has no per-syllable attribute" in unknown
 
 
 def test_build_rewrite_system_contains_context() -> None:
@@ -976,7 +976,7 @@ def test_build_rewrite_system_contains_context() -> None:
         {"lines": 4, "syllables_per_line": [5, 5, 5, 5], "alternatives": []},
         rule_note="注意对仗",
     )
-    assert "平（平声）→ heavy（重读）" in text
+    assert "平 (level tone) → heavy (stressed)" in text
     assert "errors.append('x')" in text
     assert "validate_full" in text
     assert "注意对仗" in text
