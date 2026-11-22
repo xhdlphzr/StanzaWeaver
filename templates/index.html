@@ -538,6 +538,25 @@
       </div>
     </div>
 
+    <div id="confirm-modal" class="modal confirm-modal hidden">
+      <div class="modal-content modal-confirm">
+        <h2 id="confirm-title"></h2>
+        <p id="confirm-message" class="confirm-message"></p>
+        <div class="modal-actions">
+          <button
+            id="btn-confirm-cancel"
+            class="btn-secondary"
+            data-i18n="confirm.cancel"
+          >
+            取消
+          </button>
+          <button id="btn-confirm-ok" class="btn-primary" data-i18n="confirm.ok">
+            确定
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
@@ -643,6 +662,23 @@
         document
           .getElementById("btn-reset-order")
           .addEventListener("click", resetTemplateOrder);
+        document
+          .getElementById("btn-confirm-cancel")
+          .addEventListener("click", closeConfirm);
+        document
+          .getElementById("btn-confirm-ok")
+          .addEventListener("click", runConfirm);
+        document
+          .getElementById("confirm-modal")
+          .addEventListener("click", function (e) {
+            if (e.target === this) closeConfirm();
+          });
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape") {
+            var modal = document.getElementById("confirm-modal");
+            if (modal && !modal.classList.contains("hidden")) closeConfirm();
+          }
+        });
         var manageList = document.getElementById("template-manage-list");
         manageList.addEventListener("dragstart", function (e) {
           var target = e.target && e.target.closest
@@ -870,6 +906,35 @@
           });
       }
 
+      // ---- 应用内确认弹窗（替代 window.confirm） ----
+
+      var confirmState = null;
+
+      function showConfirm(options) {
+        confirmState = options || null;
+        document.getElementById("confirm-title").textContent =
+          options.title || "";
+        document.getElementById("confirm-message").textContent =
+          options.message || "";
+        var ok = document.getElementById("btn-confirm-ok");
+        ok.textContent = options.confirmText || t("confirm.ok");
+        ok.classList.toggle("btn-danger", !!options.danger);
+        ok.classList.toggle("btn-primary", !options.danger);
+        document.getElementById("confirm-modal").classList.remove("hidden");
+        document.getElementById("btn-confirm-cancel").focus();
+      }
+
+      function closeConfirm() {
+        document.getElementById("confirm-modal").classList.add("hidden");
+        confirmState = null;
+      }
+
+      function runConfirm() {
+        var state = confirmState;
+        closeConfirm();
+        if (state && typeof state.onConfirm === "function") state.onConfirm();
+      }
+
       // ---- 模板管理：拖动排序 / 删除自定义模板 ----
 
       function openTemplateManage() {
@@ -957,29 +1022,36 @@
       }
 
       function resetTemplateOrder() {
-        if (!window.confirm(t("template_manage.reset_confirm"))) return;
-        fetch("/api/templates/order/reset", {
-          method: "POST",
-          headers: csrfHeaders(),
-        })
-          .then(function (r) {
-            return r.json();
-          })
-          .then(function (resp) {
-            if (!resp || resp.status !== "ok") {
-              showToast(
-                (resp && resp.message) || t("template_manage.reset_failed"),
-                "error",
-              );
-              return;
-            }
-            showToast(t("template_manage.reset_ok"), "success");
-            openTemplateManage();
-            loadTemplates();
-          })
-          .catch(function () {
-            showToast(t("template_manage.reset_failed"), "error");
-          });
+        showConfirm({
+          title: t("template_manage.reset"),
+          message: t("template_manage.reset_confirm"),
+          confirmText: t("confirm.reset"),
+          onConfirm: function () {
+            fetch("/api/templates/order/reset", {
+              method: "POST",
+              headers: csrfHeaders(),
+            })
+              .then(function (r) {
+                return r.json();
+              })
+              .then(function (resp) {
+                if (!resp || resp.status !== "ok") {
+                  showToast(
+                    (resp && resp.message) ||
+                      t("template_manage.reset_failed"),
+                    "error",
+                  );
+                  return;
+                }
+                showToast(t("template_manage.reset_ok"), "success");
+                openTemplateManage();
+                loadTemplates();
+              })
+              .catch(function () {
+                showToast(t("template_manage.reset_failed"), "error");
+              });
+          },
+        });
       }
 
       function persistTemplateOrder() {
@@ -1020,37 +1092,42 @@
 
       function deleteTemplate(item) {
         var name = item.display_name || item.name;
-        if (!window.confirm(t("template_manage.delete_confirm", { name: name }))) {
-          return;
-        }
-        fetch("/api/templates/delete", {
-          method: "POST",
-          headers: Object.assign(
-            { "Content-Type": "application/json" },
-            csrfHeaders(),
-          ),
-          body: JSON.stringify({ key: item.key }),
-        })
-          .then(function (r) {
-            return r.json();
-          })
-          .then(function (resp) {
-            if (!resp || resp.status !== "ok") {
-              showToast(
-                (resp && resp.message) || t("toast.error_default"),
-                "error",
-              );
-              return;
-            }
-            showToast(t("template_manage.delete_ok"), "success");
-            var select = document.getElementById("template-select");
-            if (select.value === item.key) select.value = "";
-            openTemplateManage();
-            loadTemplates();
-          })
-          .catch(function () {
-            showToast(t("toast.error_default"), "error");
-          });
+        showConfirm({
+          title: t("template_manage.delete_title"),
+          message: t("template_manage.delete_confirm", { name: name }),
+          confirmText: t("confirm.delete"),
+          danger: true,
+          onConfirm: function () {
+            fetch("/api/templates/delete", {
+              method: "POST",
+              headers: Object.assign(
+                { "Content-Type": "application/json" },
+                csrfHeaders(),
+              ),
+              body: JSON.stringify({ key: item.key }),
+            })
+              .then(function (r) {
+                return r.json();
+              })
+              .then(function (resp) {
+                if (!resp || resp.status !== "ok") {
+                  showToast(
+                    (resp && resp.message) || t("toast.error_default"),
+                    "error",
+                  );
+                  return;
+                }
+                showToast(t("template_manage.delete_ok"), "success");
+                var select = document.getElementById("template-select");
+                if (select.value === item.key) select.value = "";
+                openTemplateManage();
+                loadTemplates();
+              })
+              .catch(function () {
+                showToast(t("toast.error_default"), "error");
+              });
+          },
+        });
       }
 
       function getSelectedTemplate() {
