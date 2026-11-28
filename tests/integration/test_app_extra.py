@@ -554,11 +554,60 @@ def test_apply_saved_template_order(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls == []
     monkeypatch.delenv("STANZA_WEAVER_TEST", raising=False)
     monkeypatch.setattr(app_module, "_load_template_order", lambda: ["b"])
+    monkeypatch.setattr(
+        app_module,
+        "_merge_template_order",
+        lambda saved, current: ["merged"],
+    )
     app_module._apply_saved_template_order()
-    assert calls == [["b"]]
+    assert calls == [["merged"]]
     monkeypatch.setattr(app_module, "_load_template_order", list)
     app_module._apply_saved_template_order()
-    assert calls == [["b"]]
+    assert calls == [["merged"]]
+
+
+def test_merge_template_order_inserts_new_templates_by_default_position() -> None:
+    """New templates are inserted next to their default predecessor, not at the end."""
+    current = ["a", "b", "c", "d"]
+    assert app_module._merge_template_order(["a", "d"], current) == [
+        "a",
+        "b",
+        "c",
+        "d",
+    ]
+    assert app_module._merge_template_order(["b", "c"], current) == [
+        "a",
+        "b",
+        "c",
+        "d",
+    ]
+    assert app_module._merge_template_order(["c"], current) == [
+        "a",
+        "b",
+        "c",
+        "d",
+    ]
+    assert app_module._merge_template_order(["x", "a", "a"], ["a", "b"]) == [
+        "a",
+        "b",
+    ]
+    assert app_module._merge_template_order(["c", "a"], current) == [
+        "c",
+        "d",
+        "a",
+        "b",
+    ]
+
+
+def test_merge_template_order_keeps_new_chinese_templates_in_front() -> None:
+    """Xijiangyue/Busuanzi stay with the Chinese templates after a saved order."""
+    current = _ordered_snapshot()
+    old_saved = [key for key in current if key not in ("zh_xijiangyue", "zh_busuanzi")]
+    merged = app_module._merge_template_order(old_saved, current)
+    assert set(merged) == set(current)
+    assert merged.index("zh_xijiangyue") == merged.index("zh_qingpingyue") + 1
+    assert merged.index("zh_busuanzi") == merged.index("zh_xijiangyue") + 1
+    assert merged.index("zh_busuanzi") < merged.index("en_sonnet")
 
 
 def _ordered_snapshot() -> list[str]:

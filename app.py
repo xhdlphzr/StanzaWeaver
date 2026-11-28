@@ -370,13 +370,57 @@ def _default_template_order() -> list[str]:
     return builtins + customs + extras
 
 
+def _merge_template_order(saved: list[str], current: list[str]) -> list[str]:
+    """Merge a saved display order with templates added after it was saved.
+
+    New templates are inserted at their default position: after the nearest
+    preceding default template that already exists in the saved order, or
+    before the nearest following one when there is no preceding anchor. This
+    keeps newly added templates grouped with their language peers instead of
+    appending them to the very end.
+
+    Args:
+        saved: Previously saved template key order.
+        current: Current registration order (default order) of all templates.
+
+    Returns:
+        Merged key order containing every current template exactly once.
+
+    """
+    current_set = set(current)
+    merged: list[str] = []
+    seen: set[str] = set()
+    for key in saved:
+        if key in current_set and key not in seen:
+            merged.append(key)
+            seen.add(key)
+    for index, key in enumerate(current):
+        if key in seen:
+            continue
+        insert_at = len(merged)
+        for previous in reversed(current[:index]):
+            if previous in merged:
+                insert_at = merged.index(previous) + 1
+                break
+        else:
+            for following in current[index + 1 :]:
+                if following in merged:
+                    insert_at = merged.index(following)
+                    break
+        merged.insert(insert_at, key)
+        seen.add(key)
+    return merged
+
+
 def _apply_saved_template_order() -> None:
     """Apply the saved template order at startup (skipped in tests)."""
     if os.environ.get("STANZA_WEAVER_TEST") == "1":
         return
-    keys = _load_template_order()
-    if keys:
-        set_order(keys)
+    saved = _load_template_order()
+    if not saved:
+        return
+    current = [item["key"] for item in list_dicts()]
+    set_order(_merge_template_order(saved, current))
 
 
 _register_custom_templates()
