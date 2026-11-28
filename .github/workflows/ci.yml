@@ -20,7 +20,7 @@
 #   - macOS   : uv run pyinstaller StanzaWeaver.spec --clean -> zip -s 1g split archive
 #   - Linux   : uv run pyinstaller StanzaWeaver.spec --clean -> zip -s 1g split archive
 #
-# Note: the Python version is pinned by .python-version (3.14) at the repo root;
+# Note: the Python version is pinned by .python-version at the repo root;
 # uv installs and uses it automatically.
 
 name: CI/CD
