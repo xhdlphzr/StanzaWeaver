@@ -19,6 +19,7 @@ from src.templates.la import (
     _validate_hex,
 )
 from src.templates.zh import (
+    BusuanziTemplate,
     LangtaoshaTemplate,
     QingpingyueTemplate,
     RumenglingTemplate,
@@ -409,6 +410,53 @@ def test_xijiangyue_rhyme_mismatch() -> None:
 def test_xijiangyue_empty_syllables_and_format() -> None:
     """Xijiangyue: empty input and stanza layout."""
     tpl = XijiangyueTemplate()
+    assert tpl.validate_full([], []) == []
+    text = tpl.format_poem(["题"] + ["句"] * 8)
+    assert text.startswith("题\n\t")
+    assert "\t" in text
+    assert "，" in tpl.format_poem(["题"] + ["句"] * 8, ["，"] * 8)
+    assert tpl.format_poem(["题"]) == "题\n\t题，"
+    assert not tpl.format_poem(["句"]).startswith("题")
+
+
+def test_busuanzi_valid_and_constraints() -> None:
+    """Busuanzi: oblique rhymes in lines 2 and 4; constraints built."""
+    syls = [
+        _xjh_mk(5, None),
+        _xjh_mk(5, "ang"),
+        _xjh_mk(7, None),
+        _xjh_mk(5, "ang"),
+        _xjh_mk(5, None),
+        _xjh_mk(5, "ang"),
+        _xjh_mk(7, None),
+        _xjh_mk(5, "ang"),
+    ]
+    tpl = BusuanziTemplate()
+    assert tpl.validate_full([""] * 8, syls) == []
+    constraints = tpl.get_syllable_constraints()
+    assert len(constraints) == 8
+    assert [len(row) for row in constraints] == [5, 5, 7, 5, 5, 5, 7, 5]
+
+
+def test_busuanzi_rhyme_mismatch() -> None:
+    """Busuanzi: report a rhyme error when the rhyme feet differ."""
+    syls = [
+        _xjh_mk(5, None),
+        _xjh_mk(5, "ang"),
+        _xjh_mk(7, None),
+        _xjh_mk(5, "eng"),
+        _xjh_mk(5, None),
+        _xjh_mk(5, "ang"),
+        _xjh_mk(7, None),
+        _xjh_mk(5, "ang"),
+    ]
+    errs = BusuanziTemplate().validate_full([""] * 8, syls)
+    assert any("do not rhyme" in e for e in errs)
+
+
+def test_busuanzi_empty_syllables_and_format() -> None:
+    """Busuanzi: empty input and stanza layout."""
+    tpl = BusuanziTemplate()
     assert tpl.validate_full([], []) == []
     text = tpl.format_poem(["题"] + ["句"] * 8)
     assert text.startswith("题\n\t")
