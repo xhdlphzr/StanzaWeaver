@@ -23,6 +23,7 @@ from src.templates.zh import (
     QingpingyueTemplate,
     RumenglingTemplate,
     XiangjianhuanTemplate,
+    XijiangyueTemplate,
     _check_alternation,
     _check_guping,
     _check_jinti_rhyme,
@@ -351,6 +352,70 @@ def test_qingpingyue_same_rhyme_rejected() -> None:
 def test_qingpingyue_empty_syllables() -> None:
     """Qingpingyue: the rhyme foot falls back to empty for empty syllables."""
     assert QingpingyueTemplate().validate_full([], []) == []
+
+
+def test_xijiangyue_valid_and_constraints() -> None:
+    """Xijiangyue: level rhymes plus same-group oblique rhyme; constraints built."""
+    syls = [
+        _xjh_mk(6, None),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(7, "ang"),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(6, None),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(7, "ang"),
+        _xjh_mk(6, "ang"),
+    ]
+    tpl = XijiangyueTemplate()
+    assert tpl.validate_full([""] * 8, syls) == []
+    constraints = tpl.get_syllable_constraints()
+    assert len(constraints) == 8
+    assert [len(row) for row in constraints] == [6, 6, 7, 6, 6, 6, 7, 6]
+
+
+def test_xijiangyue_rhyme_group_must_match() -> None:
+    """Xijiangyue: the oblique rhyme must be in the level rhyme's group."""
+    syls = [
+        _xjh_mk(6, None),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(7, "ang"),
+        _xjh_mk(6, "eng"),
+        _xjh_mk(6, None),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(7, "ang"),
+        _xjh_mk(6, "eng"),
+    ]
+    errs = XijiangyueTemplate().validate_full([""] * 8, syls)
+    assert any("same rhyme group" in e for e in errs)
+
+
+def test_xijiangyue_rhyme_mismatch() -> None:
+    """Xijiangyue: report level and oblique rhyme mismatches separately."""
+    syls = [
+        _xjh_mk(6, None),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(7, "eng"),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(6, None),
+        _xjh_mk(6, "ang"),
+        _xjh_mk(7, "ang"),
+        _xjh_mk(6, "eng"),
+    ]
+    errs = XijiangyueTemplate().validate_full([""] * 8, syls)
+    assert any("Rhyme (level)" in e for e in errs)
+    assert any("Rhyme (oblique)" in e for e in errs)
+
+
+def test_xijiangyue_empty_syllables_and_format() -> None:
+    """Xijiangyue: empty input and stanza layout."""
+    tpl = XijiangyueTemplate()
+    assert tpl.validate_full([], []) == []
+    text = tpl.format_poem(["题"] + ["句"] * 8)
+    assert text.startswith("题\n\t")
+    assert "\t" in text
+    assert "，" in tpl.format_poem(["题"] + ["句"] * 8, ["，"] * 8)
+    assert tpl.format_poem(["题"]) == "题\n\t题，"
+    assert not tpl.format_poem(["句"]).startswith("题")
 
 
 def test_ci_templates_meter_validate_canonical() -> None:
