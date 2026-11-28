@@ -100,8 +100,8 @@ template_modal:
   convert_source_rhyme: "源模板韵式：{scheme}（将被一并复制）"
   convert_source_code: 源模板含自定义校验代码（将被一并复制）
   convert_copies: 行数、每行音节、押韵韵式与自定义代码会一并复制，仅逐位音节约束按映射转换
-  convert_ai_code_label: 通过 AI 转写原模板代码（按目标语言重写校验逻辑）
-  convert_ai_code_hint: 勾选后会把源模板代码与属性映射（如 平 → 轻/重）交给模板 AI 改写；请生成模板后人工检查 AI 代码。
+  convert_ai_code_label: "通过 AI 转写原模板代码（按目标语言重写校验逻辑，默认自动开启）"
+  convert_ai_code_hint: "默认会自动把源模板代码与属性映射（如 平 → 轻/重）交给模板 AI 改写，并显示在下方代码编辑器中；取消勾选则原样复制原代码。"
   convert_ai_running: AI 转写代码中...
   convert_ai_done: AI 已转写模板代码，请检查
   convert_carried_ai_code: AI 转写的模板代码
