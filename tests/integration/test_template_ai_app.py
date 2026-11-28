@@ -144,7 +144,7 @@ def test_build_code_alternatives_and_rhyme() -> None:
     assert "get_syllable_constraint_alternatives" in code
     assert "from .rhyme import check_rhyme_scheme" in code
     assert "distinct=True" in code
-    assert "可选音节约束" in code
+    assert "syllable-constraint variants" in code
     assert "errors.append('x')" in code
     assert 'rhyme_scheme = "A-"' in code
     assert "custom_code" in code
@@ -467,7 +467,7 @@ def test_convert_success_jinti_structural(client: FlaskClient) -> None:
     assert rules["forbid_guping"] is True
     assert "jinti" in data["carried_rules"]
     assert data["dropped_rules"] == []
-    assert "格律规则" in data["rule_note"]
+    assert "Rules:" in data["rule_note"]
     assert "rule_note" in data["carried_rules"]
 
 

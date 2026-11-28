@@ -124,14 +124,20 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
     name = "莎士比亚商籁体"
     language = "en"
     lines = 14
-    special_rules = ("每行至少4个重读音节", "每组四行内A/B韵须不同")
+    special_rules = (
+        "Each line has at least 4 stressed syllables",
+        "Within each quatrain the A and B rhymes must differ",
+    )
     rhyme_scheme = "ABABCDCDEFEFGG"
     syllables_per_line: ClassVar[list[int]] = [10] * 14
     rule_description = (
-        "格律规则：每行抑扬格五音步（10音节，重音在偶数位，次重音亦算重读）；"
-        "韵式 ABAB CDCD EFEF GG；每组四行内A/B两韵必须不同；"
-        "押韵须为严格重音押韵：韵脚必须落在主重音或次重音音节上，"
-        "且该音节起全部音素（含重音层级）完全一致。"
+        "Rules: each line is iambic pentameter (10 syllables, with stress on "
+        "the even positions; secondary stress also counts as stressed); rhyme "
+        "scheme ABAB CDCD EFEF GG; within each quatrain the A and B rhymes "
+        "must differ; rhyme must be strict stress rhyme: the rhyme foot must "
+        "fall on a primary or secondary stressed syllable, and all phonemes "
+        "from that syllable onward (including the stress level) must be "
+        "exactly the same."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
@@ -200,15 +206,22 @@ class VillanelleTemplate(PoetryTemplate):
     name = "维拉内拉诗"
     language = "en"
     lines = 19
-    special_rules = ("每行至少4个重读音节", "叠句须原样重复", "A/B韵须不同")
+    special_rules = (
+        "Each line has at least 4 stressed syllables",
+        "Refrains must be repeated verbatim",
+        "The A and B rhymes must differ",
+    )
     rhyme_scheme = "ABAABAABAABAABAABAA"
     syllables_per_line: ClassVar[list[int | tuple[int, int]]] = []
     rule_description = (
-        "格律规则：全诗19行（5个三行联句+1个四行联句）；韵式 ABA ABA ABA ABA ABA ABAA；"
-        "第1行(A1)在第6、12、18行原样重复，第3行(A2)在第9、15、19行原样重复；"
-        "每行至少4个重读音节，总音节数不限（次重音亦算重读）；"
-        "押韵须为严格重音押韵：韵脚落在主重音或次重音音节上，"
-        "该音节起全部音素（含重音层级）完全一致。"
+        "Rules: 19 lines in total (5 tercets + 1 quatrain); rhyme scheme "
+        "ABA ABA ABA ABA ABA ABAA; line 1 (A1) repeats verbatim at lines 6, "
+        "12 and 18, and line 3 (A2) repeats verbatim at lines 9, 15 and 19; "
+        "each line has at least 4 stressed syllables, with no restriction on "
+        "the total syllable count (secondary stress also counts as stressed); "
+        "rhyme must be strict stress rhyme: the rhyme foot falls on a primary "
+        "or secondary stressed syllable, and all phonemes from that syllable "
+        "onward (including the stress level) must be exactly the same."
     )
     _refrain_a1: ClassVar[list[int]] = [0, 5, 11, 17]
     _refrain_a2: ClassVar[list[int]] = [2, 8, 14, 18]
@@ -292,13 +305,17 @@ class HeroicCoupletTemplate(PoetryTemplate):
     name = "英雄双行体"
     language = "en"
     lines = 2
-    special_rules = ("每行至少4个重读音节",)
+    special_rules = ("Each line has at least 4 stressed syllables",)
     rhyme_scheme = "AA"
     syllables_per_line: ClassVar[list[int]] = [10, 10]
     rule_description = (
-        "格律规则：每行抑扬格五音步（10音节），全行重音音节数不少于4（次重音亦算重读）；"
-        "两行末字押同韵（AA），押韵须为严格重音押韵：韵脚落在主重音或次重音音节上，"
-        "该音节起全部音素（含重音层级）完全一致。"
+        "Rules: each line is iambic pentameter (10 syllables), with at least "
+        "4 stressed syllables per line (secondary stress also counts as "
+        "stressed); the final words of the two lines rhyme with each other "
+        "(AA), and rhyme must be strict stress rhyme: the rhyme foot falls on "
+        "a primary or secondary stressed syllable, and all phonemes from that "
+        "syllable onward (including the stress level) must be exactly the "
+        "same."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:

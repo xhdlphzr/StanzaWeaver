@@ -93,13 +93,15 @@ class TerzaRimaTemplate(PoetryTemplate):
     name = "三行体"
     language = "it"
     lines = 14
-    special_rules = ("第10音节须重读",)
+    special_rules = ("The 10th syllable must be stressed",)
     rhyme_scheme = "ABABCBCDCDEDEE"
     syllables_per_line: ClassVar[list[int]] = [11] * 14
     rule_description = (
-        "格律规则：每行11音节（跨词元音连读 sinalefe 合并计数）；"
-        "每行第10个音节必须重读（十一音节句定义特征）；"
-        "韵式 ABA BCB CDC DED EE（链式循环押韵，换韵时与前韵不同部）。"
+        "Rules: 11 syllables per line (cross-word vowel elision, sinalefe, is "
+        "merged into the count); the 10th syllable of every line must be "
+        "stressed (the defining feature of the endecasillabo); rhyme scheme "
+        "ABA BCB CDC DED EE (interlocking chain rhyme, each new rhyme "
+        "differing from the preceding one)."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
@@ -144,13 +146,14 @@ class OttavaRimaTemplate(PoetryTemplate):
     name = "八行体"
     language = "it"
     lines = 8
-    special_rules = ("第10音节须重读",)
+    special_rules = ("The 10th syllable must be stressed",)
     rhyme_scheme = "ABABABCC"
     syllables_per_line: ClassVar[list[int]] = [11] * 8
     rule_description = (
-        "格律规则：每行11音节（跨词元音连读 sinalefe 合并计数）；"
-        "每行第10个音节必须重读；"
-        "韵式 ABABABCC（前6行交替韵，末两行对句韵 CC）。"
+        "Rules: 11 syllables per line (cross-word vowel elision, sinalefe, is "
+        "merged into the count); the 10th syllable of every line must be "
+        "stressed; rhyme scheme ABABABCC (alternating rhyme over the first "
+        "six lines, closing couplet CC)."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
@@ -198,10 +201,10 @@ class CanzoneTemplate(PoetryTemplate):
     language = "it"
     lines = 13
     special_rules = (
-        "韵脚数不超过4个",
-        "同一韵脚连续出现不超过2次",
-        "末三行韵脚各不相同",
-        "末音节重读",
+        "At most 4 rhymes are used",
+        "The same rhyme does not occur more than 2 times in a row",
+        "The final three lines each have a different rhyme",
+        "The final syllable must be stressed",
     )
     syllables_per_line: ClassVar[list[int]] = [
         11,
@@ -219,10 +222,13 @@ class CanzoneTemplate(PoetryTemplate):
         7,
     ]
     rule_description = (
-        "格律规则：奇数行（1、3、5、7、9、11）为11音节（endecasillabo femminile），"
-        "第10音节重读、第11音节非重读；"
-        "偶数行（2、4、6、8、10、12）与第13行为7音节（settenario femminile），末音节重读；"
-        "全诗使用 A、B、C、D 四个韵脚，同一韵脚连续出现不得超过两次，末三行韵脚各不相同。"
+        "Rules: odd lines (1, 3, 5, 7, 9 and 11) have 11 syllables "
+        "(endecasillabo femminile), with the 10th syllable stressed and the "
+        "11th unstressed; even lines (2, 4, 6, 8, 10 and 12) and line 13 have "
+        "7 syllables (settenario femminile), with a stressed final syllable; "
+        "the poem uses the four rhymes A, B, C and D, the same rhyme may not "
+        "occur more than twice in a row, and the final three lines each have "
+        "a different rhyme."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:

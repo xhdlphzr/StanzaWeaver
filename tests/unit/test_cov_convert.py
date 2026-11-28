@@ -509,7 +509,7 @@ def test_convert_reports_dropped_special_rules() -> None:
     )
     assert error is None
     assert spec["dropped_rules"]
-    assert any("叠句" in rule for rule in spec["dropped_rules"])
+    assert any("identical refrain" in rule for rule in spec["dropped_rules"])
 
 
 def test_convert_multi_kinds_carried_codes() -> None:

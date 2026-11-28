@@ -115,12 +115,16 @@ class HexameterTemplate(PoetryTemplate):
     name = "六步格"
     language = "la"
     lines = 1
-    special_rules = ("六步格音步结构", "第5音步须为扬抑抑格")
+    special_rules = ("Six-foot structure", "Foot 5 must be a dactyl")
     syllables_per_line: ClassVar[list[tuple[int, int]]] = [(13, 17)]
     rule_description = (
-        "格律规则：共6音步；第1-4音步可为扬抑抑格(长短短)或扬扬格(长长)自由替换；"
-        "第5音步必须为扬抑抑格(长短短)；第6音步为扬扬格或扬抑格，末音节可长可短；"
-        "音长判定：词典标注优先，无标注时双元音及元音后跟两个及以上辅音(含跨词)为长音。"
+        "Rules: 6 feet in total; feet 1-4 may freely alternate between "
+        "dactyls (long-short-short) and spondees (long-long); foot 5 must be "
+        "a dactyl (long-short-short); foot 6 is a spondee or trochee, and its "
+        "final syllable may be long or short; quantity determination: "
+        "dictionary markings take precedence, and when unmarked a diphthong "
+        "or a vowel followed by two or more consonants (including across "
+        "words) counts as long."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
@@ -161,17 +165,18 @@ class DistichonTemplate(PoetryTemplate):
     language = "la"
     lines = 2
     special_rules = (
-        "六步格/五步格音步结构",
-        "第2行后6音节须为两个扬抑抑格",
-        "第2行中部caesura",
+        "Hexameter/pentameter foot structure",
+        "The last 6 syllables of line 2 must be two dactyls",
+        "Mid-line caesura in line 2",
     )
     rhyme_scheme = "AA"
     syllables_per_line: ClassVar[list[tuple[int, int]]] = [(13, 17), (11, 13)]
     rule_description = (
-        "格律规则：第1行完全遵循六步格规则；"
-        "第2行五步格：前2.5音步可为扬抑抑格或扬扬格（自由），中间必有停顿，"
-        "后2.5音步必须为两个完整的扬抑抑格（长短短长短短）收尾；"
-        "两行末字必须押韵（AA）。"
+        "Rules: line 1 follows the hexameter rules exactly; line 2 is a "
+        "pentameter: its first 2.5 feet may be dactyls or spondees (free), a "
+        "caesura is required in the middle, and its last 2.5 feet must close "
+        "with two complete dactyls (long-short-short long-short-short); the "
+        "final words of the two lines must rhyme (AA)."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
@@ -271,13 +276,17 @@ class HendecasyllabusTemplate(PoetryTemplate):
     name = "十一音节诗"
     language = "la"
     lines = 1
-    special_rules = ("十一音节音步结构", "第5/6音节之间须为词边界")
+    special_rules = (
+        "Hendecasyllable foot structure",
+        "A word boundary is required between syllables 5 and 6",
+    )
     syllables_per_line: ClassVar[list[int]] = [11]
     rule_description = (
-        "格律规则：共5音步11音节；第1音步为扬扬格或扬抑格（首音节必长）；"
-        "第2音步固定扬抑抑格(长短短)；第3-5音步均为扬抑格(长短)；"
-        "全行第5与第6音节之间必须是音步边界（不得跨词）；"
-        "第3、5、6、8、10音节（全行）必须为长音。"
+        "Rules: 5 feet and 11 syllables in total; foot 1 is a spondee or "
+        "trochee (its first syllable must be long); foot 2 is always a dactyl "
+        "(long-short-short); feet 3-5 are all trochees (long-short); a foot "
+        "boundary (no word may cross it) is required between syllables 5 and "
+        "6 of the line; syllables 3, 5, 6, 8 and 10 of the line must be long."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
