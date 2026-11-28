@@ -16,7 +16,7 @@ use -NoCache for a clean rebuild (avoiding BuildKit cache interference).
 .\scripts\docker-build.ps1
 
 .EXAMPLE
-.\scripts\docker-build.ps1 -BaseImage docker.m.daocloud.io/library/python:3.14-slim
+.\scripts\docker-build.ps1 -BaseImage docker.m.daocloud.io/library/python:3.15-slim
 
 .EXAMPLE
 .\scripts\docker-build.ps1 -NoCache -Tag stanzaweaver:1.0.0
@@ -25,9 +25,9 @@ use -NoCache for a clean rebuild (avoiding BuildKit cache interference).
 param(
     # Image tag (default stanzaweaver:latest)
     [string]$Tag = "stanzaweaver:latest",
-    # Base image (default official python:3.14-slim; a regional mirror prefix
-    # may be passed, e.g. docker.m.daocloud.io/library/python:3.14-slim)
-    [string]$BaseImage = "python:3.14-slim",
+    # Base image (default official python:3.15-slim; a regional mirror prefix
+    # may be passed, e.g. docker.m.daocloud.io/library/python:3.15-slim)
+    [string]$BaseImage = "python:3.15-slim",
     # Clean rebuild (skip BuildKit cache; slower but consistent with current files)
     [switch]$NoCache
 )
@@ -49,7 +49,7 @@ $buildArgs = @("-t", $Tag)
 if ($NoCache) {
     $buildArgs += "--no-cache"
 }
-if ($BaseImage -ne "python:3.14-slim") {
+if ($BaseImage -ne "python:3.15-slim") {
     $buildArgs += "--build-arg", "BASE_IMAGE=$BaseImage"
 }
 $buildArgs += "."

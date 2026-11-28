@@ -7,12 +7,12 @@
 #
 # Usage:
 #   ./scripts/build.sh                     # default tag=stanzaweaver:latest
-#   ./scripts/build.sh -b docker.m.daocloud.io/library/python:3.14-slim   # regional mirror
+#   ./scripts/build.sh -b docker.m.daocloud.io/library/python:3.15-slim   # regional mirror
 #   ./scripts/build.sh -t stanzaweaver:1.0.0 -n                            # custom tag + no cache
 #
 # Options:
 #   -t, --tag <tag>        image tag (default stanzaweaver:latest)
-#   -b, --base-image <img> base image (default python:3.14-slim)
+#   -b, --base-image <img> base image (default python:3.15-slim)
 #   -n, --no-cache         clean rebuild, skipping the BuildKit cache
 #   -h, --help             show help
 set -euo pipefail
@@ -21,7 +21,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
 TAG="stanzaweaver:latest"
-BASE_IMAGE="python:3.14-slim"
+BASE_IMAGE="python:3.15-slim"
 NO_CACHE=""
 
 usage() {
@@ -50,7 +50,7 @@ BUILD_ARGS=(-t "$TAG")
 if [[ -n "$NO_CACHE" ]]; then
     BUILD_ARGS+=("$NO_CACHE")
 fi
-if [[ "$BASE_IMAGE" != "python:3.14-slim" ]]; then
+if [[ "$BASE_IMAGE" != "python:3.15-slim" ]]; then
     BUILD_ARGS+=(--build-arg "BASE_IMAGE=$BASE_IMAGE")
 fi
 BUILD_ARGS+=(.)

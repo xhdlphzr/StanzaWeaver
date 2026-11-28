@@ -6,7 +6,7 @@
 #
 # Build: docker build -t stanzaweaver .
 #   (If Docker Hub is unreachable, prefix with a regional mirror:
-#     docker build --build-arg BASE_IMAGE=docker.m.daocloud.io/library/python:3.14-slim -t stanzaweaver . )
+#     docker build --build-arg BASE_IMAGE=docker.m.daocloud.io/library/python:3.15-slim -t stanzaweaver . )
 # Run:   docker run --rm -p 5000:5000 \
 #            -e STANZAWEAVER_HOST=0.0.0.0 \
 #            -v stanzaweaver-data:/home/stanzaweaver/.stanza_weaver \
@@ -18,7 +18,7 @@
 # Docker layer caching; dev dependencies (pytest/ruff/mypy/pyinstaller, etc.) stay
 # out of the image to keep it slim.
 
-ARG BASE_IMAGE=python:3.14-slim
+ARG BASE_IMAGE=python:3.15-slim
 FROM ${BASE_IMAGE}
 
 # Copy uv (same version as the official uv image; pin the tag to reuse the layer cache)
@@ -39,7 +39,7 @@ RUN groupadd -r stanzaweaver \
     && useradd -r -g stanzaweaver -d /home/stanzaweaver -m stanzaweaver
 
 # Install dependencies first (uses the layer cache; uv uses the base image's
-# system Python 3.14)
+# system Python 3.15)
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen
 

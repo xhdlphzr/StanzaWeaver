@@ -196,7 +196,7 @@ Use the one‑click scripts in `scripts/` (Windows and Linux/macOS, all support 
 | cmd        | `scripts\build.bat [-t tag] [-b base-image] [-n]`   | `scripts\run.bat [-p port] [-d] [-l] [--no-volume]`   |
 | bash       | `./scripts/build.sh [-t tag] [-b base-image] [-n]`  | `./scripts/run.sh [-p port] [-d] [-l] [--no-volume]`  |
 
-Example: `.\scripts\build.ps1 -b docker.m.daocloud.io/library/python:3.14-slim` to build, and `.\scripts\run.ps1 -d -l` to run in background and follow logs.
+Example: `.\scripts\build.ps1 -b docker.m.daocloud.io/library/python:3.15-slim` to build, and `.\scripts\run.ps1 -d -l` to run in background and follow logs.
 
 Notes:
 
@@ -215,7 +215,7 @@ StanzaWeaver/
 ├── .dockerignore
 ├── .gitignore
 ├── .python-version         # Python version (uv)
-├── Dockerfile              # Image build (Python 3.14-slim + desktop/reranking dependencies)
+├── Dockerfile              # Image build (Python 3.15-slim + desktop/reranking dependencies)
 ├── LICENSE                 # MIT License
 ├── README.md               # Project documentation
 ├── Franx.ico               # Application icon

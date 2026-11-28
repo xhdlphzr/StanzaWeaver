@@ -196,7 +196,7 @@ flowchart TD
 | cmd        | `scripts\build.bat [-t tag] [-b base-image] [-n]`   | `scripts\run.bat [-p port] [-d] [-l] [--no-volume]`   |
 | bash       | `./scripts/build.sh [-t tag] [-b base-image] [-n]`  | `./scripts/run.sh [-p port] [-d] [-l] [--no-volume]`  |
 
-示例：`.\scripts\build.ps1 -b docker.m.daocloud.io/library/python:3.14-slim` 构建，`.\scripts\run.ps1 -d -l` 后台运行并跟随日志。
+示例：`.\scripts\build.ps1 -b docker.m.daocloud.io/library/python:3.15-slim` 构建，`.\scripts\run.ps1 -d -l` 后台运行并跟随日志。
 
 说明：
 
@@ -215,7 +215,7 @@ StanzaWeaver/
 ├── .dockerignore
 ├── .gitignore
 ├── .python-version         # Python 版本（uv）
-├── Dockerfile              # 镜像构建（Python 3.14-slim + 桌面/重排依赖）
+├── Dockerfile              # 镜像构建（Python 3.15-slim + 桌面/重排依赖）
 ├── LICENSE                 # MIT 许可证
 ├── README.md               # 项目文档
 ├── Franx.ico               # 应用图标
