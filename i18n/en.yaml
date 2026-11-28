@@ -21,6 +21,7 @@ template:
   custom: "+ Custom"
   manage: Manage
   manage_title: Manage templates (drag to reorder / delete custom templates)
+  name_format: "{name} ({lang})"
 
 generate:
   button: Generate
@@ -213,3 +214,27 @@ confirm:
   cancel: Cancel
   reset: Reset
   delete: Delete
+
+template_names:
+  zh_wujue: "Five-Character Quatrain"
+  zh_qijue: "Seven-Character Quatrain"
+  zh_wulv: "Five-Character Regulated Verse"
+  zh_qilv: "Seven-Character Regulated Verse"
+  zh_xiangjianhuan: "Joy of Meeting"
+  zh_rumengling: "Like a Dream"
+  zh_langtaosha: "Waves Washing the Sand"
+  zh_qingpingyue: "Pure Serene Music"
+  zh_xijiangyue: "Moon over the West River"
+  zh_busuanzi: "Song of Divination"
+  en_sonnet: "Shakespearean Sonnet"
+  en_villanelle: "Villanelle"
+  en_heroic_couplet: "Heroic Couplet"
+  fr_rondeau: "Rondeau"
+  fr_triolet: "Triolet"
+  fr_ballade: "Ballade"
+  it_terza_rima: "Terza Rima"
+  it_ottava_rima: "Ottava Rima"
+  it_canzone: "Canzone"
+  la_hexameter: "Hexameter"
+  la_distichon: "Elegiac Distich"
+  la_hendecasyllabus: "Hendecasyllable"

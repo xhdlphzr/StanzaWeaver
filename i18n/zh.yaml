@@ -21,6 +21,7 @@ template:
   custom: "+ 自定义"
   manage: 管理
   manage_title: 模板管理（拖动排序 / 删除自定义模板）
+  name_format: "{name}（{lang}）"
 
 generate:
   button: 开始生成
@@ -213,3 +214,27 @@ confirm:
   cancel: 取消
   reset: 重置
   delete: 删除
+
+template_names:
+  zh_wujue: "五言绝句"
+  zh_qijue: "七言绝句"
+  zh_wulv: "五言律诗"
+  zh_qilv: "七言律诗"
+  zh_xiangjianhuan: "相见欢"
+  zh_rumengling: "如梦令"
+  zh_langtaosha: "浪淘沙"
+  zh_qingpingyue: "清平乐"
+  zh_xijiangyue: "西江月"
+  zh_busuanzi: "卜算子"
+  en_sonnet: "莎士比亚商籁体"
+  en_villanelle: "维拉内拉诗"
+  en_heroic_couplet: "英雄双行体"
+  fr_rondeau: "回旋诗"
+  fr_triolet: "三韵叠句诗"
+  fr_ballade: "叙事歌"
+  it_terza_rima: "三行体"
+  it_ottava_rima: "八行体"
+  it_canzone: "歌谣"
+  la_hexameter: "六步格"
+  la_distichon: "哀歌双行体"
+  la_hendecasyllabus: "十一音节诗"

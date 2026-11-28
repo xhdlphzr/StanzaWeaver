@@ -842,13 +842,33 @@
         });
       });
 
+      function templateLocalizedName(item) {
+        if (!item) return "";
+        var name = item.name || item.key || "";
+        if (item.key && item.key.indexOf("custom_") !== 0) {
+          var key = "template_names." + item.key;
+          var translated = t(key);
+          if (translated !== key) name = translated;
+        }
+        return name;
+      }
+
+      function templateDisplayName(item) {
+        if (!item) return "";
+        var name = templateLocalizedName(item);
+        var lang = item.language ? tplLanguageLabel(item.language) : "";
+        return lang
+          ? t("template.name_format", { name: name, lang: lang })
+          : name;
+      }
+
       function templateOptionsHtml() {
         return TEMPLATES.map(function (item) {
           return (
             '<option value="' +
             item.key +
             '">' +
-            escapeHtml(item.display_name || item.name) +
+            escapeHtml(templateDisplayName(item)) +
             "</option>"
           );
         }).join("");
@@ -968,7 +988,7 @@
           row.appendChild(handle);
           var name = document.createElement("span");
           name.className = "template-manage-name";
-          name.textContent = item.display_name || item.name;
+          name.textContent = templateDisplayName(item);
           row.appendChild(name);
           if (item.deletable) {
             var del = document.createElement("button");
@@ -1091,7 +1111,7 @@
       }
 
       function deleteTemplate(item) {
-        var name = item.display_name || item.name;
+        var name = templateDisplayName(item);
         showConfirm({
           title: t("template_manage.delete_title"),
           message: t("template_manage.delete_confirm", { name: name }),
@@ -2368,7 +2388,7 @@
               '<option value="' +
               escapeHtml(item.key) +
               '">' +
-              escapeHtml(item.display_name || item.name) +
+              escapeHtml(templateDisplayName(item)) +
               "</option>"
             );
           }).join("");
@@ -2634,9 +2654,15 @@
             : null;
         renderConvertReport(spec.carried_rules || [], spec.dropped_rules || []);
         var nameInput = document.getElementById("tmpl-name");
-        if (!nameInput.value.trim() && spec.source_name) {
-          nameInput.value =
-            spec.source_name + "-" + tplLanguageLabel(spec.language || language);
+        if (!nameInput.value.trim()) {
+          var baseItem = getBaseTemplate();
+          var sourceName = baseItem
+            ? templateLocalizedName(baseItem)
+            : spec.source_name || "";
+          if (sourceName) {
+            nameInput.value =
+              sourceName + "-" + tplLanguageLabel(spec.language || language);
+          }
         }
         renderSyllableTables();
         renderRhymeLines();
