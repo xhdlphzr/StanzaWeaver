@@ -72,6 +72,10 @@ _LANGTAOSHA_MARKS: list[str] = ["，", "。", "。", "，", "。"] * 2
 #: Qingpingyue default punctuation (4 lines per stanza).
 _QINGPINGYUE_MARKS: list[str] = ["，", "。", "，", "。", "，", "。", "，", "。"]
 
+#: Xijiangyue default punctuation (4 lines per stanza; rhyme lines 2-4 end
+#: with full stops).
+_XIJIANGYUE_MARKS: list[str] = ["，", "。", "。", "。"] * 2
+
 
 def _check_sanpingwei(syllables: list[Syllable]) -> list[str]:
     """Check for a three level-tone tail (last three characters all level).
@@ -1164,6 +1168,122 @@ class QingpingyueTemplate(PoetryTemplate):
         return title + "\n" + text if title else text
 
 
+class XijiangyueTemplate(PoetryTemplate):
+    """Xijiangyue (double tune, 50 characters).
+
+    The upper and lower stanzas each have four lines. In each stanza, lines 2
+    and 3 rhyme on level tones, while line 4 rhymes on an oblique tone in the
+    same rhyme group as the level rhyme (level/oblique rhyme alternation). The
+    first two lines of each stanza are usually antithetical.
+    """
+
+    name = "Moon over the West River"
+    language = "zh"
+    lines = 8
+    special_rules = (
+        "The first two lines of each stanza should form an antithetical couplet",
+        "The level and oblique rhymes must be in the same rhyme group",
+    )
+    rhyme_scheme = "-AAB-AAB"
+    centered = False
+    syllables_per_line: ClassVar[list[int]] = [6, 6, 7, 6, 6, 6, 7, 6]
+    rule_description = (
+        "Rules: a double tune of 50 characters, four lines per stanza, eight "
+        "lines in total; in each stanza lines 2 and 3 rhyme on level tones and "
+        "line 4 rhymes on an oblique tone, and the oblique rhyme must be in "
+        "the same rhyme group as the level rhyme (level/oblique rhyme "
+        "alternation); the first two lines of each stanza are usually "
+        "antithetical; tone patterns for both stanzas: 中仄中平平仄 / "
+        "中平中仄平平 / 中平中仄仄平平 / 中仄平平中仄."
+    )
+
+    def get_syllable_constraints(self) -> ConstraintTable:
+        """Fixed tone pattern of the ci tune (free positions are unconstrained).
+
+        Returns:
+            Per-position syllable constraint table.
+
+        """
+        _f, _p, _z = _FREE, _tone("平"), _tone("仄")
+        return [
+            [_f, _z, _f, _p, _p, _z],
+            [_f, _p, _f, _z, _p, _p],
+            [_f, _p, _f, _z, _z, _p, _p],
+            [_f, _z, _p, _p, _f, _z],
+            [_f, _z, _f, _p, _p, _z],
+            [_f, _p, _f, _z, _p, _p],
+            [_f, _p, _f, _z, _z, _p, _p],
+            [_f, _z, _p, _p, _f, _z],
+        ]
+
+    def validate_full(
+        self, poem: list[str], syllables: list[list[Syllable]]
+    ) -> list[str]:
+        """Rhyme check: level rhymes in lines 2-3 and an oblique rhyme in line 4.
+
+        The level and oblique rhymes must belong to the same rhyme group.
+
+        Args:
+            poem: List of poem lines.
+            syllables: Syllables per line.
+
+        Returns:
+            List of error messages (empty means pass).
+
+        """
+        errors: list[str] = []
+        errors.extend(_check_rhyme(syllables, [1, 2, 5, 6], "Rhyme (level)"))
+        errors.extend(_check_rhyme(syllables, [3, 7], "Rhyme (oblique)"))
+
+        def tail(idx: int) -> str:
+            """Get the rhyme key of the final syllable of one line.
+
+            Args:
+                idx: Line number (0-based).
+
+            Returns:
+                Rhyme key string; empty when the line has no syllables.
+
+            """
+            if idx < len(syllables) and syllables[idx]:
+                return _rhyme_key(syllables[idx][-1])
+            return ""
+
+        level = tail(1) or tail(2)
+        oblique = tail(3) or tail(7)
+        if level and oblique and level != oblique:
+            errors.append(
+                f"The level and oblique rhymes must be in the same rhyme "
+                f"group: level '{level}', oblique '{oblique}'"
+            )
+        return errors
+
+    def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
+        """Xijiangyue layout: leading tab, tab between stanzas, no breaks.
+
+        Args:
+            poem: List of poem lines (first element is the title).
+            punctuation: Per-line punctuation; empty/None uses defaults.
+
+        Returns:
+            Formatted display text.
+
+        """
+        title = poem[0] if poem else ""
+        content = poem[1:] if len(poem) > 1 else poem
+        marks = punctuation or _XIJIANGYUE_MARKS
+        content = [
+            content[i] + (marks[i] if i < len(marks) else "")
+            for i in range(len(content))
+        ]
+        upper = "".join(content[:4])
+        lower = "".join(content[4:])
+        text = "\t" + upper
+        if lower:
+            text += "\t" + lower
+        return title + "\n" + text if title else text
+
+
 def register_chinese_templates() -> None:
     """Register all Chinese templates."""
     register("zh_wujue", WujueTemplate())
@@ -1174,3 +1294,4 @@ def register_chinese_templates() -> None:
     register("zh_rumengling", RumenglingTemplate())
     register("zh_langtaosha", LangtaoshaTemplate())
     register("zh_qingpingyue", QingpingyueTemplate())
+    register("zh_xijiangyue", XijiangyueTemplate())
