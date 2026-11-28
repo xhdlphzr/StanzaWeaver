@@ -384,7 +384,7 @@
           <div id="tmpl-conversion" class="tmpl-conversion hidden">
             <div id="tmpl-convert-mapping" class="tmpl-convert-mapping"></div>
             <label class="checkbox-label ai-rewrite-code-label">
-              <input type="checkbox" id="tmpl-ai-rewrite-code" />
+              <input type="checkbox" id="tmpl-ai-rewrite-code" checked />
               <span data-i18n="template_modal.convert_ai_code_label"
                 >通过 AI 转写原模板代码（按目标语言重写校验逻辑）</span
               >
@@ -2642,8 +2642,14 @@
         document.getElementById("tmpl-rhyme-distinct").checked =
           TPL_STATE.rhymeDistinct;
 
-        if (typeof spec.code === "string" && cmEditor) {
-          cmEditor.setValue(spec.code);
+        if (typeof spec.code === "string") {
+          if (!cmEditor) refreshTplEditor();
+          if (cmEditor) {
+            cmEditor.setValue(spec.code);
+            setTimeout(function () {
+              cmEditor.refresh();
+            }, 0);
+          }
         }
         if (typeof spec.rule_note === "string" && spec.rule_note.trim()) {
           document.getElementById("tmpl-rule-note").value = spec.rule_note;
