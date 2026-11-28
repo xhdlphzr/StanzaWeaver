@@ -76,6 +76,9 @@ _QINGPINGYUE_MARKS: list[str] = ["，", "。", "，", "。", "，", "。", "，"
 #: with full stops).
 _XIJIANGYUE_MARKS: list[str] = ["，", "。", "。", "。"] * 2
 
+#: Busuanzi default punctuation (4 lines per stanza).
+_BUSUANZI_MARKS: list[str] = ["，", "。", "，", "。"] * 2
+
 
 def _check_sanpingwei(syllables: list[Syllable]) -> list[str]:
     """Check for a three level-tone tail (last three characters all level).
@@ -1284,6 +1287,87 @@ class XijiangyueTemplate(PoetryTemplate):
         return title + "\n" + text if title else text
 
 
+class BusuanziTemplate(PoetryTemplate):
+    """Busuanzi (double tune, 44 characters).
+
+    Four lines per stanza; lines 2 and 4 of each stanza rhyme throughout on
+    oblique tones.
+    """
+
+    name = "Song of Divination"
+    language = "zh"
+    lines = 8
+    special_rules = ("All rhymes use oblique tones",)
+    rhyme_scheme = "-A-A-A-A"
+    centered = False
+    syllables_per_line: ClassVar[list[int]] = [5, 5, 7, 5, 5, 5, 7, 5]
+    rule_description = (
+        "Rules: a double tune of 44 characters, four lines per stanza, eight "
+        "lines in total; lines 2 and 4 of each stanza rhyme throughout on "
+        "oblique tones; tone patterns for both stanzas: 中仄仄平平 / "
+        "中仄平平仄 / 中仄平平仄仄平 / 中仄平平仄."
+    )
+
+    def get_syllable_constraints(self) -> ConstraintTable:
+        """Fixed tone pattern of the ci tune (free positions are unconstrained).
+
+        Returns:
+            Per-position syllable constraint table.
+
+        """
+        _f, _p, _z = _FREE, _tone("平"), _tone("仄")
+        return [
+            [_f, _z, _z, _p, _p],
+            [_f, _z, _p, _p, _z],
+            [_f, _z, _p, _p, _z, _z, _p],
+            [_f, _z, _p, _p, _z],
+            [_f, _z, _z, _p, _p],
+            [_f, _z, _p, _p, _z],
+            [_f, _z, _p, _p, _z, _z, _p],
+            [_f, _z, _p, _p, _z],
+        ]
+
+    def validate_full(
+        self, poem: list[str], syllables: list[list[Syllable]]
+    ) -> list[str]:
+        """Rhyme check: lines 2 and 4 of each stanza rhyme on oblique tones.
+
+        Args:
+            poem: List of poem lines.
+            syllables: Syllables per line.
+
+        Returns:
+            List of error messages (empty means pass).
+
+        """
+        return _check_rhyme(syllables, [1, 3, 5, 7], "Rhyme (oblique)")
+
+    def format_poem(self, poem: list[str], punctuation: list[str] | None = None) -> str:
+        """Busuanzi layout: leading tab, tab between stanzas, no breaks.
+
+        Args:
+            poem: List of poem lines (first element is the title).
+            punctuation: Per-line punctuation; empty/None uses defaults.
+
+        Returns:
+            Formatted display text.
+
+        """
+        title = poem[0] if poem else ""
+        content = poem[1:] if len(poem) > 1 else poem
+        marks = punctuation or _BUSUANZI_MARKS
+        content = [
+            content[i] + (marks[i] if i < len(marks) else "")
+            for i in range(len(content))
+        ]
+        upper = "".join(content[:4])
+        lower = "".join(content[4:])
+        text = "\t" + upper
+        if lower:
+            text += "\t" + lower
+        return title + "\n" + text if title else text
+
+
 def register_chinese_templates() -> None:
     """Register all Chinese templates."""
     register("zh_wujue", WujueTemplate())
@@ -1295,3 +1379,4 @@ def register_chinese_templates() -> None:
     register("zh_langtaosha", LangtaoshaTemplate())
     register("zh_qingpingyue", QingpingyueTemplate())
     register("zh_xijiangyue", XijiangyueTemplate())
+    register("zh_busuanzi", BusuanziTemplate())
