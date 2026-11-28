@@ -14,7 +14,7 @@ Thank you for contributing to **StanzaWeaver** (Weaving Stanzas with Wisdom)! Th
 
 ## 1. Development Environment Setup (Docker)
 
-It is recommended to use Docker to start a development/runtime environment consistent with CI (base image `python:3.14-slim`, matching the Python version locked in `.github/workflows/ci.yml`).
+It is recommended to use Docker to start a development/runtime environment consistent with CI (base image `python:3.15-slim`, matching the Python version locked in `.github/workflows/ci.yml`).
 
 ### 1.1 Build the Image
 
@@ -29,7 +29,7 @@ Cross‑platform scripts (`.sh` / `.ps1` / `.bat`) are provided under the `scrip
 ```
 
 - If you cannot directly reach Docker Hub from China, specify an accelerator‑prefixed base image:
-  `./scripts/build.sh -b docker.m.daocloud.io/library/python:3.14-slim`
+  `./scripts/build.sh -b docker.m.daocloud.io/library/python:3.15-slim`
 - For other optional parameters, see the script `--help` (e.g., `-t <tag>` to specify image tag, `-n` for no‑cache rebuild).
 
 ### 1.2 Run (with Data Persistence)
@@ -65,7 +65,7 @@ python -m pytest
 
 ### 1.5 Without Docker (Optional)
 
-You can also develop locally without Docker. The repo is dependency-managed with [uv](https://docs.astral.sh/uv/) and targets **Python 3.14** (see `.python-version`):
+You can also develop locally without Docker. The repo is dependency-managed with [uv](https://docs.astral.sh/uv/) and targets **Python 3.15** (see `.python-version`):
 
 ```bash
 uv sync                    # creates .venv; installs runtime + dev deps from uv.lock
@@ -104,7 +104,7 @@ uv run ruff format --check ./
 Notes:
 
 - In CI, these run in the same order as the spec: `uv lock --check` → `reuse lint` → coverage‑gated `pytest` → `ruff check` → `mypy --strict` → `ruff format --check`. `ruff check` runs without auto‑fix, so **you must locally clean up with `--fix --unsafe-fixes` and `format`** first.
-- `mypy` must be used with the virtual environment that matches this project (`python3.14` + project dependencies); a system‑wide `mypy` may produce false‑positive import‑not‑found errors.
+- `mypy` must be used with the virtual environment that matches this project (`python3.15` + project dependencies); a system‑wide `mypy` may produce false‑positive import‑not‑found errors.
 - Coverage measures **`src/` and root `app.py`** (module name `app`) and must reach **100%** — the flags `--cov=src --cov=app --cov-report=term --cov-fail-under=100` are baked into `pyproject.toml` `[tool.pytest.ini_options].addopts`; `pytest` fails otherwise. Every `src`/`app.py` change must be fully covered. Tests use the `StubLLMClient` from `tests/helpers.py` – **no real LLM calls / no network**; they can run fully offline.
 
 ---

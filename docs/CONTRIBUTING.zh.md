@@ -14,7 +14,7 @@
 
 ## 1. 开发环境搭建（Docker）
 
-推荐用 Docker 启动一个与 CI 一致的开发/运行环境（基础镜像 `python:3.14-slim`，与 `.github/workflows/ci.yml` 锁定的 Python 版本一致）。
+推荐用 Docker 启动一个与 CI 一致的开发/运行环境（基础镜像 `python:3.15-slim`，与 `.github/workflows/ci.yml` 锁定的 Python 版本一致）。
 
 ### 1.1 构建镜像
 
@@ -29,7 +29,7 @@
 ```
 
 - 国内无法直连 Docker Hub 时，可指定加速器前缀基础镜像：
-  `./scripts/build.sh -b docker.m.daocloud.io/library/python:3.14-slim`
+  `./scripts/build.sh -b docker.m.daocloud.io/library/python:3.15-slim`
 - 其他可选参数见脚本 `--help`（如 `-t <tag>` 指定镜像标签、`-n` 无缓存重建）。
 
 ### 1.2 运行（带数据持久化）
@@ -65,7 +65,7 @@ python -m pytest
 
 ### 1.5 不使用 Docker（可选）
 
-也可不依赖 Docker 在本地开发。项目使用 [uv](https://docs.astral.sh/uv/) 管理依赖，目标 Python **3.14**（见 `.python-version`）：
+也可不依赖 Docker 在本地开发。项目使用 [uv](https://docs.astral.sh/uv/) 管理依赖，目标 Python **3.15**（见 `.python-version`）：
 
 ```bash
 uv sync                    # 创建 .venv 并按 uv.lock 安装运行 + dev 依赖
@@ -104,7 +104,7 @@ uv run ruff format --check ./
 说明：
 
 - CI 中按规范顺序执行：`uv lock --check` → `reuse lint` → 覆盖率门禁的 `pytest` → `ruff check` → `mypy --strict` → `ruff format --check`。其中 `ruff check` 不自动修改，因此**你本地必须先用上面的 `--fix --unsafe-fixes` 与 `format` 把代码整理干净**，否则 CI 会失败。
-- `mypy` 必须使用本项目配套的虚拟环境版本（`python3.14` + 项目依赖），系统全局 `mypy` 可能出现 import-not-found 的误报。
+- `mypy` 必须使用本项目配套的虚拟环境版本（`python3.15` + 项目依赖），系统全局 `mypy` 可能出现 import-not-found 的误报。
 - 覆盖率测量范围为 **`src/` 与根目录 `app.py`（模块名 `app`）**，必须达到 **100%** —— 参数 `--cov=src --cov=app --cov-report=term --cov-fail-under=100` 已写入 `pyproject.toml` 的 `[tool.pytest.ini_options].addopts`，`pytest` 不达标会失败；任何 `src` / `app.py` 改动都必须有测试覆盖。测试使用 `tests/helpers.py` 中的 `StubLLMClient` 走桩，**不调用任何真实 LLM / 不联网**，可离线全量运行。
 
 ---
