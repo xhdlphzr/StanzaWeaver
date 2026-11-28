@@ -121,7 +121,7 @@ def _check_rhyme_group(
 class ShakespeareSonnetTemplate(PoetryTemplate):
     """Shakespearean sonnet: 14 lines of iambic pentameter, ABAB CDCD EFEF GG."""
 
-    name = "莎士比亚商籁体"
+    name = "Shakespearean Sonnet"
     language = "en"
     lines = 14
     special_rules = (
@@ -203,7 +203,7 @@ class ShakespeareSonnetTemplate(PoetryTemplate):
 class VillanelleTemplate(PoetryTemplate):
     """Villanelle: 19 lines, ABA...ABAA scheme, two cycling refrains, free length."""
 
-    name = "维拉内拉诗"
+    name = "Villanelle"
     language = "en"
     lines = 19
     special_rules = (
@@ -302,7 +302,7 @@ class HeroicCoupletTemplate(PoetryTemplate):
     Couplets can be stacked continuously.
     """
 
-    name = "英雄双行体"
+    name = "Heroic Couplet"
     language = "en"
     lines = 2
     special_rules = ("Each line has at least 4 stressed syllables",)

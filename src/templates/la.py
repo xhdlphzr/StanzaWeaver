@@ -112,7 +112,7 @@ def _validate_hex(syls: list[Syllable]) -> list[str]:
 class HexameterTemplate(PoetryTemplate):
     """Hexameter: a single line, stackable, validated line by line."""
 
-    name = "六步格"
+    name = "Hexameter"
     language = "la"
     lines = 1
     special_rules = ("Six-foot structure", "Foot 5 must be a dactyl")
@@ -161,7 +161,7 @@ class DistichonTemplate(PoetryTemplate):
     The last 6 syllables of line 2 are two complete dactyls.
     """
 
-    name = "哀歌双行体"
+    name = "Elegiac Distich"
     language = "la"
     lines = 2
     special_rules = (
@@ -273,7 +273,7 @@ class DistichonTemplate(PoetryTemplate):
 class HendecasyllabusTemplate(PoetryTemplate):
     """Hendecasyllable: 5 feet, with a word boundary between syllables 5 and 6."""
 
-    name = "十一音节诗"
+    name = "Hendecasyllable"
     language = "la"
     lines = 1
     special_rules = (

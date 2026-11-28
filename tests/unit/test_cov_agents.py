@@ -329,7 +329,8 @@ def test_fire_stream_swallows_exception() -> None:
 def test_build_checker_system_parallelism() -> None:
     """Verify regulated-verse templates include the antithesis check note."""
     text = _build_checker_system(
-        ["a", "b"], {"name": "五言律诗", "language": "zh", "lines": 8}
+        ["a", "b"],
+        {"name": "Five-Character Regulated Verse", "language": "zh", "lines": 8},
     )
     assert "Antithesis check" in text
 

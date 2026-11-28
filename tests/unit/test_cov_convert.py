@@ -145,7 +145,7 @@ def test_convert_builtin_sonnet_carries_rhyme() -> None:
     )
     assert error is None
     assert spec["status"] == "ok"
-    assert spec["source_name"] == "莎士比亚商籁体"
+    assert spec["source_name"] == "Shakespearean Sonnet"
     assert spec["source_language"] == "en"
     assert spec["language"] == "zh"
     assert spec["lines"] == 14

@@ -62,7 +62,7 @@ def _check_rhyme_group(
 class RondeauTemplate(PoetryTemplate):
     """Rondeau: 15 lines in three stanzas, AABBA AAB AABBA, refrains on 9 and 15."""
 
-    name = "回旋诗"
+    name = "Rondeau"
     language = "fr"
     lines = 15
     special_rules = ("Refrains must be repeated verbatim",)
@@ -123,7 +123,7 @@ class RondeauTemplate(PoetryTemplate):
 class TrioletTemplate(PoetryTemplate):
     """Triolet: 8 lines, ABaAabAB scheme, lines 1/4/7 and 2/8 are refrains."""
 
-    name = "三韵叠句诗"
+    name = "Triolet"
     language = "fr"
     lines = 8
     special_rules = ("Refrains must be repeated verbatim",)
@@ -178,7 +178,7 @@ class TrioletTemplate(PoetryTemplate):
 class BalladeTemplate(PoetryTemplate):
     """Ballade: 28 lines (3 stanzas of 8 + 4-line envoi), ababbcbc, final refrain."""
 
-    name = "叙事歌"
+    name = "Ballade"
     language = "fr"
     lines = 28
     special_rules = (

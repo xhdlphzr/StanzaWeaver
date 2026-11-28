@@ -462,7 +462,7 @@ class WujueTemplate(PoetryTemplate):
     Tones are fixed at positions 2/4; even lines rhyme on a level tone.
     """
 
-    name = "五言绝句"
+    name = "Five-Character Quatrain"
     language = "zh"
     lines = 4
     structural_rules = _JINTI_WUJUE
@@ -533,7 +533,7 @@ class QijueTemplate(PoetryTemplate):
     Tones are fixed at positions 2/4/6; even lines rhyme on a level tone.
     """
 
-    name = "七言绝句"
+    name = "Seven-Character Quatrain"
     language = "zh"
     lines = 4
     structural_rules = _JINTI_QIJUE
@@ -604,7 +604,7 @@ class WulvTemplate(PoetryTemplate):
     Even lines rhyme on a level tone (antithesis is checked by the review AI).
     """
 
-    name = "五言律诗"
+    name = "Five-Character Regulated Verse"
     language = "zh"
     lines = 8
     structural_rules = _JINTI_WULV
@@ -680,7 +680,7 @@ class QilvTemplate(PoetryTemplate):
     Even lines rhyme on a level tone (antithesis is checked by the review AI).
     """
 
-    name = "七言律诗"
+    name = "Seven-Character Regulated Verse"
     language = "zh"
     lines = 8
     structural_rules = _JINTI_QILV
@@ -757,7 +757,7 @@ class XiangjianhuanTemplate(PoetryTemplate):
     changes to two oblique-tone rhymes, then returns to level-tone rhyme.
     """
 
-    name = "相见欢"
+    name = "Joy of Meeting"
     language = "zh"
     lines = 7
     special_rules = (
@@ -898,7 +898,7 @@ class RumenglingTemplate(PoetryTemplate):
     and 6 must be an identical refrain.
     """
 
-    name = "如梦令"
+    name = "Like a Dream"
     language = "zh"
     lines = 7
     special_rules = ("Lines 5 and 6 must be an identical refrain (verbatim)",)
@@ -982,7 +982,7 @@ class LangtaoshaTemplate(PoetryTemplate):
     rhymes, with a single rhyme throughout.
     """
 
-    name = "浪淘沙"
+    name = "Waves Washing the Sand"
     language = "zh"
     lines = 10
     rhyme_scheme = "AAA-AAAA-A"
@@ -1070,7 +1070,7 @@ class QingpingyueTemplate(PoetryTemplate):
     a rhyme change between stanzas.
     """
 
-    name = "清平乐"
+    name = "Pure Serene Music"
     language = "zh"
     lines = 8
     special_rules = (
