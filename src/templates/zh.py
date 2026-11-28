@@ -469,9 +469,12 @@ class WujueTemplate(PoetryTemplate):
     rhyme_scheme = "-A-A"
     syllables_per_line: ClassVar[list[int]] = [5, 5, 5, 5]
     rule_description = (
-        "格律规则：每句第2、4字平仄相间；每联上下句第2、4字平仄相对；"
-        "下一联首句与上一联对句第2、4字平仄相粘；"
-        "偶数句押平声韵，首句尾字可押韵(平)可不押韵(仄)；忌三平尾、孤平。"
+        "Rules: characters 2 and 4 of every line alternate in tone; the two "
+        "lines of a couplet oppose each other at characters 2 and 4; the first "
+        "line of each couplet adheres in tone to the responding line of the "
+        "previous couplet at characters 2 and 4; even lines rhyme on a level "
+        "tone, and the first line's final character may rhyme (level) or not "
+        "(oblique); avoid a three-level-tone tail and isolated level."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
@@ -537,9 +540,12 @@ class QijueTemplate(PoetryTemplate):
     rhyme_scheme = "-A-A"
     syllables_per_line: ClassVar[list[int]] = [7, 7, 7, 7]
     rule_description = (
-        "格律规则：每句第2、4、6字平仄相间；每联上下句第2、4、6字平仄相对；"
-        "下一联首句与上一联对句第2、4、6字平仄相粘；"
-        "偶数句押平声韵，首句尾字可押韵(平)可不押韵(仄)；忌三平尾、孤平。"
+        "Rules: characters 2, 4 and 6 of every line alternate in tone; the two "
+        "lines of a couplet oppose each other at characters 2, 4 and 6; the "
+        "first line of each couplet adheres in tone to the responding line of "
+        "the previous couplet at characters 2, 4 and 6; even lines rhyme on a "
+        "level tone, and the first line's final character may rhyme (level) "
+        "or not (oblique); avoid a three-level-tone tail and isolated level."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
@@ -755,17 +761,21 @@ class XiangjianhuanTemplate(PoetryTemplate):
     language = "zh"
     lines = 7
     special_rules = (
-        "下阕平韵须转回上阕同部",
-        "下阕仄韵须与平韵不同部（换韵）",
-        "上下阕末句末三字不宜全平",
+        "The lower stanza's level rhyme must return to the upper stanza's rhyme group",
+        "The lower stanza's oblique rhyme must differ from the level rhyme group",
+        "Both stanzas' final lines should not end in three level tones",
     )
     rhyme_scheme = "AAABBAA"
     centered = False
     syllables_per_line: ClassVar[list[int]] = [6, 3, 9, 3, 3, 3, 9]
     rule_description = (
-        "格律规则：上阕3句三平韵（中平中仄平平/仄平平/中仄中平平仄仄平平）；"
-        "下阕4句先两仄韵（中中仄/中平仄）换韵、再转回平韵（仄平平/中仄中平平仄仄平平），"
-        "下阕平韵须与上阕同部；上下阕末句末三字不宜全平。"
+        "Rules: the upper stanza's 3 lines all rhyme on level tones "
+        "(中平中仄平平 / 仄平平 / 中仄中平平仄仄平平); the lower stanza's 4 "
+        "lines first change to two oblique-tone rhymes (中中仄 / 中平仄), then "
+        "return to a level rhyme (仄平平 / 中仄中平平仄仄平平), and the lower "
+        "stanza's level rhyme must be in the same group as the upper "
+        "stanza's; the last three characters of the final line in both "
+        "stanzas should not all be level."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
@@ -891,13 +901,16 @@ class RumenglingTemplate(PoetryTemplate):
     name = "如梦令"
     language = "zh"
     lines = 7
-    special_rules = ("第5、6句须为叠句（原文相同）",)
+    special_rules = ("Lines 5 and 6 must be an identical refrain (verbatim)",)
     rhyme_scheme = "AA-AAAA"
     centered = False
     syllables_per_line: ClassVar[list[int]] = [6, 6, 5, 6, 2, 2, 6]
     rule_description = (
-        "格律规则：单调七句，全押仄声韵（一韵到底）；第5、6句为二字叠句须完全相同；"
-        "谱式：中仄中平中仄/中仄中平中仄/中仄仄平平/中仄中平中仄/中仄/中仄/中仄中平中仄。"
+        "Rules: a single tune of seven lines, rhyming throughout on oblique "
+        "tones (one rhyme from start to finish); lines 5 and 6 are a "
+        "two-character refrain and must be exactly identical; tone patterns: "
+        "中仄中平中仄 / 中仄中平中仄 / 中仄仄平平 / 中仄中平中仄 / 中仄 / "
+        "中仄 / 中仄中平中仄."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
@@ -976,8 +989,11 @@ class LangtaoshaTemplate(PoetryTemplate):
     centered = False
     syllables_per_line: ClassVar[list[int]] = [5, 4, 7, 7, 4, 5, 4, 7, 7, 4]
     rule_description = (
-        "格律规则：双调十句，上下片各五句四平韵（第4、9句为句不入韵），一韵到底；"
-        "谱式（上下片同）：中仄仄平平/中仄平平/中平中仄仄平平/中仄中平平仄仄/中仄平平。"
+        "Rules: a double tune of ten lines; the upper and lower stanzas each "
+        "have five lines and four level-tone rhymes (lines 4 and 9 do not "
+        "rhyme), with one rhyme throughout; tone patterns (the same for both "
+        "stanzas): 中仄仄平平 / 中仄平平 / 中平中仄仄平平 / 中仄中平平仄仄 / "
+        "中仄平平."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:
@@ -1057,15 +1073,19 @@ class QingpingyueTemplate(PoetryTemplate):
     name = "清平乐"
     language = "zh"
     lines = 8
-    special_rules = ("上下片换韵须不同部",)
+    special_rules = (
+        "The stanzas change rhyme; the two rhymes must be in different groups",
+    )
     rhyme_scheme = "AAAABB-B"
     centered = False
     syllables_per_line: ClassVar[list[int]] = [4, 5, 7, 6, 6, 6, 6, 6]
     rule_description = (
-        "格律规则：上片四句句句押仄韵，下片四句隔句押平韵（第7句为句不入韵），"
-        "上下片换韵；"
-        "谱式：上片中平中仄/中仄平平仄/中仄中平平仄仄/中仄中平中仄，"
-        "下片中平中仄平平/中平中仄平平/中仄中平中仄/中平中仄平平。"
+        "Rules: the upper stanza's four lines each rhyme on oblique tones; "
+        "the lower stanza's four lines rhyme on level tones on alternate "
+        "lines (line 7 does not rhyme); the two stanzas change rhyme; tone "
+        "patterns: upper stanza 中平中仄 / 中仄平平仄 / 中仄中平平仄仄 / "
+        "中仄中平中仄, lower stanza 中平中仄平平 / 中平中仄平平 / "
+        "中仄中平中仄 / 中平中仄平平."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable:

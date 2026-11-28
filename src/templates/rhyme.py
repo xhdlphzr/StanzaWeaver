@@ -305,4 +305,4 @@ def rhyme_scheme_description(scheme: str) -> str:
     if not cleaned:
         return ""
     grouped = " ".join(cleaned[i : i + 4] for i in range(0, len(cleaned), 4))
-    return f"韵式 {grouped}"
+    return f"Rhyme scheme {grouped}"

@@ -65,15 +65,17 @@ class RondeauTemplate(PoetryTemplate):
     name = "回旋诗"
     language = "fr"
     lines = 15
-    special_rules = ("叠句须原样重复",)
+    special_rules = ("Refrains must be repeated verbatim",)
     rhyme_scheme = "AABBAAABAAABBAA"
     # Each line allows 8 or 10 syllables (classic rondeaux use 10 throughout).
     syllables_per_line: ClassVar[list[int | tuple[int, int]]] = [(8, 10)] * 15
     _refrain_lines: ClassVar[list[int]] = [8, 14]  # 0-based: refrains on lines 9, 15
     rule_description = (
-        "格律规则：15行，分三节（5+4+6）；韵式 AABBA AAB AABBA（仅用A、B两韵）；"
-        "每行8音节（可放宽至10，但全诗统一）；"
-        "第1行首半句在第9行和第15行末尾原样重复为叠句。"
+        "Rules: 15 lines in three stanzas (5+4+6); rhyme scheme "
+        "AABBA AAB AABBA (only the two rhymes A and B are used); each line "
+        "has 8 syllables (may be relaxed to 10, but must be uniform across "
+        "the whole poem); the first half-line of line 1 repeats verbatim at "
+        "the end of lines 9 and 15 as a refrain."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
@@ -124,13 +126,14 @@ class TrioletTemplate(PoetryTemplate):
     name = "三韵叠句诗"
     language = "fr"
     lines = 8
-    special_rules = ("叠句须原样重复",)
+    special_rules = ("Refrains must be repeated verbatim",)
     rhyme_scheme = "ABAAABAB"
     syllables_per_line = [8] * 8
     rule_description = (
-        "格律规则：8行，每行8音节；韵式 ABaAabAB："
-        "第1、4、7行同为A叠句原样重复，第2、8行同为B叠句原样重复；"
-        "第3、5行押A韵（a），第6行押B韵（b）。"
+        "Rules: 8 lines of 8 syllables each; rhyme scheme ABaAabAB: lines 1, "
+        "4 and 7 are the same A refrain repeated verbatim, and lines 2 and 8 "
+        "are the same B refrain repeated verbatim; lines 3 and 5 rhyme on A "
+        "(a), and line 6 rhymes on B (b)."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:
@@ -178,15 +181,20 @@ class BalladeTemplate(PoetryTemplate):
     name = "叙事歌"
     language = "fr"
     lines = 28
-    special_rules = ("叠句须原样重复", "全诗音节数须统一")
+    special_rules = (
+        "Refrains must be repeated verbatim",
+        "Syllable counts must be uniform throughout the poem",
+    )
     rhyme_scheme = "ABABBCBCABABBCBCABABBCBCBCBC"
     syllables_per_line: ClassVar[list[int | tuple[int, int]]] = []
     _refrain_line = 27
     rule_description = (
-        "格律规则：28行（3个8行诗节+1个4行跋）；每节韵式 ababbcbc，"
-        "三节及跋使用相同的A、B、C三个韵脚；"
-        "每节末行（第8、16、24行）与跋末行（第28行）为完全相同的叠句；"
-        "全诗每行音节数统一为8或10音节。"
+        "Rules: 28 lines (3 stanzas of 8 lines + a 4-line envoi); each "
+        "stanza rhymes ababbcbc, and the three stanzas and the envoi use the "
+        "same three rhymes A, B and C; the last line of each stanza (lines 8, "
+        "16 and 24) and the last line of the envoi (line 28) are an identical "
+        "refrain; every line of the poem has a uniform syllable count of 8 or "
+        "10."
     )
 
     def get_syllable_constraints(self) -> ConstraintTable | None:

@@ -1235,22 +1235,33 @@ def _build_custom_template_code(
     )
     rule_parts = [
         (
-            f"自定义格律模板：共 {lines} 行，"
-            f"每行音节数依次为 {', '.join(str(s) for s in syllables_per_line)}"
+            f"Custom meter template: {lines} lines; syllables per line: "
+            f"{', '.join(str(s) for s in syllables_per_line)}"
         )
     ]
     if len(tables) > 1:
-        rule_parts.append(f"共 {len(tables)} 种可选音节约束，满足任意一种即可")
+        rule_parts.append(
+            f"{len(tables)} alternative syllable-constraint variants; "
+            "satisfying any one is enough"
+        )
     from src.templates.rhyme import rhyme_scheme_description
 
     rhyme_desc = rhyme_scheme_description(rhyme_scheme)
     if rhyme_desc:
         rule_parts.append(
-            rhyme_desc + ("（不同韵组须互不相同）" if rhyme_distinct else "")
+            rhyme_desc
+            + (
+                " (distinct rhyme groups must not share words)"
+                if rhyme_distinct
+                else ""
+            )
         )
     if structural_rules:
-        rule_parts.append("近体诗结构规则（平仄骨架/三平尾/孤平/押韵）随转化保留")
-    rule_description = "；".join(rule_parts) + "。"
+        rule_parts.append(
+            "Near-style (jinti) structural rules (tone skeleton / three-level "
+            "tail / isolated level / rhyme) are preserved by conversion"
+        )
+    rule_description = "; ".join(rule_parts) + "."
     code_body = (
         f"# Copyright (c) 2026 xhdlphzr\n"
         f"{spdx_line}\n"
