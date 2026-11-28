@@ -381,7 +381,7 @@ def test_convert_success_carries_rhyme(client: FlaskClient) -> None:
     assert data["language"] == "en"
     assert data["lines"] == 7
     assert data["rhyme_scheme"] == "AAABBAA"
-    assert data["source_name"] == "相见欢"
+    assert data["source_name"] == "Joy of Meeting"
     values = {
         cell["attributes"]["stress"]
         for table in data["alternatives"]

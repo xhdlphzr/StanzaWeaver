@@ -60,7 +60,10 @@ def _build_checker_system(
     """
     parallelism_note = ""
     dim_count = 5
-    if template.get("name") in ("五言律诗", "七言律诗"):
+    if template.get("name") in (
+        "Five-Character Regulated Verse",
+        "Seven-Character Regulated Verse",
+    ):
         parallelism_note = """
 6. **Antithesis check**: Check whether the jaw couplet (lines 3-4) and the neck
 couplet (lines 5-6) are antithetical in part of speech and structure. Sentence

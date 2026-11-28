@@ -90,7 +90,7 @@ def _check_rhyme_group(
 class TerzaRimaTemplate(PoetryTemplate):
     """Terza rima: 14 eleven-syllable lines, interlocking rhyme ABA BCB CDC DED EE."""
 
-    name = "三行体"
+    name = "Terza Rima"
     language = "it"
     lines = 14
     special_rules = ("The 10th syllable must be stressed",)
@@ -143,7 +143,7 @@ class TerzaRimaTemplate(PoetryTemplate):
 class OttavaRimaTemplate(PoetryTemplate):
     """Ottava rima: 8 eleven-syllable lines, ABABABCC scheme."""
 
-    name = "八行体"
+    name = "Ottava Rima"
     language = "it"
     lines = 8
     special_rules = ("The 10th syllable must be stressed",)
@@ -197,7 +197,7 @@ class CanzoneTemplate(PoetryTemplate):
     most 4 rhymes are used.
     """
 
-    name = "歌谣"
+    name = "Canzone"
     language = "it"
     lines = 13
     special_rules = (
